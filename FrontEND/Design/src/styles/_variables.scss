@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap');
+
+:root {
+  --bg-page: #f4f6f8;
+  --bg-surface: #ffffff;
+  --text-primary: #1f2328;
+  --text-secondary: #6b7280;
+  --line: #dce3ea;
+
+  --accent: #005bff;
+  --accent-hover: #0047cc;
+  --accent-soft: #eaf2ff;
+
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #e5484d;
+
+  --radius-xl: 20px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 10px;
+
+  --shadow-card: 0 8px 22px rgba(16, 24, 40, 0.06);
+  --shadow-soft: 0 4px 12px rgba(16, 24, 40, 0.05);
+
+  --font-heading: 'Manrope', 'Inter', 'Segoe UI', sans-serif;
+  --font-body: 'Inter', 'Manrope', 'Segoe UI', sans-serif;
+}
+
