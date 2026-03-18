@@ -21,6 +21,32 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+
+# .NET / C#
+**/bin/
+**/obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+_ReSharper*/
+*.DotSettings.user
+
+# EF / local DB files
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker local
+docker-compose.override.yml
+*.pid
 
 # Local artifacts
 ifelse_task2.1.pdf

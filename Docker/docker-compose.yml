@@ -1,0 +1,79 @@
+﻿services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: tramplin_db
+    environment:
+      POSTGRES_USER: tramplin
+      POSTGRES_PASSWORD: tramplin
+      POSTGRES_DB: tramplin_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tramplin -d tramplin_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    container_name: tramplin_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: tramplin_minio_init
+    depends_on:
+      - minio
+    volumes:
+      - ./minio/init.sh:/init.sh:ro
+      - ./minio/seed/companies:/seed/companies:ro
+    entrypoint: ["/bin/sh", "/init.sh"]
+    restart: "no"
+
+  api:
+    build:
+      context: ../BackEND/Monolith/Monolith
+      dockerfile: Dockerfile
+    container_name: tramplin_api
+    depends_on:
+      db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=tramplin_db;Username=tramplin;Password=tramplin
+      Jwt__Issuer: Tramplin.Api
+      Jwt__Audience: Tramplin.Client
+      Jwt__Secret: CHANGE_THIS_SECRET_TO_A_LONG_RANDOM_KEY_32_BYTES_MIN_1234567890
+      Jwt__AccessTokenMinutes: 15
+      Jwt__RefreshTokenDays: 30
+      Minio__Endpoint: minio:9000
+      Minio__AccessKey: minioadmin
+      Minio__SecretKey: minioadmin
+      Minio__Bucket: tramplin-media
+      Minio__UseSsl: "false"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: tramplin_nginx
+    depends_on:
+      - api
+      - minio
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "1488:1488"
+
+volumes:
+  pg_data:
+  minio_data:
+

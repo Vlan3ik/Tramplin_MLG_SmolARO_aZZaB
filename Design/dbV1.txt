@@ -1,0 +1,980 @@
+-- =========================================================
+-- Трамплин / PostgreSQL + PostGIS
+-- Полный DDL
+-- =========================================================
+
+-- CREATE DATABASE trampolin_db;
+-- \c trampolin_db;
+
+CREATE EXTENSION IF NOT EXISTS citext;
+CREATE EXTENSION IF NOT EXISTS postgis;
+
+-- =========================================================
+-- ENUM TYPES
+-- =========================================================
+
+CREATE TYPE account_status AS ENUM (
+    'active',
+    'blocked',
+    'deleted'
+);
+
+CREATE TYPE platform_role AS ENUM (
+    'seeker',
+    'employer',
+    'curator'
+);
+
+CREATE TYPE curator_level AS ENUM (
+    'admin',
+    'moderator'
+);
+
+CREATE TYPE company_legal_type AS ENUM (
+    'legal_entity',
+    'individual_entrepreneur'
+);
+
+CREATE TYPE company_status AS ENUM (
+    'draft',
+    'pending_verification',
+    'verified',
+    'rejected',
+    'blocked'
+);
+
+CREATE TYPE verification_status AS ENUM (
+    'draft',
+    'submitted',
+    'under_review',
+    'approved',
+    'rejected',
+    'needs_revision'
+);
+
+CREATE TYPE verification_method AS ENUM (
+    'tax_id',
+    'registration_number',
+    'official_website',
+    'professional_network',
+    'supporting_document',
+    'manual_review'
+);
+
+CREATE TYPE company_document_kind AS ENUM (
+    'registration_certificate',
+    'tax_registry_extract',
+    'charter',
+    'power_of_attorney',
+    'other'
+);
+
+CREATE TYPE catalog_status AS ENUM (
+    'active',
+    'pending',
+    'archived'
+);
+
+CREATE TYPE skill_level AS ENUM (
+    'basic',
+    'intermediate',
+    'advanced',
+    'expert'
+);
+
+CREATE TYPE education_status AS ENUM (
+    'studying',
+    'graduated',
+    'academic_leave',
+    'dropped'
+);
+
+CREATE TYPE opportunity_type AS ENUM (
+    'internship',
+    'vacancy',
+    'mentorship_program',
+    'career_event'
+);
+
+CREATE TYPE work_format AS ENUM (
+    'onsite',
+    'hybrid',
+    'remote'
+);
+
+CREATE TYPE opportunity_status AS ENUM (
+    'draft',
+    'pending_moderation',
+    'planned',
+    'published',
+    'closed',
+    'rejected',
+    'archived'
+);
+
+CREATE TYPE application_status AS ENUM (
+    'sent',
+    'under_review',
+    'reserve',
+    'accepted',
+    'rejected',
+    'withdrawn'
+);
+
+CREATE TYPE privacy_scope AS ENUM (
+    'private',
+    'contacts_only',
+    'authorized_users'
+);
+
+CREATE TYPE contact_request_status AS ENUM (
+    'pending',
+    'accepted',
+    'declined',
+    'cancelled'
+);
+
+CREATE TYPE company_member_role AS ENUM (
+    'owner',
+    'recruiter',
+    'manager'
+);
+
+CREATE TYPE link_type AS ENUM (
+    'website',
+    'telegram',
+    'vk',
+    'github',
+    'gitlab',
+    'linkedin',
+    'hh',
+    'habr_career',
+    'youtube',
+    'rutube',
+    'other'
+);
+
+CREATE TYPE media_type AS ENUM (
+    'image',
+    'video',
+    'document'
+);
+
+CREATE TYPE contact_type AS ENUM (
+    'email',
+    'phone',
+    'telegram',
+    'whatsapp',
+    'website',
+    'other'
+);
+
+CREATE TYPE moderation_action AS ENUM (
+    'approve',
+    'reject',
+    'request_changes',
+    'block',
+    'unblock',
+    'edit'
+);
+
+CREATE TYPE geocode_source AS ENUM (
+    'manual',
+    'reverse_geocoding_api'
+);
+
+-- =========================================================
+-- SERVICE FUNCTION
+-- =========================================================
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+-- =========================================================
+-- CITIES / UNIVERSITIES / LOCATIONS
+-- =========================================================
+
+CREATE TABLE cities (
+    id              BIGSERIAL PRIMARY KEY,
+    country_code    CHAR(2) NOT NULL,
+    region_name     VARCHAR(200) NOT NULL DEFAULT '',
+    city_name       VARCHAR(200) NOT NULL,
+    latitude        NUMERIC(9,6),
+    longitude       NUMERIC(9,6),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_cities_latitude
+        CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
+    CONSTRAINT chk_cities_longitude
+        CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180)
+);
+
+CREATE UNIQUE INDEX uq_cities_country_region_city
+    ON cities (country_code, region_name, city_name);
+
+CREATE TRIGGER trg_cities_updated_at
+BEFORE UPDATE ON cities
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE universities (
+    id              BIGSERIAL PRIMARY KEY,
+    city_id         BIGINT REFERENCES cities(id) ON DELETE SET NULL,
+    full_name       VARCHAR(300) NOT NULL,
+    short_name      VARCHAR(100),
+    website_url     VARCHAR(500),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX uq_universities_full_name
+    ON universities (full_name);
+
+CREATE TRIGGER trg_universities_updated_at
+BEFORE UPDATE ON universities
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE locations (
+    id                  BIGSERIAL PRIMARY KEY,
+    city_id             BIGINT NOT NULL REFERENCES cities(id) ON DELETE RESTRICT,
+    geo_point           geometry(Point, 4326) NOT NULL,
+    street_name         VARCHAR(200),
+    house_number        VARCHAR(50),
+    geocode_source      geocode_source NOT NULL DEFAULT 'manual',
+    geocoded_at         TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_locations_street_or_house
+        CHECK (
+            (street_name IS NULL AND house_number IS NULL)
+            OR
+            (street_name IS NOT NULL)
+        )
+);
+
+CREATE INDEX idx_locations_city_id
+    ON locations (city_id);
+
+CREATE INDEX idx_locations_geo_point
+    ON locations
+    USING GIST (geo_point);
+
+CREATE TRIGGER trg_locations_updated_at
+BEFORE UPDATE ON locations
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+-- =========================================================
+-- USERS / ROLES
+-- =========================================================
+
+CREATE TABLE users (
+    id              BIGSERIAL PRIMARY KEY,
+    email           CITEXT NOT NULL,
+    password_hash   TEXT NOT NULL,
+    display_name    VARCHAR(150) NOT NULL,
+    status          account_status NOT NULL DEFAULT 'active',
+    last_login_at   TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_users_email UNIQUE (email)
+);
+
+CREATE TRIGGER trg_users_updated_at
+BEFORE UPDATE ON users
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE user_roles (
+    user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role            platform_role NOT NULL,
+    assigned_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, role)
+);
+
+-- =========================================================
+-- SEEKER
+-- =========================================================
+
+CREATE TABLE candidate_profiles (
+    user_id          BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    last_name        VARCHAR(100) NOT NULL,
+    first_name       VARCHAR(100) NOT NULL,
+    middle_name      VARCHAR(100),
+    phone            VARCHAR(30),
+    about            TEXT,
+    avatar_url       VARCHAR(500),
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_candidate_profiles_updated_at
+BEFORE UPDATE ON candidate_profiles
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE candidate_privacy_settings (
+    user_id                      BIGINT PRIMARY KEY REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    profile_visibility           privacy_scope NOT NULL DEFAULT 'authorized_users',
+    resume_visibility            privacy_scope NOT NULL DEFAULT 'authorized_users',
+    portfolio_visibility         privacy_scope NOT NULL DEFAULT 'authorized_users',
+    applications_visibility      privacy_scope NOT NULL DEFAULT 'private',
+    contacts_visibility          privacy_scope NOT NULL DEFAULT 'authorized_users',
+    show_contacts_in_resume      BOOLEAN NOT NULL DEFAULT FALSE,
+    show_salary_expectations     BOOLEAN NOT NULL DEFAULT FALSE,
+    show_portfolio               BOOLEAN NOT NULL DEFAULT TRUE,
+    open_to_work                 BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_at                   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_candidate_privacy_settings_updated_at
+BEFORE UPDATE ON candidate_privacy_settings
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE candidate_resume_profiles (
+    user_id              BIGINT PRIMARY KEY REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    headline             VARCHAR(200),
+    desired_position     VARCHAR(200),
+    summary              TEXT,
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_candidate_resume_profiles_updated_at
+BEFORE UPDATE ON candidate_resume_profiles
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE candidate_educations (
+    id                  BIGSERIAL PRIMARY KEY,
+    user_id             BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    university_id       BIGINT NOT NULL REFERENCES universities(id) ON DELETE RESTRICT,
+    faculty_name        VARCHAR(200),
+    program_name        VARCHAR(200),
+    education_status    education_status NOT NULL,
+    course_number       SMALLINT,
+    graduation_year     SMALLINT,
+    is_primary          BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_candidate_educations_course
+        CHECK (course_number IS NULL OR course_number BETWEEN 1 AND 8),
+    CONSTRAINT chk_candidate_educations_grad_year
+        CHECK (graduation_year IS NULL OR graduation_year BETWEEN 2000 AND 2100)
+);
+
+CREATE INDEX idx_candidate_educations_user_id
+    ON candidate_educations (user_id);
+
+CREATE TRIGGER trg_candidate_educations_updated_at
+BEFORE UPDATE ON candidate_educations
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE candidate_links (
+    id              BIGSERIAL PRIMARY KEY,
+    user_id         BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    link_kind       link_type NOT NULL,
+    label           VARCHAR(150),
+    url             VARCHAR(500) NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_candidate_links_user_id
+    ON candidate_links (user_id);
+
+CREATE TABLE candidate_portfolio_projects (
+    id                  BIGSERIAL PRIMARY KEY,
+    user_id             BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    title               VARCHAR(200) NOT NULL,
+    description         TEXT NOT NULL,
+    solution_url        VARCHAR(500) NOT NULL,
+    resource_url        VARCHAR(500),
+    image_url           VARCHAR(500),
+    started_on          DATE,
+    finished_on         DATE,
+    sort_order          INTEGER NOT NULL DEFAULT 0,
+    is_featured         BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_candidate_portfolio_dates
+        CHECK (finished_on IS NULL OR started_on IS NULL OR finished_on >= started_on)
+);
+
+CREATE INDEX idx_candidate_portfolio_projects_user_id
+    ON candidate_portfolio_projects (user_id);
+
+CREATE TRIGGER trg_candidate_portfolio_projects_updated_at
+BEFORE UPDATE ON candidate_portfolio_projects
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE candidate_salary_expectations (
+    user_id          BIGINT PRIMARY KEY REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    salary_from      NUMERIC(12,2),
+    salary_to        NUMERIC(12,2),
+    currency_code    CHAR(3),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_candidate_salary_expectations
+        CHECK (
+            (salary_from IS NULL OR salary_from >= 0) AND
+            (salary_to IS NULL OR salary_to >= 0) AND
+            (salary_from IS NULL OR salary_to IS NULL OR salary_to >= salary_from)
+        ),
+    CONSTRAINT chk_candidate_salary_currency
+        CHECK (currency_code IS NULL OR currency_code ~ '^[A-Z]{3}$')
+);
+
+CREATE TRIGGER trg_candidate_salary_expectations_updated_at
+BEFORE UPDATE ON candidate_salary_expectations
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+-- =========================================================
+-- TAGS
+-- =========================================================
+
+CREATE TABLE tag_groups (
+    id              BIGSERIAL PRIMARY KEY,
+    code            VARCHAR(50) NOT NULL,
+    name            VARCHAR(100) NOT NULL,
+    description     TEXT,
+    is_system       BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_tag_groups_code UNIQUE (code),
+    CONSTRAINT uq_tag_groups_name UNIQUE (name)
+);
+
+CREATE TRIGGER trg_tag_groups_updated_at
+BEFORE UPDATE ON tag_groups
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE tags (
+    id                  BIGSERIAL PRIMARY KEY,
+    group_id            BIGINT NOT NULL REFERENCES tag_groups(id) ON DELETE RESTRICT,
+    created_by_user_id  BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    name                VARCHAR(100) NOT NULL,
+    slug                VARCHAR(120) NOT NULL,
+    description         TEXT,
+    status              catalog_status NOT NULL DEFAULT 'active',
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_tags_slug UNIQUE (slug),
+    CONSTRAINT uq_tags_group_name UNIQUE (group_id, name)
+);
+
+CREATE INDEX idx_tags_group_id
+    ON tags (group_id);
+
+CREATE INDEX idx_tags_status
+    ON tags (status);
+
+CREATE TRIGGER trg_tags_updated_at
+BEFORE UPDATE ON tags
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE candidate_skills (
+    user_id             BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    tag_id              BIGINT NOT NULL REFERENCES tags(id) ON DELETE RESTRICT,
+    proficiency         skill_level NOT NULL DEFAULT 'basic',
+    years_experience    NUMERIC(4,1),
+    is_primary          BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (user_id, tag_id),
+    CONSTRAINT chk_candidate_skills_years
+        CHECK (years_experience IS NULL OR years_experience >= 0)
+);
+
+CREATE INDEX idx_candidate_skills_tag_id
+    ON candidate_skills (tag_id);
+
+CREATE TABLE candidate_interest_tags (
+    user_id         BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    tag_id          BIGINT NOT NULL REFERENCES tags(id) ON DELETE RESTRICT,
+    PRIMARY KEY (user_id, tag_id)
+);
+
+CREATE INDEX idx_candidate_interest_tags_tag_id
+    ON candidate_interest_tags (tag_id);
+
+CREATE TABLE candidate_preferred_formats (
+    user_id         BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    format          work_format NOT NULL,
+    PRIMARY KEY (user_id, format)
+);
+
+CREATE TABLE candidate_preferred_opportunity_types (
+    user_id         BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    opp_type        opportunity_type NOT NULL,
+    PRIMARY KEY (user_id, opp_type)
+);
+
+CREATE TABLE candidate_preferred_cities (
+    user_id         BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    city_id         BIGINT NOT NULL REFERENCES cities(id) ON DELETE RESTRICT,
+    PRIMARY KEY (user_id, city_id)
+);
+
+-- =========================================================
+-- SEEKER NETWORKING
+-- =========================================================
+
+CREATE TABLE contact_requests (
+    id                  BIGSERIAL PRIMARY KEY,
+    requester_user_id   BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    addressee_user_id   BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    status              contact_request_status NOT NULL DEFAULT 'pending',
+    message             VARCHAR(500),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    responded_at        TIMESTAMPTZ,
+    CONSTRAINT chk_contact_requests_self
+        CHECK (requester_user_id <> addressee_user_id)
+);
+
+CREATE UNIQUE INDEX uq_contact_requests_pending_pair
+    ON contact_requests (
+        LEAST(requester_user_id, addressee_user_id),
+        GREATEST(requester_user_id, addressee_user_id)
+    )
+    WHERE status = 'pending';
+
+CREATE INDEX idx_contact_requests_requester
+    ON contact_requests (requester_user_id, status);
+
+CREATE INDEX idx_contact_requests_addressee
+    ON contact_requests (addressee_user_id, status);
+
+-- =========================================================
+-- COMPANIES / EMPLOYERS / CURATORS
+-- =========================================================
+
+CREATE TABLE companies (
+    id                      BIGSERIAL PRIMARY KEY,
+    legal_name              VARCHAR(300) NOT NULL,
+    brand_name              VARCHAR(300),
+    legal_type              company_legal_type NOT NULL,
+    tax_id                  VARCHAR(20) NOT NULL,
+    registration_number     VARCHAR(20) NOT NULL,
+    industry                VARCHAR(200) NOT NULL,
+    description             TEXT NOT NULL,
+    website_url             VARCHAR(500),
+    public_email            CITEXT,
+    public_phone            VARCHAR(30),
+    base_city_id            BIGINT NOT NULL REFERENCES cities(id) ON DELETE RESTRICT,
+    status                  company_status NOT NULL DEFAULT 'draft',
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_companies_tax_id UNIQUE (tax_id),
+    CONSTRAINT uq_companies_registration_number UNIQUE (registration_number),
+    CONSTRAINT chk_companies_public_contact
+        CHECK (
+            website_url IS NOT NULL
+            OR public_email IS NOT NULL
+            OR public_phone IS NOT NULL
+        )
+);
+
+CREATE INDEX idx_companies_base_city_id
+    ON companies (base_city_id);
+
+CREATE INDEX idx_companies_status
+    ON companies (status);
+
+CREATE TRIGGER trg_companies_updated_at
+BEFORE UPDATE ON companies
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE company_users (
+    company_id          BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    user_id             BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    member_role         company_member_role NOT NULL DEFAULT 'recruiter',
+    job_title           VARCHAR(150),
+    is_primary_contact  BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (company_id, user_id)
+);
+
+CREATE INDEX idx_company_users_user_id
+    ON company_users (user_id);
+
+CREATE UNIQUE INDEX uq_company_users_primary_contact
+    ON company_users (company_id)
+    WHERE is_primary_contact = TRUE;
+
+CREATE TABLE company_locations (
+    id              BIGSERIAL PRIMARY KEY,
+    company_id      BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    location_id     BIGINT NOT NULL REFERENCES locations(id) ON DELETE RESTRICT,
+    is_primary      BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_company_locations UNIQUE (company_id, location_id)
+);
+
+CREATE INDEX idx_company_locations_company_id
+    ON company_locations (company_id);
+
+CREATE UNIQUE INDEX uq_company_locations_one_primary
+    ON company_locations (company_id)
+    WHERE is_primary = TRUE;
+
+CREATE TABLE company_links (
+    id              BIGSERIAL PRIMARY KEY,
+    company_id      BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    link_kind       link_type NOT NULL,
+    label           VARCHAR(150),
+    url             VARCHAR(500) NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_company_links_company_id
+    ON company_links (company_id);
+
+CREATE TABLE company_media (
+    id              BIGSERIAL PRIMARY KEY,
+    company_id      BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    media_kind      media_type NOT NULL,
+    title           VARCHAR(200),
+    url             VARCHAR(500) NOT NULL,
+    sort_order      INTEGER NOT NULL DEFAULT 0,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_company_media_company_id
+    ON company_media (company_id);
+
+CREATE TABLE curator_profiles (
+    user_id          BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    curator_level    curator_level NOT NULL DEFAULT 'moderator',
+    university_id    BIGINT REFERENCES universities(id) ON DELETE SET NULL,
+    notes            TEXT,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_curator_profiles_updated_at
+BEFORE UPDATE ON curator_profiles
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE company_verification_profiles (
+    company_id                   BIGINT PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+    legal_address_text           VARCHAR(500) NOT NULL,
+    representative_full_name     VARCHAR(200) NOT NULL,
+    representative_position      VARCHAR(150) NOT NULL,
+    representative_phone         VARCHAR(30) NOT NULL,
+    representative_email         CITEXT NOT NULL,
+    additional_note              TEXT,
+    created_at                   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at                   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_company_verification_profiles_updated_at
+BEFORE UPDATE ON company_verification_profiles
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE company_verification_requests (
+    id                      BIGSERIAL PRIMARY KEY,
+    company_id              BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    requested_by_user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    status                  verification_status NOT NULL DEFAULT 'draft',
+    review_comment          TEXT,
+    reviewed_by_user_id     BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    submitted_at            TIMESTAMPTZ,
+    reviewed_at             TIMESTAMPTZ,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_company_verification_requests_company_id
+    ON company_verification_requests (company_id);
+
+CREATE INDEX idx_company_verification_requests_status
+    ON company_verification_requests (status);
+
+CREATE TRIGGER trg_company_verification_requests_updated_at
+BEFORE UPDATE ON company_verification_requests
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE company_verification_evidences (
+    id              BIGSERIAL PRIMARY KEY,
+    request_id      BIGINT NOT NULL REFERENCES company_verification_requests(id) ON DELETE CASCADE,
+    method          verification_method NOT NULL,
+    value_text      VARCHAR(500),
+    value_url       VARCHAR(500),
+    note            VARCHAR(500),
+    CONSTRAINT chk_company_verification_evidences_value
+        CHECK (value_text IS NOT NULL OR value_url IS NOT NULL)
+);
+
+CREATE INDEX idx_company_verification_evidences_request_id
+    ON company_verification_evidences (request_id);
+
+CREATE TABLE company_verification_documents (
+    id                  BIGSERIAL PRIMARY KEY,
+    request_id          BIGINT NOT NULL REFERENCES company_verification_requests(id) ON DELETE CASCADE,
+    document_kind       company_document_kind NOT NULL,
+    file_url            VARCHAR(500) NOT NULL,
+    original_file_name  VARCHAR(255),
+    mime_type           VARCHAR(100),
+    note                VARCHAR(500)
+);
+
+CREATE INDEX idx_company_verification_documents_request_id
+    ON company_verification_documents (request_id);
+
+-- =========================================================
+-- OPPORTUNITIES
+-- remote  -> city_id заполнен, location_id NULL
+-- onsite/hybrid -> location_id заполнен, city_id NULL
+-- =========================================================
+
+CREATE TABLE opportunities (
+    id                      BIGSERIAL PRIMARY KEY,
+    company_id              BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    created_by_user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    title                   VARCHAR(300) NOT NULL,
+    short_description       VARCHAR(500) NOT NULL,
+    full_description        TEXT NOT NULL,
+    opp_type                opportunity_type NOT NULL,
+    format                  work_format NOT NULL,
+    status                  opportunity_status NOT NULL DEFAULT 'draft',
+    city_id                 BIGINT REFERENCES cities(id) ON DELETE RESTRICT,
+    location_id             BIGINT REFERENCES locations(id) ON DELETE RESTRICT,
+    salary_from             NUMERIC(12,2),
+    salary_to               NUMERIC(12,2),
+    currency_code           CHAR(3),
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_opportunities_salary
+        CHECK (
+            (salary_from IS NULL OR salary_from >= 0) AND
+            (salary_to IS NULL OR salary_to >= 0) AND
+            (salary_from IS NULL OR salary_to IS NULL OR salary_to >= salary_from)
+        ),
+    CONSTRAINT chk_opportunities_currency
+        CHECK (currency_code IS NULL OR currency_code ~ '^[A-Z]{3}$'),
+    CONSTRAINT chk_opportunities_place
+        CHECK (
+            (format = 'remote' AND city_id IS NOT NULL AND location_id IS NULL)
+            OR
+            (format IN ('onsite', 'hybrid') AND city_id IS NULL AND location_id IS NOT NULL)
+        )
+);
+
+CREATE INDEX idx_opportunities_company_id
+    ON opportunities (company_id);
+
+CREATE INDEX idx_opportunities_city_id
+    ON opportunities (city_id);
+
+CREATE INDEX idx_opportunities_location_id
+    ON opportunities (location_id);
+
+CREATE INDEX idx_opportunities_filter
+    ON opportunities (status, opp_type, format);
+
+CREATE TRIGGER trg_opportunities_updated_at
+BEFORE UPDATE ON opportunities
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE opportunity_schedules (
+    opportunity_id           BIGINT PRIMARY KEY REFERENCES opportunities(id) ON DELETE CASCADE,
+    publish_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    application_deadline     TIMESTAMPTZ,
+    start_at                 TIMESTAMPTZ,
+    end_at                   TIMESTAMPTZ,
+    updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_opportunity_schedules_dates
+        CHECK (
+            (end_at IS NULL OR start_at IS NULL OR end_at >= start_at)
+            AND
+            (application_deadline IS NULL OR publish_at <= application_deadline)
+        )
+);
+
+CREATE INDEX idx_opportunity_schedules_publish_at
+    ON opportunity_schedules (publish_at);
+
+CREATE INDEX idx_opportunity_schedules_application_deadline
+    ON opportunity_schedules (application_deadline);
+
+CREATE INDEX idx_opportunity_schedules_start_at
+    ON opportunity_schedules (start_at);
+
+CREATE TRIGGER trg_opportunity_schedules_updated_at
+BEFORE UPDATE ON opportunity_schedules
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE opportunity_contacts (
+    id              BIGSERIAL PRIMARY KEY,
+    opportunity_id  BIGINT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+    contact_kind    contact_type NOT NULL,
+    label           VARCHAR(150),
+    value           VARCHAR(300) NOT NULL,
+    is_primary      BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX idx_opportunity_contacts_opportunity_id
+    ON opportunity_contacts (opportunity_id);
+
+CREATE TABLE opportunity_links (
+    id              BIGSERIAL PRIMARY KEY,
+    opportunity_id  BIGINT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+    link_kind       link_type NOT NULL,
+    label           VARCHAR(150),
+    url             VARCHAR(500) NOT NULL
+);
+
+CREATE INDEX idx_opportunity_links_opportunity_id
+    ON opportunity_links (opportunity_id);
+
+CREATE TABLE opportunity_media (
+    id              BIGSERIAL PRIMARY KEY,
+    opportunity_id  BIGINT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+    media_kind      media_type NOT NULL,
+    title           VARCHAR(200),
+    url             VARCHAR(500) NOT NULL,
+    sort_order      INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_opportunity_media_opportunity_id
+    ON opportunity_media (opportunity_id);
+
+CREATE TABLE opportunity_tags (
+    opportunity_id  BIGINT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+    tag_id          BIGINT NOT NULL REFERENCES tags(id) ON DELETE RESTRICT,
+    PRIMARY KEY (opportunity_id, tag_id)
+);
+
+CREATE INDEX idx_opportunity_tags_tag_id
+    ON opportunity_tags (tag_id);
+
+CREATE TABLE opportunity_moderation_log (
+    id                  BIGSERIAL PRIMARY KEY,
+    opportunity_id      BIGINT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+    curator_user_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    action              moderation_action NOT NULL,
+    comment             TEXT,
+    result_status       opportunity_status,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_opportunity_moderation_log_opportunity_id
+    ON opportunity_moderation_log (opportunity_id);
+
+-- =========================================================
+-- APPLICATIONS / FAVORITES / RECOMMENDATIONS
+-- =========================================================
+
+CREATE TABLE applications (
+    id                  BIGSERIAL PRIMARY KEY,
+    opportunity_id      BIGINT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+    candidate_user_id   BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    status              application_status NOT NULL DEFAULT 'sent',
+    cover_letter        TEXT,
+    employer_comment    TEXT,
+    decided_by_user_id  BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    decided_at          TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_applications_unique UNIQUE (opportunity_id, candidate_user_id)
+);
+
+CREATE INDEX idx_applications_candidate_status
+    ON applications (candidate_user_id, status);
+
+CREATE INDEX idx_applications_opportunity_status
+    ON applications (opportunity_id, status);
+
+CREATE TRIGGER trg_applications_updated_at
+BEFORE UPDATE ON applications
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE saved_opportunities (
+    user_id          BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    opportunity_id   BIGINT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, opportunity_id)
+);
+
+CREATE INDEX idx_saved_opportunities_user_id
+    ON saved_opportunities (user_id);
+
+CREATE TABLE saved_companies (
+    user_id          BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    company_id       BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, company_id)
+);
+
+CREATE INDEX idx_saved_companies_user_id
+    ON saved_companies (user_id);
+
+CREATE TABLE opportunity_recommendations (
+    id                      BIGSERIAL PRIMARY KEY,
+    recommender_user_id     BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    recipient_user_id       BIGINT NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+    opportunity_id          BIGINT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+    message                 VARCHAR(500),
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_opportunity_recommendations_self
+        CHECK (recommender_user_id <> recipient_user_id)
+);
+
+CREATE INDEX idx_opportunity_recommendations_recipient
+    ON opportunity_recommendations (recipient_user_id);
+
+-- =========================================================
+-- START DATA
+-- =========================================================
+
+INSERT INTO tag_groups (code, name, description, is_system)
+VALUES
+    ('technology', 'Технологии', 'Языки, фреймворки, базы данных, инструменты', TRUE),
+    ('grade', 'Уровень', 'Junior, Middle, Senior и производные', TRUE),
+    ('employment', 'Тип занятости', 'Полная, частичная, проектная и т.п.', TRUE),
+    ('specialization', 'Специализация', 'Backend, Frontend, Data Science и т.п.', TRUE)
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO users (
+    email,
+    password_hash,
+    display_name,
+    status
+)
+VALUES (
+    'admin@trampolin.local',
+    '$2b$12$CHANGE_ME_TO_REAL_BCRYPT_HASH___________________________',
+    'Администратор',
+    'active'
+)
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role)
+SELECT id, 'curator'::platform_role
+FROM users
+WHERE email = 'admin@trampolin.local'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO curator_profiles (user_id, curator_level, notes)
+SELECT id, 'admin'::curator_level, 'Стартовый системный куратор'
+FROM users
+WHERE email = 'admin@trampolin.local'
+ON CONFLICT (user_id) DO NOTHING;
