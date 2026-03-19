@@ -1,4 +1,4 @@
-import { Filter, List, Map, Search, SlidersHorizontal } from 'lucide-react'
+﻿import { Filter, List, Map, Search, SlidersHorizontal } from 'lucide-react'
 import { useCity } from '../../contexts/CityContext'
 import { quickTags } from '../../data/mockData'
 
@@ -8,7 +8,12 @@ type SearchHeroProps = {
 }
 
 export function SearchHero({ viewMode, onModeChange }: SearchHeroProps) {
-  const { cities, isLoading, selectedCityId, selectCity } = useCity()
+  const {
+    cities,
+    isLoading,
+    selectedCityId,
+    selectCity,
+  } = useCity()
 
   return (
     <section className="search-hero container">
