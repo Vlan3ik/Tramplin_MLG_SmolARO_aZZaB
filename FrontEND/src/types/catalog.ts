@@ -14,3 +14,11 @@ export type PagedResponse<T> = {
   page: number
   pageSize: number
 }
+
+export type TagListItem = {
+  id: number
+  groupId: number
+  groupCode: string
+  name: string
+  slug: string
+}

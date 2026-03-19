@@ -1,4 +1,4 @@
-import type { City, PagedResponse } from '../types/catalog'
+import type { City, PagedResponse, TagListItem } from '../types/catalog'
 import { getJson } from './client'
 
 type CityApiItem = {
@@ -38,4 +38,10 @@ export async function fetchCities(signal?: AbortSignal) {
   } while (items.length < total)
 
   return items
+}
+
+export function fetchTags(signal?: AbortSignal) {
+  return getJson<TagListItem[]>('/catalog/tags', {
+    signal,
+  })
 }
