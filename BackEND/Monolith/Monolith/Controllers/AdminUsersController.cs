@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Monolith.Contexts;
@@ -11,8 +11,8 @@ using Monolith.Services.Common;
 namespace Monolith.Controllers;
 
 /// <summary>
-/// РђРґРјРёРЅРёСЃС‚СЂР°С‚РёРІРЅС‹Рµ РѕРїРµСЂР°С†РёРё РЅР°Рґ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРјРё РїР»Р°С‚С„РѕСЂРјС‹.
-/// Р”РѕСЃС‚СѓРї С‚РѕР»СЊРєРѕ РґР»СЏ СЂРѕР»Рё curator.
+/// Административные операции над пользователями платформы.
+/// Доступ только для роли curator.
 /// </summary>
 [ApiController]
 [Authorize(Roles = "curator")]
@@ -21,13 +21,13 @@ namespace Monolith.Controllers;
 public class AdminUsersController(AppDbContext dbContext, IPasswordHasher passwordHasher) : ControllerBase
 {
     /// <summary>
-    /// Р’РѕР·РІСЂР°С‰Р°РµС‚ СЃРїРёСЃРѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ СЃ РїР°РіРёРЅР°С†РёРµР№ Рё РїРѕРёСЃРєРѕРј РїРѕ email/РёРјРµРЅРё.
+    /// Возвращает список пользователей с пагинацией и поиском по email/имени.
     /// </summary>
-    /// <param name="page">РќРѕРјРµСЂ СЃС‚СЂР°РЅРёС†С‹ (РЅР°С‡РёРЅР°СЏ СЃ 1).</param>
-    /// <param name="pageSize">Р Р°Р·РјРµСЂ СЃС‚СЂР°РЅРёС†С‹ (РјР°РєСЃРёРјСѓРј 100).</param>
-    /// <param name="search">РџРѕРёСЃРєРѕРІР°СЏ СЃС‚СЂРѕРєР° РїРѕ email РёР»Рё username.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё.</param>
-    /// <returns>РџР°РіРёРЅРёСЂРѕРІР°РЅРЅС‹Р№ СЃРїРёСЃРѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ СЃ СЂРѕР»СЏРјРё.</returns>
+    /// <param name="page">Номер страницы (начиная с 1).</param>
+    /// <param name="pageSize">Размер страницы (максимум 100).</param>
+    /// <param name="search">Поисковая строка по email или username.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Пагинированный список пользователей с ролями.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<AdminUserListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -70,15 +70,15 @@ public class AdminUsersController(AppDbContext dbContext, IPasswordHasher passwo
     }
 
     /// <summary>
-    /// РЎРѕР·РґР°РµС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рё РЅР°Р·РЅР°С‡Р°РµС‚ РµРјСѓ РЅР°Р±РѕСЂ РїР»Р°С‚С„РѕСЂРјРµРЅРЅС‹С… СЂРѕР»РµР№.
+    /// Создает пользователя и назначает ему набор платформенных ролей.
     /// </summary>
     /// <remarks>
-    /// РџР°СЂРѕР»СЊ РіРµРЅРµСЂРёСЂСѓРµС‚СЃСЏ СЃРёСЃС‚РµРјРѕР№ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё (СЃР»СѓР¶РµР±РЅС‹Р№ Р°РєРєР°СѓРЅС‚).
-    /// Р”СѓР±Р»РёРєР°С‚С‹ СЂРѕР»РµР№ РІ Р·Р°РїСЂРѕСЃРµ РёРіРЅРѕСЂРёСЂСѓСЋС‚СЃСЏ.
+    /// Пароль генерируется системой автоматически (служебный аккаунт).
+    /// Дубликаты ролей в запросе игнорируются.
     /// </remarks>
-    /// <param name="request">Р”Р°РЅРЅС‹Рµ СЃРѕР·РґР°РІР°РµРјРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рё СЃРїРёСЃРѕРє СЂРѕР»РµР№.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё.</param>
-    /// <returns>РЎРѕР·РґР°РЅРЅС‹Р№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ.</returns>
+    /// <param name="request">Данные создаваемого пользователя и список ролей.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Созданный пользователь.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(AdminUserListItemDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
@@ -89,7 +89,7 @@ public class AdminUsersController(AppDbContext dbContext, IPasswordHasher passwo
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
         if (await dbContext.Users.AnyAsync(x => x.Email == normalizedEmail, cancellationToken))
         {
-            return this.ToConflictError("admin.users.email_exists", "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј email СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚.");
+            return this.ToConflictError("admin.users.email_exists", "Пользователь с таким email уже существует.");
         }
 
         var firstName = request.FirstName.Trim();
@@ -119,15 +119,15 @@ public class AdminUsersController(AppDbContext dbContext, IPasswordHasher passwo
     }
 
     /// <summary>
-    /// РћР±РЅРѕРІР»СЏРµС‚ РґР°РЅРЅС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рё РїРѕР»РЅРѕСЃС‚СЊСЋ Р·Р°РјРµРЅСЏРµС‚ РЅР°Р±РѕСЂ РµРіРѕ СЂРѕР»РµР№.
+    /// Обновляет данные пользователя и полностью заменяет набор его ролей.
     /// </summary>
     /// <remarks>
-    /// РўРµРєСѓС‰РёРµ СЂРѕР»Рё РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СѓРґР°Р»СЏСЋС‚СЃСЏ Рё СЃРѕР·РґР°СЋС‚СЃСЏ Р·Р°РЅРѕРІРѕ РёР· Р·Р°РїСЂРѕСЃР°.
+    /// Текущие роли пользователя удаляются и создаются заново из запроса.
     /// </remarks>
-    /// <param name="id">РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.</param>
-    /// <param name="request">РќРѕРІС‹Рµ Р·РЅР°С‡РµРЅРёСЏ РїРѕР»РµР№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рё СЂРѕР»РµР№.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё.</param>
-    /// <returns>РћР±РЅРѕРІР»РµРЅРЅС‹Р№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ.</returns>
+    /// <param name="id">Идентификатор пользователя.</param>
+    /// <param name="request">Новые значения полей пользователя и ролей.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Обновленный пользователь.</returns>
     [HttpPut("{id:long}")]
     [ProducesResponseType(typeof(AdminUserListItemDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -138,7 +138,7 @@ public class AdminUsersController(AppDbContext dbContext, IPasswordHasher passwo
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (user is null)
         {
-            return this.ToNotFoundError("admin.users.not_found", "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ.");
+            return this.ToNotFoundError("admin.users.not_found", "Пользователь не найден.");
         }
 
         user.Email = request.Email.Trim().ToLowerInvariant();
@@ -158,13 +158,13 @@ public class AdminUsersController(AppDbContext dbContext, IPasswordHasher passwo
     }
 
     /// <summary>
-    /// РЈРґР°Р»СЏРµС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.
+    /// Удаляет пользователя.
     /// </summary>
     /// <remarks>
-    /// РЈРґР°Р»РµРЅРёРµ С„РёР·РёС‡РµСЃРєРѕРµ (hard delete). РЎРІСЏР·Р°РЅРЅС‹Рµ РґР°РЅРЅС‹Рµ СѓРґР°Р»СЏСЋС‚СЃСЏ РєР°СЃРєР°РґРЅРѕ РІ СЃРѕРѕС‚РІРµС‚СЃС‚РІРёРё СЃ FK.
+    /// Удаление физическое (hard delete). Связанные данные удаляются каскадно в соответствии с FK.
     /// </remarks>
-    /// <param name="id">РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё.</param>
+    /// <param name="id">Идентификатор пользователя.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -175,7 +175,7 @@ public class AdminUsersController(AppDbContext dbContext, IPasswordHasher passwo
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (user is null)
         {
-            return this.ToNotFoundError("admin.users.not_found", "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ.");
+            return this.ToNotFoundError("admin.users.not_found", "Пользователь не найден.");
         }
 
         dbContext.Users.Remove(user);
