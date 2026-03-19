@@ -10,7 +10,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CandidateProfile> CandidateProfiles => Set<CandidateProfile>();
     public DbSet<CandidatePrivacySettings> CandidatePrivacySettings => Set<CandidatePrivacySettings>();
     public DbSet<CandidateResumeProfile> CandidateResumeProfiles => Set<CandidateResumeProfile>();
+    public DbSet<CandidateResumeSkill> CandidateResumeSkills => Set<CandidateResumeSkill>();
+    public DbSet<CandidateResumeProject> CandidateResumeProjects => Set<CandidateResumeProject>();
+    public DbSet<CandidateResumeEducation> CandidateResumeEducation => Set<CandidateResumeEducation>();
+    public DbSet<CandidateResumeLink> CandidateResumeLinks => Set<CandidateResumeLink>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<ContactRequest> ContactRequests => Set<ContactRequest>();
+    public DbSet<UserContact> UserContacts => Set<UserContact>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<TagGroup> TagGroups => Set<TagGroup>();
@@ -39,6 +45,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).HasColumnName("id");
             entity.Property(x => x.Email).HasColumnName("email").HasMaxLength(320);
+            entity.Property(x => x.Username).HasColumnName("username").HasMaxLength(50);
             entity.Property(x => x.PasswordHash).HasColumnName("password_hash");
             entity.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(150);
             entity.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(500);
@@ -47,6 +54,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasIndex(x => x.Email).IsUnique();
+            entity.HasIndex(x => x.Username).IsUnique();
         });
 
         modelBuilder.Entity<UserRole>(entity =>
@@ -104,6 +112,66 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasOne(x => x.CandidateProfile).WithOne(x => x.ResumeProfile).HasForeignKey<CandidateResumeProfile>(x => x.UserId);
         });
 
+        modelBuilder.Entity<CandidateResumeSkill>(entity =>
+        {
+            entity.ToTable("candidate_resume_skills");
+            entity.HasKey(x => new { x.UserId, x.TagId });
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.TagId).HasColumnName("tag_id");
+            entity.Property(x => x.Level).HasColumnName("level");
+            entity.Property(x => x.YearsExperience).HasColumnName("years_experience").HasColumnType("numeric(5,2)");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasOne(x => x.Resume).WithMany(x => x.Skills).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Tag).WithMany().HasForeignKey(x => x.TagId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CandidateResumeProject>(entity =>
+        {
+            entity.ToTable("candidate_resume_projects");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.Title).HasColumnName("title").HasMaxLength(300);
+            entity.Property(x => x.Role).HasColumnName("role").HasMaxLength(150);
+            entity.Property(x => x.Description).HasColumnName("description");
+            entity.Property(x => x.StartDate).HasColumnName("start_date");
+            entity.Property(x => x.EndDate).HasColumnName("end_date");
+            entity.Property(x => x.RepoUrl).HasColumnName("repo_url").HasMaxLength(500);
+            entity.Property(x => x.DemoUrl).HasColumnName("demo_url").HasMaxLength(500);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasOne(x => x.Resume).WithMany(x => x.Projects).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CandidateResumeEducation>(entity =>
+        {
+            entity.ToTable("candidate_resume_education");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.University).HasColumnName("university").HasMaxLength(300);
+            entity.Property(x => x.Faculty).HasColumnName("faculty").HasMaxLength(200);
+            entity.Property(x => x.Specialty).HasColumnName("specialty").HasMaxLength(200);
+            entity.Property(x => x.Course).HasColumnName("course");
+            entity.Property(x => x.GraduationYear).HasColumnName("graduation_year");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasOne(x => x.Resume).WithMany(x => x.EducationEntries).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CandidateResumeLink>(entity =>
+        {
+            entity.ToTable("candidate_resume_links");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.Kind).HasColumnName("kind").HasMaxLength(50);
+            entity.Property(x => x.Url).HasColumnName("url").HasMaxLength(500);
+            entity.Property(x => x.Label).HasColumnName("label").HasMaxLength(150);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasOne(x => x.Resume).WithMany(x => x.Links).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<RefreshToken>(entity =>
         {
             entity.ToTable("refresh_tokens");
@@ -119,6 +187,32 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.HasIndex(x => x.TokenHash).IsUnique();
             entity.HasOne(x => x.User).WithMany(x => x.RefreshTokens).HasForeignKey(x => x.UserId);
+        });
+
+        modelBuilder.Entity<ContactRequest>(entity =>
+        {
+            entity.ToTable("contact_requests");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.FromUserId).HasColumnName("from_user_id");
+            entity.Property(x => x.ToUserId).HasColumnName("to_user_id");
+            entity.Property(x => x.Status).HasColumnName("status");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => new { x.FromUserId, x.ToUserId }).IsUnique();
+            entity.HasOne(x => x.FromUser).WithMany(x => x.OutgoingContactRequests).HasForeignKey(x => x.FromUserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.ToUser).WithMany(x => x.IncomingContactRequests).HasForeignKey(x => x.ToUserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserContact>(entity =>
+        {
+            entity.ToTable("user_contacts");
+            entity.HasKey(x => new { x.UserId, x.ContactUserId });
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.ContactUserId).HasColumnName("contact_user_id");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasOne(x => x.User).WithMany(x => x.Contacts).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.ContactUser).WithMany(x => x.ContactOfUsers).HasForeignKey(x => x.ContactUserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<City>(entity =>

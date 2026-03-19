@@ -4,6 +4,7 @@ public class User
 {
     public long Id { get; set; }
     public string Email { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
@@ -20,4 +21,8 @@ public class User
     public List<ChatParticipant> ChatParticipants { get; set; } = new();
     public List<ChatMessage> ChatMessages { get; set; } = new();
     public List<ChatMessageRead> ChatReads { get; set; } = new();
+    public List<ContactRequest> OutgoingContactRequests { get; set; } = new();
+    public List<ContactRequest> IncomingContactRequests { get; set; } = new();
+    public List<UserContact> Contacts { get; set; } = new();
+    public List<UserContact> ContactOfUsers { get; set; } = new();
 }

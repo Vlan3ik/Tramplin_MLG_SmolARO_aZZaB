@@ -49,6 +49,7 @@ public class AuthController(
         var user = new User
         {
             Email = request.Email.Trim().ToLowerInvariant(),
+            Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, request.DisplayName, cancellationToken),
             PasswordHash = passwordHasher.HashPassword(request.Password),
             DisplayName = request.DisplayName.Trim(),
             Status = AccountStatus.Active
@@ -165,7 +166,7 @@ public class AuthController(
             access.ExpiresAt,
             result.Value.NewToken.RefreshToken,
             result.Value.NewToken.ExpiresAt,
-            new AuthUserDto(user.Id, user.Email, user.DisplayName, user.AvatarUrl, roles.Select(x => x.ToString().ToLowerInvariant()).ToArray())));
+            new AuthUserDto(user.Id, user.Email, user.Username, user.DisplayName, user.AvatarUrl, roles.Select(x => x.ToString().ToLowerInvariant()).ToArray())));
     }
 
     /// <summary>
@@ -226,6 +227,6 @@ public class AuthController(
             access.ExpiresAt,
             refresh.RefreshToken,
             refresh.ExpiresAt,
-            new AuthUserDto(user.Id, user.Email, user.DisplayName, user.AvatarUrl, roles.Select(x => x.ToString().ToLowerInvariant()).ToArray()));
+            new AuthUserDto(user.Id, user.Email, user.Username, user.DisplayName, user.AvatarUrl, roles.Select(x => x.ToString().ToLowerInvariant()).ToArray()));
     }
 }

@@ -95,6 +95,7 @@ public class AdminUsersController(AppDbContext dbContext, IPasswordHasher passwo
         var user = new User
         {
             Email = normalizedEmail,
+            Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, request.DisplayName, cancellationToken),
             DisplayName = request.DisplayName.Trim(),
             PasswordHash = passwordHasher.HashPassword(Guid.NewGuid().ToString("N")),
             Status = request.Status

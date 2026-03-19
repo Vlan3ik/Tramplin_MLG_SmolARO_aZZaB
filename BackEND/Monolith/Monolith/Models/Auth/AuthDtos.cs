@@ -20,7 +20,7 @@ public record AuthResponse(
     AuthUserDto User
 );
 
-public record AuthUserDto(long Id, string Email, string DisplayName, string? AvatarUrl, IReadOnlyCollection<string> Roles);
+public record AuthUserDto(long Id, string Email, string Username, string DisplayName, string? AvatarUrl, IReadOnlyCollection<string> Roles);
 
 /// <summary>
 /// Элемент справочника ролей платформы.

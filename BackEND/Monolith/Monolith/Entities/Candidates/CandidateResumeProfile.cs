@@ -12,4 +12,8 @@ public class CandidateResumeProfile
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public CandidateProfile CandidateProfile { get; set; } = null!;
+    public List<CandidateResumeSkill> Skills { get; set; } = new();
+    public List<CandidateResumeProject> Projects { get; set; } = new();
+    public List<CandidateResumeEducation> EducationEntries { get; set; } = new();
+    public List<CandidateResumeLink> Links { get; set; } = new();
 }

@@ -2,6 +2,7 @@
 using Monolith.Contexts;
 using Monolith.Entities;
 using Monolith.Services.Auth;
+using Monolith.Services.Common;
 using NetTopologySuite.Geometries;
 using LocationEntity = Monolith.Entities.Location;
 
@@ -46,17 +47,22 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Email == normalizedEmail);
         if (user is not null)
         {
+            if (string.IsNullOrWhiteSpace(user.Username))
+            {
+                user.Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, displayName, CancellationToken.None);
+            }
             if (!string.IsNullOrWhiteSpace(avatarUrl) && string.IsNullOrWhiteSpace(user.AvatarUrl))
             {
                 user.AvatarUrl = avatarUrl;
-                await dbContext.SaveChangesAsync();
             }
+            await dbContext.SaveChangesAsync();
             return user;
         }
 
         user = new User
         {
             Email = normalizedEmail,
+            Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, displayName, CancellationToken.None),
             DisplayName = displayName,
             AvatarUrl = avatarUrl,
             PasswordHash = passwordHasher.HashPassword(password),
