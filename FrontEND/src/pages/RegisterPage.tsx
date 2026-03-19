@@ -7,13 +7,13 @@ import { PlatformRole } from '../types/auth'
 import { createAuthSession, getPostRegisterRoute } from '../utils/auth'
 
 type RegisterFormState = {
-  displayName: string
+  fullName: string
   email: string
   password: string
 }
 
 const initialFormState: RegisterFormState = {
-  displayName: '',
+  fullName: '',
   email: '',
   password: '',
 }
@@ -66,14 +66,17 @@ export function RegisterPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const displayName = formState.displayName.trim()
+    const fullName = formState.fullName.trim()
     const email = formState.email.trim()
     const password = formState.password
 
-    if (!displayName || !email || !password) {
+    if (!fullName || !email || !password) {
       setErrorMessage('Заполните отображаемое имя, email и пароль.')
       return
     }
+
+    const [firstName, ...lastNameParts] = fullName.split(/\s+/)
+    const lastName = lastNameParts.join(' ') || firstName
 
     setErrorMessage('')
     setIsSubmitting(true)
@@ -82,7 +85,8 @@ export function RegisterPage() {
       const response = await registerUser({
         email,
         password,
-        displayName,
+        firstName,
+        lastName,
         role: selectedRole,
       })
 
@@ -154,9 +158,9 @@ export function RegisterPage() {
           <label>
             Отображаемое имя
             <input
-              name="displayName"
+              name="fullName"
               type="text"
-              value={formState.displayName}
+              value={formState.fullName}
               onChange={handleChange}
               placeholder="Иван Петров"
               autoComplete="name"
@@ -199,6 +203,7 @@ export function RegisterPage() {
 
       <aside className="auth-side card">
         <h2>Почему Трамплин</h2>
+        <img src="/auth/reklama.png" alt="" />
         <ul>
           <li>Одна платформа для вакансий, стажировок, менторства и событий.</li>
           <li>Проверенные компании и прозрачные статусы откликов.</li>

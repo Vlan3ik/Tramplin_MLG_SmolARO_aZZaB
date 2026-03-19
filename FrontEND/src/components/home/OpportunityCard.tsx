@@ -1,8 +1,8 @@
 import { Bookmark, CheckCircle2, MapPin } from 'lucide-react'
 import clsx from 'clsx'
 import { Link } from 'react-router-dom'
-import type { Opportunity } from '../../data/mockData'
-import { typeLabel } from '../../data/mockData'
+import type { Opportunity } from '../../types/opportunity'
+import { typeLabel } from '../../types/opportunity'
 
 type OpportunityCardProps = {
   opportunity: Opportunity

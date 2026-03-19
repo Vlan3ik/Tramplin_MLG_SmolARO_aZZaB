@@ -1,19 +1,28 @@
-﻿import { Filter, List, Map, Search, SlidersHorizontal } from 'lucide-react'
+import { Filter, List, Map, Search, SlidersHorizontal } from 'lucide-react'
 import { useCity } from '../../contexts/CityContext'
 import { quickTags } from '../../data/mockData'
 
 type SearchHeroProps = {
+  searchValue: string
   viewMode: 'map' | 'list'
   onModeChange: (mode: 'map' | 'list') => void
+  onSearchChange: (value: string) => void
+  onSearchSubmit: () => void
 }
 
-export function SearchHero({ viewMode, onModeChange }: SearchHeroProps) {
-  const {
-    cities,
-    isLoading,
-    selectedCityId,
-    selectCity,
-  } = useCity()
+export function SearchHero({
+  searchValue,
+  viewMode,
+  onModeChange,
+  onSearchChange,
+  onSearchSubmit,
+}: SearchHeroProps) {
+  const { cities, isLoading, selectedCityId, selectCity } = useCity()
+
+  function handleTagClick(tag: string) {
+    onSearchChange(tag)
+    onSearchSubmit()
+  }
 
   return (
     <section className="search-hero container">
@@ -25,7 +34,16 @@ export function SearchHero({ viewMode, onModeChange }: SearchHeroProps) {
       <div className="search-row">
         <label className="input-wrap input-wrap--wide">
           <Search size={18} />
-          <input placeholder="Должность, навык, компания или мероприятие" />
+          <input
+            value={searchValue}
+            onChange={(event) => onSearchChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                onSearchSubmit()
+              }
+            }}
+            placeholder="Должность, навык, компания или мероприятие"
+          />
         </label>
         <label className="input-wrap input-wrap--select">
           <Map size={18} />
@@ -50,24 +68,16 @@ export function SearchHero({ viewMode, onModeChange }: SearchHeroProps) {
           <SlidersHorizontal size={16} />
           Фильтры
         </button>
-        <button className="btn btn--primary" type="button">
+        <button className="btn btn--primary" type="button" onClick={onSearchSubmit}>
           <Search size={16} />
           Найти
         </button>
         <div className="view-switch" role="tablist" aria-label="Режим отображения">
-          <button
-            type="button"
-            className={viewMode === 'map' ? 'is-active' : ''}
-            onClick={() => onModeChange('map')}
-          >
+          <button type="button" className={viewMode === 'map' ? 'is-active' : ''} onClick={() => onModeChange('map')}>
             <Map size={16} />
             Карта
           </button>
-          <button
-            type="button"
-            className={viewMode === 'list' ? 'is-active' : ''}
-            onClick={() => onModeChange('list')}
-          >
+          <button type="button" className={viewMode === 'list' ? 'is-active' : ''} onClick={() => onModeChange('list')}>
             <List size={16} />
             Список
           </button>
@@ -80,6 +90,7 @@ export function SearchHero({ viewMode, onModeChange }: SearchHeroProps) {
             key={tag}
             type="button"
             className={`chip ${index < 3 ? 'chip--active' : ''}`}
+            onClick={() => handleTagClick(tag)}
           >
             {tag}
           </button>

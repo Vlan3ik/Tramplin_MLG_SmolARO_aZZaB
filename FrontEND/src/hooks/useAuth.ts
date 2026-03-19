@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { logoutUser } from '../api/auth'
 import type { AuthSession } from '../types/auth'
 import {
   clearAuthSession,
@@ -25,7 +26,17 @@ export function useAuth() {
     signIn(sessionToSave: AuthSession) {
       saveAuthSession(sessionToSave)
     },
-    signOut() {
+    async signOut() {
+      const refreshToken = session?.refreshToken ?? null
+
+      if (refreshToken) {
+        try {
+          await logoutUser({ refreshToken })
+        } catch {
+          // If the session is already invalid on backend, local cleanup still must happen.
+        }
+      }
+
       clearAuthSession()
     },
   }

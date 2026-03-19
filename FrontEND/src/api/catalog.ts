@@ -1,6 +1,5 @@
 import type { City, PagedResponse } from '../types/catalog'
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || 'http://169.254.185.29:1488/api'
+import { getJson } from './client'
 
 type CityApiItem = {
   id: number
@@ -11,47 +10,10 @@ type CityApiItem = {
   longitude: number | null
 }
 
-type ApiErrorPayload = {
-  code?: string
-  detail?: string
-  message?: string
-  title?: string
-}
-
-function extractApiErrorMessage(payload: ApiErrorPayload | null, status: number) {
-  if (payload?.message) {
-    return payload.message
-  }
-
-  if (payload?.detail) {
-    return payload.detail
-  }
-
-  if (payload?.title) {
-    return payload.title
-  }
-
-  if (payload?.code) {
-    return `Ошибка API: ${payload.code}`
-  }
-
-  return `Ошибка запроса (${status})`
-}
-
 async function fetchCitiesPage(page: number, signal?: AbortSignal) {
-  const response = await fetch(`${API_BASE_URL}/catalog/cities?page=${page}&pageSize=100`, {
-    method: 'GET',
+  return getJson<PagedResponse<CityApiItem>>(`/catalog/cities?page=${page}&pageSize=100`, {
     signal,
   })
-
-  const isJsonResponse = response.headers.get('content-type')?.includes('application/json')
-  const responseBody = isJsonResponse ? ((await response.json()) as PagedResponse<CityApiItem> | ApiErrorPayload) : null
-
-  if (!response.ok) {
-    throw new Error(extractApiErrorMessage(responseBody as ApiErrorPayload | null, response.status))
-  }
-
-  return responseBody as PagedResponse<CityApiItem>
 }
 
 export async function fetchCities(signal?: AbortSignal) {
@@ -61,7 +23,7 @@ export async function fetchCities(signal?: AbortSignal) {
 
   do {
     const response = await fetchCitiesPage(page, signal)
-    total = response.total
+    total = response.totalCount ?? response.total ?? 0
     items.push(
       ...response.items.map((city) => ({
         id: city.id,

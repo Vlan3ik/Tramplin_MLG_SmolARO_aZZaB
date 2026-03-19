@@ -9,7 +9,7 @@ export type PlatformRole = (typeof PlatformRole)[keyof typeof PlatformRole]
 export type AuthUser = {
   id: number
   email: string | null
-  displayName: string | null
+  username: string | null
   avatarUrl: string | null
   roles: string[] | null
 }
@@ -27,10 +27,19 @@ export type LoginRequest = {
   password: string
 }
 
+export type RefreshRequest = {
+  refreshToken: string
+}
+
+export type LogoutRequest = {
+  refreshToken: string
+}
+
 export type RegisterRequest = {
   email: string
   password: string
-  displayName: string
+  firstName: string
+  lastName: string
   role: PlatformRole
 }
 

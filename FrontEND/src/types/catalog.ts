@@ -9,7 +9,8 @@ export type City = {
 
 export type PagedResponse<T> = {
   items: T[]
-  total: number
+  totalCount: number
+  total?: number
   page: number
   pageSize: number
 }

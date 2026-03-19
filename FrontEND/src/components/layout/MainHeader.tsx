@@ -14,8 +14,8 @@ export function MainHeader() {
   const navigate = useNavigate()
   const { isAuthenticated, signOut } = useAuth()
 
-  function handleLogout() {
-    signOut()
+  async function handleLogout() {
+    await signOut()
     navigate('/', { replace: true })
   }
 
