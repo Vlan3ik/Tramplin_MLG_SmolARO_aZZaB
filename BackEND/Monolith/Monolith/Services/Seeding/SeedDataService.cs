@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using Microsoft.EntityFrameworkCore;
 using Monolith.Contexts;
 using Monolith.Entities;
 using Monolith.Services.Auth;
@@ -183,9 +184,43 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
     {
         var pointFactory = new GeometryFactory(new PrecisionModel(), 4326);
         var locations = new List<LocationEntity>();
+        var smolenskPoints = BuildSmolenskVacancyPoints().ToArray();
 
         foreach (var city in cities)
         {
+            if (city.CityName == "Смоленск")
+            {
+                var existingSmolenskLocations = await dbContext.Locations
+                    .Where(x => x.CityId == city.Id)
+                    .ToListAsync();
+
+                foreach (var point in smolenskPoints)
+                {
+                    var exists = existingSmolenskLocations.Any(x =>
+                        x.StreetName == point.StreetName &&
+                        x.HouseNumber == point.HouseNumber);
+
+                    if (!exists)
+                    {
+                        dbContext.Locations.Add(new LocationEntity
+                        {
+                            CityId = city.Id,
+                            GeoPoint = pointFactory.CreatePoint(new Coordinate(point.Longitude, point.Latitude)),
+                            StreetName = point.StreetName,
+                            HouseNumber = point.HouseNumber
+                        });
+                    }
+                }
+
+                await dbContext.SaveChangesAsync();
+                var smolenskLocations = await dbContext.Locations
+                    .Where(x => x.CityId == city.Id)
+                    .OrderBy(x => x.Id)
+                    .ToListAsync();
+                locations.AddRange(smolenskLocations);
+                continue;
+            }
+
             var location = await dbContext.Locations.FirstOrDefaultAsync(x => x.CityId == city.Id);
             if (location is null)
             {
@@ -193,8 +228,8 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
                 {
                     CityId = city.Id,
                     GeoPoint = pointFactory.CreatePoint(new Coordinate((double)(city.Longitude ?? 0), (double)(city.Latitude ?? 0))),
-                    StreetName = city.CityName == "Смоленск" ? "ул. Карла Маркса" : "Центральная улица",
-                    HouseNumber = city.CityName == "Смоленск" ? "12" : "1"
+                    StreetName = "Центральная улица",
+                    HouseNumber = "1"
                 };
                 dbContext.Locations.Add(location);
                 await dbContext.SaveChangesAsync();
@@ -529,8 +564,27 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         DateTimeOffset now)
     {
         var companyByBrand = companies.ToDictionary(x => x.BrandName ?? x.LegalName, StringComparer.OrdinalIgnoreCase);
+        var smolenskCityId = cityByName["Смоленск"].Id;
+        var smolenskLocations = locations
+            .Where(x => x.CityId == smolenskCityId)
+            .OrderBy(x => x.Id)
+            .ToArray();
+        var smolenskLocationIndex = 0;
 
-        LocationEntity FindLocation(string cityName) => locations.First(x => x.CityId == cityByName[cityName].Id);
+        long NextSmolenskLocationId()
+        {
+            if (smolenskLocations.Length == 0)
+            {
+                throw new InvalidOperationException("Для Смоленска не найдено ни одной локации.");
+            }
+
+            if (smolenskLocationIndex >= smolenskLocations.Length)
+            {
+                smolenskLocationIndex = 0;
+            }
+
+            return smolenskLocations[smolenskLocationIndex++].Id;
+        }
 
         var opportunities = new List<Opportunity>
         {
@@ -545,7 +599,8 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
                 OppType = OpportunityType.Vacancy,
                 Format = WorkFormat.Remote,
                 Status = OpportunityStatus.Published,
-                CityId = cityByName["Смоленск"].Id,
+                CityId = null,
+                LocationId = NextSmolenskLocationId(),
                 SalaryFrom = 80000,
                 SalaryTo = 140000,
                 CurrencyCode = "RUB",
@@ -563,7 +618,7 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
                 Format = WorkFormat.Onsite,
                 Status = OpportunityStatus.Published,
                 CityId = null,
-                LocationId = FindLocation("Смоленск").Id,
+                LocationId = NextSmolenskLocationId(),
                 SalaryFrom = 40000,
                 SalaryTo = 70000,
                 CurrencyCode = "RUB",
@@ -591,13 +646,10 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         foreach (var companyName in companyOrder)
         {
             var company = companyByBrand[companyName];
-            var city = cityByName.First(x => x.Value.Id == company.BaseCityId).Value;
-            var location = locations.First(x => x.CityId == city.Id);
 
             for (var i = 0; i < 4; i++)
             {
                 var t = templates[(i + companyName.Length) % templates.Length];
-                var remote = t.Format == WorkFormat.Remote;
 
                 opportunities.Add(new Opportunity
                 {
@@ -609,8 +661,8 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
                     OppType = t.Type,
                     Format = t.Format,
                     Status = OpportunityStatus.Published,
-                    CityId = remote ? city.Id : null,
-                    LocationId = remote ? null : location.Id,
+                    CityId = null,
+                    LocationId = NextSmolenskLocationId(),
                     SalaryFrom = t.Type == OpportunityType.CareerEvent ? null : t.SalaryFrom,
                     SalaryTo = t.Type == OpportunityType.CareerEvent ? null : t.SalaryTo,
                     CurrencyCode = t.Type == OpportunityType.CareerEvent ? null : "RUB",
@@ -621,6 +673,23 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         }
 
         return opportunities;
+    }
+
+    private static IEnumerable<(string StreetName, string HouseNumber, double Latitude, double Longitude)> BuildSmolenskVacancyPoints()
+    {
+        const double baseLatitude = 54.7350;
+        const double baseLongitude = 31.9650;
+
+        for (var i = 0; i < 80; i++)
+        {
+            var row = i / 10;
+            var col = i % 10;
+            yield return (
+                "Тестовая улица",
+                (100 + i).ToString(CultureInfo.InvariantCulture),
+                baseLatitude + (row * 0.0100) + (col * 0.0010),
+                baseLongitude + (col * 0.0100) + (row * 0.0010));
+        }
     }
     private static IEnumerable<OpportunityTag> BuildOpportunityTags(IReadOnlyCollection<Opportunity> opportunities, IReadOnlyCollection<Tag> tags)
     {
