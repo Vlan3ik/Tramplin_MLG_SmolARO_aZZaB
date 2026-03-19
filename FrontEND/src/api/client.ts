@@ -1,5 +1,7 @@
 const RAW_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
 const AUTH_STORAGE_KEY = 'tramplin.auth.session'
+const AUTH_SESSION_EVENT = 'tramplin:auth-session-change'
+const TOKEN_REFRESH_SKEW_MS = 60_000
 
 export const API_BASE_URL = RAW_API_BASE_URL
   ? RAW_API_BASE_URL.replace(/\/$/, '')
@@ -25,6 +27,8 @@ type RefreshApiResponse = {
   refreshToken: string | null
   refreshTokenExpiresAt: string | null
 }
+
+let refreshInFlight: Promise<boolean> | null = null
 
 function isBrowser() {
   return typeof window !== 'undefined'
@@ -63,12 +67,24 @@ function writeStoredTokens(tokens: RefreshApiResponse) {
   }
 
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession))
-  window.dispatchEvent(new Event('tramplin:auth-session-change'))
+  window.dispatchEvent(new Event(AUTH_SESSION_EVENT))
 }
 
-function createHeaders(withAuth: boolean) {
+function clearStoredSession() {
+  if (!isBrowser()) {
+    return
+  }
+
+  window.localStorage.removeItem(AUTH_STORAGE_KEY)
+  window.dispatchEvent(new Event(AUTH_SESSION_EVENT))
+}
+
+function createHeaders(withAuth: boolean, includeJsonContentType: boolean) {
   const headers = new Headers()
-  headers.set('Content-Type', 'application/json')
+
+  if (includeJsonContentType) {
+    headers.set('Content-Type', 'application/json')
+  }
 
   if (withAuth) {
     const accessToken = readStoredSession()?.accessToken
@@ -79,6 +95,20 @@ function createHeaders(withAuth: boolean) {
   }
 
   return headers
+}
+
+function isAccessTokenExpiringSoon(accessTokenExpiresAt: string | null | undefined) {
+  if (!accessTokenExpiresAt) {
+    return true
+  }
+
+  const expiresAtMs = Date.parse(accessTokenExpiresAt)
+
+  if (Number.isNaN(expiresAtMs)) {
+    return true
+  }
+
+  return expiresAtMs - Date.now() <= TOKEN_REFRESH_SKEW_MS
 }
 
 async function tryRefreshAccessToken() {
@@ -97,6 +127,7 @@ async function tryRefreshAccessToken() {
   })
 
   if (!response.ok) {
+    clearStoredSession()
     return false
   }
 
@@ -105,12 +136,40 @@ async function tryRefreshAccessToken() {
   return true
 }
 
+function refreshAccessTokenShared() {
+  if (!refreshInFlight) {
+    refreshInFlight = tryRefreshAccessToken().finally(() => {
+      refreshInFlight = null
+    })
+  }
+
+  return refreshInFlight
+}
+
 function canRetryWithRefresh(path: string, withAuth: boolean) {
   if (!withAuth) {
     return false
   }
 
   return !path.startsWith('/auth/')
+}
+
+async function ensureFreshAccessToken(path: string, withAuth: boolean) {
+  if (!canRetryWithRefresh(path, withAuth)) {
+    return true
+  }
+
+  const session = readStoredSession()
+
+  if (!session?.refreshToken) {
+    return true
+  }
+
+  if (!isAccessTokenExpiringSoon(session.accessTokenExpiresAt)) {
+    return true
+  }
+
+  return refreshAccessTokenShared()
 }
 
 function toApiErrorMessage(payload: ApiErrorPayload | null, status: number) {
@@ -138,23 +197,27 @@ export async function getJson<TResponse>(
   options?: {
     signal?: AbortSignal
     withAuth?: boolean
+    retryOnUnauthorized?: boolean
   },
 ) {
   const withAuth = options?.withAuth ?? true
+  const retryOnUnauthorized = options?.retryOnUnauthorized ?? true
+  await ensureFreshAccessToken(path, withAuth)
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'GET',
-    headers: createHeaders(withAuth),
+    headers: createHeaders(withAuth, false),
     signal: options?.signal,
   })
 
-  if (response.status === 401 && canRetryWithRefresh(path, withAuth)) {
-    const refreshed = await tryRefreshAccessToken()
+  if (response.status === 401 && retryOnUnauthorized && canRetryWithRefresh(path, withAuth)) {
+    const refreshed = await refreshAccessTokenShared()
 
     if (refreshed) {
       return getJson<TResponse>(path, {
         ...options,
         withAuth,
+        retryOnUnauthorized: false,
       })
     }
   }
@@ -175,24 +238,28 @@ export async function postJson<TResponse, TRequest extends object>(
   options?: {
     signal?: AbortSignal
     withAuth?: boolean
+    retryOnUnauthorized?: boolean
   },
 ) {
   const withAuth = options?.withAuth ?? true
+  const retryOnUnauthorized = options?.retryOnUnauthorized ?? true
+  await ensureFreshAccessToken(path, withAuth)
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
-    headers: createHeaders(withAuth),
+    headers: createHeaders(withAuth, true),
     body: JSON.stringify(payload),
     signal: options?.signal,
   })
 
-  if (response.status === 401 && canRetryWithRefresh(path, withAuth)) {
-    const refreshed = await tryRefreshAccessToken()
+  if (response.status === 401 && retryOnUnauthorized && canRetryWithRefresh(path, withAuth)) {
+    const refreshed = await refreshAccessTokenShared()
 
     if (refreshed) {
       return postJson<TResponse, TRequest>(path, payload, {
         ...options,
         withAuth,
+        retryOnUnauthorized: false,
       })
     }
   }

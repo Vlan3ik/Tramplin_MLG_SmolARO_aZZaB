@@ -1,8 +1,10 @@
 import { Bookmark, CheckCircle2, MapPin } from 'lucide-react'
 import clsx from 'clsx'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Opportunity } from '../../types/opportunity'
 import { typeLabel } from '../../types/opportunity'
+import { isFavoriteOpportunity, toggleFavoriteOpportunity } from '../../utils/favorites'
 
 type OpportunityCardProps = {
   opportunity: Opportunity
@@ -10,6 +12,17 @@ type OpportunityCardProps = {
 }
 
 export function OpportunityCard({ opportunity, compact = false }: OpportunityCardProps) {
+  const [isFavorite, setIsFavorite] = useState(() => isFavoriteOpportunity(opportunity.id))
+  const favoriteLabel = useMemo(
+    () => (isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'),
+    [isFavorite],
+  )
+
+  function handleFavoriteToggle() {
+    const nextValue = toggleFavoriteOpportunity(opportunity.id)
+    setIsFavorite(nextValue)
+  }
+
   return (
     <article className={clsx('opportunity-card card', compact && 'opportunity-card--compact')}>
       <div className="opportunity-card__top">
@@ -43,7 +56,7 @@ export function OpportunityCard({ opportunity, compact = false }: OpportunityCar
         <div className="company-status">
           <CheckCircle2 size={14} />
           {opportunity.verified ? 'Компания подтверждена' : 'Проверка компании в процессе'}
-          {opportunity.favoriteCompany && <span className="favorite-company">Избранная компания</span>}
+          {opportunity.favoriteCompany ? <span className="favorite-company">Избранная компания</span> : null}
         </div>
 
         <div className="action-row">
@@ -53,8 +66,13 @@ export function OpportunityCard({ opportunity, compact = false }: OpportunityCar
           <button className="btn btn--primary" type="button">
             {opportunity.type === 'event' ? 'Записаться' : 'Откликнуться'}
           </button>
-          <button className="btn btn--icon" type="button" aria-label="Добавить в избранное">
-            <Bookmark size={16} />
+          <button
+            className={clsx('btn btn--icon', isFavorite && 'is-active')}
+            type="button"
+            aria-label={favoriteLabel}
+            onClick={handleFavoriteToggle}
+          >
+            <Bookmark size={16} fill={isFavorite ? 'currentColor' : 'none'} />
           </button>
         </div>
       </div>

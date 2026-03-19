@@ -1,6 +1,6 @@
 export type SeekerProfile = {
   userId: number
-  displayName: string
+  username: string
   firstName: string
   lastName: string
   middleName: string | null
@@ -10,11 +10,20 @@ export type SeekerProfile = {
 }
 
 export type UpdateSeekerProfileRequest = {
-  displayName: string
   firstName: string
   lastName: string
   middleName: string | null
   phone: string | null
   about: string | null
   avatarUrl: string | null
+}
+
+export type SeekerProfileStats = {
+  applicationsTotal: number
+  applicationsOpen: number
+  applicationsClosed: number
+  applicationsRejected: number
+  internshipsCompleted: number
+  eventsAttended: number
+  mentorshipParticipations: number
 }

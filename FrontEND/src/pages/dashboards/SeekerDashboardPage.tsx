@@ -3,16 +3,18 @@ import { CalendarClock, MapPin, Phone, Settings2, UploadCloud, X } from 'lucide-
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchTags } from '../../api/catalog'
-import { fetchSeekerProfile, fetchSeekerResume, updateSeekerProfile, updateSeekerResume } from '../../api/me'
+import { fetchSeekerProfile, fetchSeekerProfileStats, fetchSeekerResume, updateSeekerProfile, updateSeekerResume } from '../../api/me'
 import { uploadMyAvatar } from '../../api/media'
+import { fetchOpportunityById } from '../../api/opportunities'
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
-import { opportunities } from '../../data/mockData'
 import { useAuth } from '../../hooks/useAuth'
 import type { TagListItem } from '../../types/catalog'
-import type { SeekerProfile } from '../../types/me'
+import type { SeekerProfile, SeekerProfileStats } from '../../types/me'
+import type { Opportunity } from '../../types/opportunity'
 import type { SeekerResume } from '../../types/resume'
+import { getFavoriteOpportunityIds, subscribeToFavoriteOpportunities } from '../../utils/favorites'
 
 type TabId = 'responses' | 'favorites' | 'resume'
 
@@ -136,51 +138,13 @@ function loadResumeLocal(userId: number) {
   }
 }
 
-const responses = [
-  {
-    id: '1',
-    title: 'Frontend Engineer',
-    company: 'CloudLine',
-    location: 'Москва',
-    date: '12 марта',
-    status: 'Приглашение на интервью',
-    tone: 'success' as const,
-    next: 'Интервью 21 марта в 11:00',
-    note: 'Сильный матч по React и API.',
-  },
-  {
-    id: '2',
-    title: 'Data Internship',
-    company: 'Nova Systems',
-    location: 'Санкт-Петербург',
-    date: '10 марта',
-    status: 'На рассмотрении',
-    tone: 'warning' as const,
-    next: 'Ответ ожидается до 24 марта',
-    note: 'Профиль в шортлисте.',
-  },
-  {
-    id: '3',
-    title: 'Product Mentorship',
-    company: 'Urban Metrics',
-    location: 'Удаленно',
-    date: '8 марта',
-    status: 'Нужны уточнения',
-    tone: 'danger' as const,
-    next: 'Доработайте блок резюме',
-    note: 'Нужно больше данных по опыту.',
-  },
-]
-
-const favorites = opportunities.slice(0, 3).map((item, index) => ({
-  id: item.id,
-  title: item.title,
-  company: item.company,
-  location: item.location,
-  workFormat: item.workFormat,
-  compensation: item.compensation,
-  note: ['Хороший стек', 'Удобный формат', 'Интересный рост'][index] ?? 'Сохранено в избранное',
-}))
+type ResponseStatusCard = {
+  id: string
+  label: string
+  count: number
+  tone: 'success' | 'warning' | 'danger'
+  description: string
+}
 
 export function SeekerDashboardPage() {
   const { session, signIn } = useAuth()
@@ -189,6 +153,9 @@ export function SeekerDashboardPage() {
   const [profile, setProfile] = useState<SeekerProfile | null>(null)
   const [resume, setResume] = useState<SeekerResume>(initialResume())
   const [tags, setTags] = useState<TagListItem[]>([])
+  const [profileStats, setProfileStats] = useState<SeekerProfileStats | null>(null)
+  const [favoriteOpportunities, setFavoriteOpportunities] = useState<Opportunity[]>([])
+  const [favoriteIds, setFavoriteIds] = useState<number[]>(() => getFavoriteOpportunityIds())
 
   const [profileForm, setProfileForm] = useState({ firstName: '', lastName: '', middleName: '', phone: '', avatarUrl: '' })
   const [projectForm, setProjectForm] = useState(initialProject)
@@ -200,6 +167,7 @@ export function SeekerDashboardPage() {
 
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [loadingResume, setLoadingResume] = useState(true)
+  const [loadingFavorites, setLoadingFavorites] = useState(true)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingResume, setSavingResume] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -207,17 +175,17 @@ export function SeekerDashboardPage() {
 
   const [profileError, setProfileError] = useState('')
   const [resumeError, setResumeError] = useState('')
+  const [favoritesError, setFavoritesError] = useState('')
   const [success, setSuccess] = useState('')
 
   useEffect(() => {
-    const token = session?.accessToken
-    if (typeof token !== 'string' || !token) {
+    if (!session?.accessToken) {
       setLoadingProfile(false)
       setLoadingResume(false)
       setProfileError('Не удалось получить токен авторизации.')
       return
     }
-    const authToken: string = token
+
     const controller = new AbortController()
 
     async function loadData() {
@@ -227,8 +195,8 @@ export function SeekerDashboardPage() {
       setLoadingResume(true)
 
       const [profileResult, resumeResult, tagsResult] = await Promise.allSettled([
-        fetchSeekerProfile(authToken, controller.signal),
-        fetchSeekerResume(authToken, controller.signal),
+        fetchSeekerProfile(controller.signal),
+        fetchSeekerResume(controller.signal),
         fetchTags(controller.signal),
       ])
 
@@ -246,6 +214,17 @@ export function SeekerDashboardPage() {
           phone: p.phone ? formatPhone(p.phone) : '',
           avatarUrl: p.avatarUrl ?? '',
         })
+
+        try {
+          const stats = await fetchSeekerProfileStats(p.username ?? session?.user?.username ?? '', controller.signal)
+          if (!controller.signal.aborted) {
+            setProfileStats(stats)
+          }
+        } catch {
+          if (!controller.signal.aborted) {
+            setProfileStats(null)
+          }
+        }
       } else if (!isAbortError(profileResult.reason)) {
         setProfileError(profileResult.reason instanceof Error ? profileResult.reason.message : 'Ошибка загрузки профиля.')
       }
@@ -287,11 +266,56 @@ export function SeekerDashboardPage() {
     void loadData()
 
     return () => controller.abort()
-  }, [session?.accessToken])
+  }, [session?.accessToken, session?.user?.username])
 
   useEffect(() => {
     saveResumeLocal(resume)
   }, [resume])
+
+  useEffect(() => {
+    const unsubscribe = subscribeToFavoriteOpportunities(() => {
+      setFavoriteIds(getFavoriteOpportunityIds())
+    })
+
+    return unsubscribe
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadFavorites() {
+      setLoadingFavorites(true)
+      setFavoritesError('')
+
+      if (!favoriteIds.length) {
+        setFavoriteOpportunities([])
+        setLoadingFavorites(false)
+        return
+      }
+
+      const results = await Promise.allSettled(favoriteIds.map((id) => fetchOpportunityById(id, controller.signal)))
+
+      if (controller.signal.aborted) {
+        return
+      }
+
+      const resolved = results
+        .filter((result): result is PromiseFulfilledResult<Opportunity> => result.status === 'fulfilled')
+        .map((result) => result.value)
+
+      setFavoriteOpportunities(resolved)
+
+      if (!resolved.length && favoriteIds.length) {
+        setFavoritesError('Не удалось загрузить избранные вакансии.')
+      }
+
+      setLoadingFavorites(false)
+    }
+
+    void loadFavorites()
+
+    return () => controller.abort()
+  }, [favoriteIds])
 
   const avatarUrl = useMemo(() => resolveAvatarUrl(profile?.avatarUrl), [profile?.avatarUrl])
   const avatarFormUrl = useMemo(() => resolveAvatarUrl(profileForm.avatarUrl), [profileForm.avatarUrl])
@@ -316,6 +340,48 @@ export function SeekerDashboardPage() {
     return { done, total: checks.length, percent: Math.round((done / checks.length) * 100) }
   }, [profile, resume])
 
+  const responseStatusCards = useMemo<ResponseStatusCard[]>(() => {
+    if (!profileStats) {
+      return [
+        { id: 'total', label: 'Всего откликов', count: 0, tone: 'warning', description: 'Данные пока недоступны' },
+        { id: 'open', label: 'Открытые', count: 0, tone: 'success', description: 'В процессе рассмотрения' },
+        { id: 'closed', label: 'Закрытые', count: 0, tone: 'warning', description: 'Завершенные отклики' },
+        { id: 'rejected', label: 'Отклоненные', count: 0, tone: 'danger', description: 'Нужны новые отклики' },
+      ]
+    }
+
+    return [
+      {
+        id: 'total',
+        label: 'Всего откликов',
+        count: profileStats.applicationsTotal,
+        tone: profileStats.applicationsTotal > 0 ? 'success' : 'warning',
+        description: 'Общее число откликов по профилю',
+      },
+      {
+        id: 'open',
+        label: 'Открытые',
+        count: profileStats.applicationsOpen,
+        tone: profileStats.applicationsOpen > 0 ? 'success' : 'warning',
+        description: 'Отклики в работе',
+      },
+      {
+        id: 'closed',
+        label: 'Закрытые',
+        count: profileStats.applicationsClosed,
+        tone: profileStats.applicationsClosed > 0 ? 'success' : 'warning',
+        description: 'Отклики с завершенным процессом',
+      },
+      {
+        id: 'rejected',
+        label: 'Отклоненные',
+        count: profileStats.applicationsRejected,
+        tone: profileStats.applicationsRejected > 0 ? 'danger' : 'success',
+        description: 'Отклики с отказом',
+      },
+    ]
+  }, [profileStats])
+
   async function onProfileSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (typeof session?.accessToken !== 'string' || !session.accessToken) return
@@ -329,7 +395,6 @@ export function SeekerDashboardPage() {
 
     try {
       const payload = {
-        displayName: `${profileForm.firstName.trim()} ${profileForm.lastName.trim()}`.trim(),
         firstName: profileForm.firstName.trim(),
         lastName: profileForm.lastName.trim(),
         middleName: toNullable(profileForm.middleName),
@@ -337,12 +402,12 @@ export function SeekerDashboardPage() {
         about: toNullable(profile?.about ?? ''),
         avatarUrl: toNullable(profileForm.avatarUrl),
       }
-      const updated = await updateSeekerProfile(session.accessToken, payload)
+      const updated = await updateSeekerProfile(payload)
       setProfile(updated)
       setSuccess('Профиль сохранен.')
       setIsSettingsOpen(false)
       if (session.user) {
-        const username = `${updated.firstName} ${updated.lastName}`.trim() || session.user.username
+        const username = updated.username || session.user.username
         signIn({ ...session, user: { ...session.user, username, avatarUrl: updated.avatarUrl } })
       }
     } catch (error) {
@@ -388,7 +453,7 @@ export function SeekerDashboardPage() {
     setSavingResume(true)
 
     try {
-      const response = await updateSeekerResume(session.accessToken, resume)
+      const response = await updateSeekerResume(resume)
       setResume((state) => ({
         ...state,
         userId: response.userId,
@@ -453,24 +518,34 @@ export function SeekerDashboardPage() {
                 <section className="card seeker-profile-panel">
                   <h2>Мои отклики</h2>
                   <div className="application-stats">
-                    <article><strong>{responses.length}</strong><span>Всего откликов</span></article>
-                    <article><strong>{responses.filter((x) => x.tone === 'success').length}</strong><span>Есть интервью</span></article>
-                    <article><strong>{responses.filter((x) => x.tone === 'warning').length}</strong><span>На рассмотрении</span></article>
-                    <article><strong>{responses.filter((x) => x.tone === 'danger').length}</strong><span>Нужны правки</span></article>
+                    {responseStatusCards.map((item) => (
+                      <article key={item.id}>
+                        <strong>{item.count}</strong>
+                        <span>{item.label}</span>
+                      </article>
+                    ))}
                   </div>
                   <div className="application-list">
-                    {responses.map((item) => (
+                    {responseStatusCards.map((item) => (
                       <article key={item.id} className="application-card">
                         <div className="application-card__top">
-                          <div><h3>{item.title}</h3><p>{item.company}</p></div>
-                          <span className={`status-chip status-chip--${item.tone}`}>{item.status}</span>
+                          <div>
+                            <h3>{item.label}</h3>
+                            <p>Данные из API профиля</p>
+                          </div>
+                          <span className={`status-chip status-chip--${item.tone}`}>{item.count}</span>
                         </div>
                         <div className="application-card__meta">
-                          <span><MapPin size={14} />{item.location}</span>
-                          <span><CalendarClock size={14} />Отклик: {item.date}</span>
+                          <span>
+                            <MapPin size={14} />
+                            Профиль соискателя
+                          </span>
+                          <span>
+                            <CalendarClock size={14} />
+                            Актуально на сейчас
+                          </span>
                         </div>
-                        <p className="application-card__next">Следующий шаг: {item.next}</p>
-                        <p>{item.note}</p>
+                        <p className="application-card__next">Статус: {item.description}</p>
                       </article>
                     ))}
                   </div>
@@ -480,22 +555,39 @@ export function SeekerDashboardPage() {
               {tab === 'favorites' ? (
                 <section className="card seeker-profile-panel">
                   <h2>Избранное</h2>
-                  <div className="favorite-list">
-                    {favorites.map((item) => (
-                      <article key={item.id} className="favorite-card">
-                        <div className="favorite-card__head">
-                          <div><h3>{item.title}</h3><p>{item.company}</p></div>
-                          <span className="favorite-card__salary">{item.compensation}</span>
-                        </div>
-                        <div className="favorite-card__meta"><span>{item.location}</span><span>{item.workFormat}</span></div>
-                        <p>{item.note}</p>
-                        <div className="favorite-card__actions">
-                          <Link className="btn btn--ghost" to={`/opportunity/${item.id}`}>Подробнее</Link>
-                          <button type="button" className="btn btn--primary">Откликнуться</button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
+                  {loadingFavorites ? <p>Загружаем избранные вакансии...</p> : null}
+                  {favoritesError ? <div className="auth-feedback auth-feedback--error">{favoritesError}</div> : null}
+                  {!loadingFavorites && !favoriteOpportunities.length ? (
+                    <p>В избранном пока пусто. Добавьте вакансии с главной страницы.</p>
+                  ) : null}
+                  {!loadingFavorites && favoriteOpportunities.length ? (
+                    <div className="favorite-list">
+                      {favoriteOpportunities.map((item) => (
+                        <article key={item.id} className="favorite-card">
+                          <div className="favorite-card__head">
+                            <div>
+                              <h3>{item.title}</h3>
+                              <p>{item.company}</p>
+                            </div>
+                            <span className="favorite-card__salary">{item.compensation}</span>
+                          </div>
+                          <div className="favorite-card__meta">
+                            <span>{item.location}</span>
+                            <span>{item.workFormat}</span>
+                          </div>
+                          <p>{item.description}</p>
+                          <div className="favorite-card__actions">
+                            <Link className="btn btn--ghost" to={`/opportunity/${item.id}`}>
+                              Подробнее
+                            </Link>
+                            <button type="button" className="btn btn--primary">
+                              Откликнуться
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
 

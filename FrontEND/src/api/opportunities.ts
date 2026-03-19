@@ -50,6 +50,29 @@ type MapOpportunityResponseApi = {
   features?: MapOpportunityFeatureApi[]
 }
 
+type OpportunityDetailApi = {
+  id: number
+  title: string | null
+  shortDescription: string | null
+  fullDescription: string | null
+  type: OpportunityTypeApi
+  format: WorkFormatApi
+  publishAt: string
+  salaryFrom: number | null
+  salaryTo: number | null
+  currencyCode: string | null
+  company?: {
+    name: string | null
+    verified: boolean
+  } | null
+  location?: {
+    cityName: string | null
+    latitude: number | null
+    longitude: number | null
+  } | null
+  tags?: string[] | null
+}
+
 export type HomeSearchQuery = {
   page?: number
   pageSize?: number
@@ -254,5 +277,27 @@ export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: Ab
   return {
     items,
     total: listResponse.totalCount ?? listResponse.total ?? 0,
+  }
+}
+
+export async function fetchOpportunityById(id: number, signal?: AbortSignal): Promise<Opportunity> {
+  const response = await getJson<OpportunityDetailApi>(`/opportunities/${id}`, { signal, withAuth: false })
+  const type = parseOpportunityType(response.type)
+  const normalizedFormat = parseFormat(response.format)
+
+  return {
+    id: response.id,
+    title: response.title ?? 'Без названия',
+    type,
+    company: response.company?.name ?? 'Компания',
+    location: response.location?.cityName ?? 'Локация не указана',
+    compensation: formatSalary(response.salaryFrom, response.salaryTo, response.currencyCode),
+    workFormat: normalizedFormat === 'onsite' ? 'Офис' : normalizedFormat === 'remote' ? 'Удаленно' : 'Гибрид',
+    date: formatRelativeDate(response.publishAt),
+    description: response.shortDescription ?? response.fullDescription ?? 'Описание добавляется в карточке вакансии.',
+    tags: response.tags ?? [],
+    verified: response.company?.verified ?? false,
+    latitude: response.location?.latitude ?? null,
+    longitude: response.location?.longitude ?? null,
   }
 }
