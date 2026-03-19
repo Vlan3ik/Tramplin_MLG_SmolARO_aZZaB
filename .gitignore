@@ -47,6 +47,3 @@ _ReSharper*/
 # Docker local
 docker-compose.override.yml
 *.pid
-
-# Local artifacts
-ifelse_task2.1.pdf
