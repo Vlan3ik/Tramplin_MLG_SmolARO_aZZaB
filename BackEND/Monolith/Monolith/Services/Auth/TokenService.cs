@@ -19,6 +19,7 @@ public class TokenService(IOptions<JwtOptions> jwtOptions) : ITokenService
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var roleClaims = roles.Select(x => new Claim(ClaimTypes.Role, x.ToString().ToLowerInvariant()));
+        var roleIdClaims = roles.Select(x => new Claim("role_id", ((int)x).ToString()));
 
         var claims = new List<Claim>
         {
@@ -28,6 +29,7 @@ public class TokenService(IOptions<JwtOptions> jwtOptions) : ITokenService
             new(JwtRegisteredClaimNames.UniqueName, user.DisplayName)
         };
         claims.AddRange(roleClaims);
+        claims.AddRange(roleIdClaims);
 
         var token = new JwtSecurityToken(
             issuer: _jwtOptions.Issuer,

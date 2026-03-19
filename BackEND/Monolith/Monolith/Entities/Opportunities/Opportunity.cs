@@ -24,4 +24,5 @@ public class Opportunity
     public City? City { get; set; }
     public Location? Location { get; set; }
     public List<OpportunityTag> OpportunityTags { get; set; } = new();
+    public List<Application> Applications { get; set; } = new();
 }

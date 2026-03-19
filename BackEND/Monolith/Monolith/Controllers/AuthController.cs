@@ -23,7 +23,7 @@ public class AuthController(
     /// Регистрирует нового пользователя платформы.
     /// </summary>
     /// <remarks>
-    /// Доступные публичные роли: seeker и employer.
+    /// Доступные публичные роли: seeker (1) и employer (2).
     /// Роль curator для публичной регистрации запрещена.
     /// </remarks>
     /// <param name="request">Данные регистрации: email, пароль, отображаемое имя, роль.</param>
@@ -78,6 +78,24 @@ public class AuthController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(await BuildAuthResponse(user, [request.Role], cancellationToken));
+    }
+
+    /// <summary>
+    /// Возвращает справочник платформенных ролей с их id.
+    /// </summary>
+    /// <returns>Список ролей с id/code/title.</returns>
+    [AllowAnonymous]
+    [HttpGet("roles")]
+    [ProducesResponseType(typeof(IReadOnlyCollection<RoleDictionaryItemDto>), StatusCodes.Status200OK)]
+    public ActionResult<IReadOnlyCollection<RoleDictionaryItemDto>> GetRoles()
+    {
+        var roles = new List<RoleDictionaryItemDto>
+        {
+            new((int)PlatformRole.Seeker, "seeker", "Соискатель"),
+            new((int)PlatformRole.Employer, "employer", "Работодатель"),
+            new((int)PlatformRole.Curator, "curator", "Куратор")
+        };
+        return Ok(roles);
     }
 
     /// <summary>

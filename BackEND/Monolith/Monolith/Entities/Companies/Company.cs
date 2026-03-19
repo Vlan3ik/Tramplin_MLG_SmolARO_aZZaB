@@ -21,4 +21,8 @@ public class Company
     public City BaseCity { get; set; } = null!;
     public List<CompanyLink> Links { get; set; } = new();
     public List<Opportunity> Opportunities { get; set; } = new();
+    public List<CompanyMember> Members { get; set; } = new();
+    public List<CompanyInvite> Invites { get; set; } = new();
+    public List<Application> Applications { get; set; } = new();
+    public CompanyChatSettings? ChatSettings { get; set; }
 }

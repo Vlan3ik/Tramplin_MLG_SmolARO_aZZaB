@@ -17,8 +17,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<CompanyLink> CompanyLinks => Set<CompanyLink>();
+    public DbSet<CompanyMember> CompanyMembers => Set<CompanyMember>();
+    public DbSet<CompanyInvite> CompanyInvites => Set<CompanyInvite>();
+    public DbSet<CompanyChatSettings> CompanyChatSettings => Set<CompanyChatSettings>();
     public DbSet<Opportunity> Opportunities => Set<Opportunity>();
     public DbSet<OpportunityTag> OpportunityTags => Set<OpportunityTag>();
+    public DbSet<Application> Applications => Set<Application>();
+    public DbSet<Chat> Chats => Set<Chat>();
+    public DbSet<ChatParticipant> ChatParticipants => Set<ChatParticipant>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<ChatMessageRead> ChatMessageReads => Set<ChatMessageRead>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -212,6 +220,54 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasOne(x => x.Company).WithMany(x => x.Links).HasForeignKey(x => x.CompanyId);
         });
 
+        modelBuilder.Entity<CompanyMember>(entity =>
+        {
+            entity.ToTable("company_members");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.CompanyId).HasColumnName("company_id");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.Role).HasColumnName("role");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => x.UserId).IsUnique();
+            entity.HasIndex(x => new { x.CompanyId, x.UserId }).IsUnique();
+            entity.HasOne(x => x.Company).WithMany(x => x.Members).HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.User).WithMany(x => x.CompanyMemberships).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CompanyInvite>(entity =>
+        {
+            entity.ToTable("company_invites");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.CompanyId).HasColumnName("company_id");
+            entity.Property(x => x.InvitedByUserId).HasColumnName("invited_by_user_id");
+            entity.Property(x => x.Role).HasColumnName("role");
+            entity.Property(x => x.Token).HasColumnName("token").HasMaxLength(120);
+            entity.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+            entity.Property(x => x.AcceptedAt).HasColumnName("accepted_at");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => x.Token).IsUnique();
+            entity.HasOne(x => x.Company).WithMany(x => x.Invites).HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.InvitedByUser).WithMany(x => x.SentCompanyInvites).HasForeignKey(x => x.InvitedByUserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CompanyChatSettings>(entity =>
+        {
+            entity.ToTable("company_chat_settings");
+            entity.HasKey(x => x.CompanyId);
+            entity.Property(x => x.CompanyId).HasColumnName("company_id");
+            entity.Property(x => x.AutoGreetingEnabled).HasColumnName("auto_greeting_enabled");
+            entity.Property(x => x.AutoGreetingText).HasColumnName("auto_greeting_text").HasMaxLength(2000);
+            entity.Property(x => x.OutsideHoursEnabled).HasColumnName("outside_hours_enabled");
+            entity.Property(x => x.OutsideHoursText).HasColumnName("outside_hours_text").HasMaxLength(2000);
+            entity.Property(x => x.WorkingHoursTimezone).HasColumnName("working_hours_timezone").HasMaxLength(100);
+            entity.Property(x => x.WorkingHoursFrom).HasColumnName("working_hours_from");
+            entity.Property(x => x.WorkingHoursTo).HasColumnName("working_hours_to");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasOne(x => x.Company).WithOne(x => x.ChatSettings).HasForeignKey<CompanyChatSettings>(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<Opportunity>(entity =>
         {
             entity.ToTable("opportunities");
@@ -247,6 +303,74 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.TagId).HasColumnName("tag_id");
             entity.HasOne(x => x.Opportunity).WithMany(x => x.OpportunityTags).HasForeignKey(x => x.OpportunityId);
             entity.HasOne(x => x.Tag).WithMany(x => x.OpportunityTags).HasForeignKey(x => x.TagId);
+        });
+
+        modelBuilder.Entity<Application>(entity =>
+        {
+            entity.ToTable("applications");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.CompanyId).HasColumnName("company_id");
+            entity.Property(x => x.CandidateUserId).HasColumnName("candidate_user_id");
+            entity.Property(x => x.OpportunityId).HasColumnName("opportunity_id");
+            entity.Property(x => x.InitiatorRole).HasColumnName("initiator_role");
+            entity.Property(x => x.Status).HasColumnName("status");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => x.CandidateUserId);
+            entity.HasOne(x => x.Company).WithMany(x => x.Applications).HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.CandidateUser).WithMany(x => x.CandidateApplications).HasForeignKey(x => x.CandidateUserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Opportunity).WithMany(x => x.Applications).HasForeignKey(x => x.OpportunityId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Chat>(entity =>
+        {
+            entity.ToTable("chats");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.Type).HasColumnName("type");
+            entity.Property(x => x.ApplicationId).HasColumnName("application_id");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => x.ApplicationId).IsUnique();
+            entity.HasOne(x => x.Application).WithOne(x => x.Chat).HasForeignKey<Chat>(x => x.ApplicationId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChatParticipant>(entity =>
+        {
+            entity.ToTable("chat_participants");
+            entity.HasKey(x => new { x.ChatId, x.UserId });
+            entity.Property(x => x.ChatId).HasColumnName("chat_id");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasOne(x => x.Chat).WithMany(x => x.Participants).HasForeignKey(x => x.ChatId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.User).WithMany(x => x.ChatParticipants).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChatMessage>(entity =>
+        {
+            entity.ToTable("chat_messages");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.ChatId).HasColumnName("chat_id");
+            entity.Property(x => x.SenderUserId).HasColumnName("sender_user_id");
+            entity.Property(x => x.Text).HasColumnName("text");
+            entity.Property(x => x.IsSystem).HasColumnName("is_system");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => new { x.ChatId, x.CreatedAt });
+            entity.HasOne(x => x.Chat).WithMany(x => x.Messages).HasForeignKey(x => x.ChatId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.SenderUser).WithMany(x => x.ChatMessages).HasForeignKey(x => x.SenderUserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChatMessageRead>(entity =>
+        {
+            entity.ToTable("chat_message_reads");
+            entity.HasKey(x => new { x.MessageId, x.UserId });
+            entity.Property(x => x.MessageId).HasColumnName("message_id");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.ReadAt).HasColumnName("read_at");
+            entity.HasOne(x => x.Message).WithMany(x => x.Reads).HasForeignKey(x => x.MessageId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.User).WithMany(x => x.ChatReads).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 

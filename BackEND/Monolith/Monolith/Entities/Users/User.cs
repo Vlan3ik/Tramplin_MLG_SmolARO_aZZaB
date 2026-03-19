@@ -14,4 +14,10 @@ public class User
     public List<UserRole> Roles { get; set; } = new();
     public CandidateProfile? CandidateProfile { get; set; }
     public List<RefreshToken> RefreshTokens { get; set; } = new();
+    public List<CompanyMember> CompanyMemberships { get; set; } = new();
+    public List<CompanyInvite> SentCompanyInvites { get; set; } = new();
+    public List<Application> CandidateApplications { get; set; } = new();
+    public List<ChatParticipant> ChatParticipants { get; set; } = new();
+    public List<ChatMessage> ChatMessages { get; set; } = new();
+    public List<ChatMessageRead> ChatReads { get; set; } = new();
 }
