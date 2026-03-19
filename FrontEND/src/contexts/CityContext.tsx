@@ -1,18 +1,22 @@
-import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { fetchCities } from '../api/catalog'
 import type { City } from '../types/catalog'
 
 const CITY_STORAGE_KEY = 'tramplin.selected.city'
+const CITY_MANUAL_STORAGE_KEY = 'tramplin.selected.city.manual'
 
 type CitySelectionSource = 'default' | 'geolocation' | 'manual' | 'saved'
 
 type CityContextValue = {
   cities: City[]
   errorMessage: string
+  isDetectingLocation: boolean
+  isGeolocationAvailable: boolean
   isLoading: boolean
   selectedCity: City | null
   selectedCityId: number | null
   selectionSource: CitySelectionSource | null
+  detectCity: () => Promise<boolean>
   selectCity: (cityId: number) => void
 }
 
@@ -42,6 +46,22 @@ function persistCityId(cityId: number) {
   }
 
   window.localStorage.setItem(CITY_STORAGE_KEY, String(cityId))
+}
+
+function readIsManualSelectionEnabled() {
+  if (!isBrowser()) {
+    return false
+  }
+
+  return window.localStorage.getItem(CITY_MANUAL_STORAGE_KEY) === '1'
+}
+
+function persistManualSelectionState(isManual: boolean) {
+  if (!isBrowser()) {
+    return
+  }
+
+  window.localStorage.setItem(CITY_MANUAL_STORAGE_KEY, isManual ? '1' : '0')
 }
 
 function resolveFallbackCityId(cities: City[]) {
@@ -84,12 +104,16 @@ function findNearestCity(cities: City[], latitude: number, longitude: number) {
   return nearestCity
 }
 
-function requestBrowserGeolocation() {
+function requestBrowserGeolocation(forceFresh = false) {
   if (!isBrowser() || !('geolocation' in navigator)) {
     return Promise.resolve<GeolocationCoordinates | null>(null)
   }
 
-  if (!geolocationPromise) {
+  if (forceFresh) {
+    geolocationPromise = null
+  }
+
+  if (geolocationPromise === null) {
     geolocationPromise = new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
         (position) => resolve(position.coords),
@@ -118,6 +142,47 @@ export function CityProvider({ children }: CityProviderProps) {
   const [isLoadingCities, setIsLoadingCities] = useState(true)
   const [isDetectingLocation, setIsDetectingLocation] = useState(false)
   const userSelectedRef = useRef(false)
+  const isGeolocationAvailable = isBrowser() && 'geolocation' in navigator
+
+  const detectCity = useCallback(async () => {
+    if (!cities.length) {
+      return false
+    }
+
+    userSelectedRef.current = false
+
+    const fallbackCityId = resolveFallbackCityId(cities)
+
+    if (!fallbackCityId) {
+      return false
+    }
+
+    setIsDetectingLocation(true)
+    setErrorMessage('')
+
+    try {
+      const coordinates = await requestBrowserGeolocation(true)
+
+      if (userSelectedRef.current) {
+        return false
+      }
+
+      const nearestCity =
+        coordinates === null ? null : findNearestCity(cities, coordinates.latitude, coordinates.longitude)
+
+      const resolvedCityId = nearestCity?.id ?? fallbackCityId
+      const resolvedSource: CitySelectionSource = nearestCity ? 'geolocation' : 'default'
+
+      setSelectedCityId(resolvedCityId)
+      setSelectionSource(resolvedSource)
+      persistCityId(resolvedCityId)
+      persistManualSelectionState(false)
+
+      return nearestCity !== null
+    } finally {
+      setIsDetectingLocation(false)
+    }
+  }, [cities])
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -138,12 +203,16 @@ export function CityProvider({ children }: CityProviderProps) {
         setCities(loadedCities)
 
         const savedCityId = readSavedCityId()
+        const isManualSelectionEnabled = readIsManualSelectionEnabled()
         const savedCity = savedCityId ? loadedCities.find((city) => city.id === savedCityId) : null
 
         if (savedCity) {
           setSelectedCityId(savedCity.id)
-          setSelectionSource('saved')
-          return
+          setSelectionSource(isManualSelectionEnabled ? 'manual' : 'saved')
+
+          if (isManualSelectionEnabled) {
+            return
+          }
         }
 
         const fallbackCityId = resolveFallbackCityId(loadedCities)
@@ -170,6 +239,7 @@ export function CityProvider({ children }: CityProviderProps) {
         setSelectedCityId(resolvedCityId)
         setSelectionSource(resolvedSource)
         persistCityId(resolvedCityId)
+        persistManualSelectionState(false)
       } catch (error) {
         if (abortController.signal.aborted || isDisposed) {
           return
@@ -197,6 +267,7 @@ export function CityProvider({ children }: CityProviderProps) {
     setSelectedCityId(cityId)
     setSelectionSource('manual')
     persistCityId(cityId)
+    persistManualSelectionState(true)
   }
 
   const selectedCity = cities.find((city) => city.id === selectedCityId) ?? null
@@ -205,7 +276,10 @@ export function CityProvider({ children }: CityProviderProps) {
     <CityContext.Provider
       value={{
         cities,
+        detectCity,
         errorMessage,
+        isDetectingLocation,
+        isGeolocationAvailable,
         isLoading: isLoadingCities || isDetectingLocation,
         selectedCity,
         selectedCityId,

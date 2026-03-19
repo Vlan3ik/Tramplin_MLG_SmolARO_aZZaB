@@ -1,4 +1,4 @@
-import { MapPin } from 'lucide-react'
+﻿import { MapPin } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useCity } from '../../contexts/CityContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -6,7 +6,16 @@ import { getDashboardLabelForRole, getDefaultRouteForRole } from '../../utils/au
 
 export function TopServiceBar() {
   const { session } = useAuth()
-  const { cities, errorMessage, isLoading, selectedCity, selectedCityId, selectionSource, selectCity } = useCity()
+  const {
+    cities,
+    detectCity,
+    errorMessage,
+    isDetectingLocation,
+    isGeolocationAvailable,
+    isLoading,
+    selectedCityId,
+    selectCity,
+  } = useCity()
 
   const serviceLinks = [
     ...(session?.platformRole
@@ -14,6 +23,7 @@ export function TopServiceBar() {
       : []),
     { label: 'О платформе', to: '/about' },
   ]
+
 
   return (
     <div className="service-bar">
@@ -40,11 +50,14 @@ export function TopServiceBar() {
               </option>
             ))}
           </select>
-          {selectedCity ? (
-            <span className="service-bar__city-badge">
-              {selectionSource === 'geolocation' ? 'По геолокации' : 'Выбран'}
-            </span>
-          ) : null}
+          <button
+            type="button"
+            className="service-bar__city-action"
+            onClick={() => void detectCity()}
+            disabled={isLoading || !cities.length || !isGeolocationAvailable}
+          >
+            {isDetectingLocation ? 'Определяем...' : 'Определить автоматически'}
+          </button>
           {errorMessage ? <span className="service-bar__city-error">{errorMessage}</span> : null}
         </div>
 
