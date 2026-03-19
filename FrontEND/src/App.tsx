@@ -1,4 +1,7 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
+import { DashboardRedirect } from './components/auth/DashboardRedirect'
+import { GuestOnlyRoute } from './components/auth/GuestOnlyRoute'
+import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { PublicLayout } from './components/layout/PublicLayout'
 import { CompanyPage } from './pages/CompanyPage'
 import { EmployerVerificationPage } from './pages/EmployerVerificationPage'
@@ -10,6 +13,7 @@ import { RegisterPage } from './pages/RegisterPage'
 import { CuratorDashboardPage } from './pages/dashboards/CuratorDashboardPage'
 import { EmployerDashboardPage } from './pages/dashboards/EmployerDashboardPage'
 import { SeekerDashboardPage } from './pages/dashboards/SeekerDashboardPage'
+import { PlatformRole } from './types/auth'
 
 function App() {
   return (
@@ -21,16 +25,29 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
 
-      <Route path="register" element={<RegisterPage />} />
-      <Route path="login" element={<LoginPage />} />
-      <Route path="verification/employer" element={<EmployerVerificationPage />} />
-      <Route path="dashboard/seeker" element={<SeekerDashboardPage />} />
-      <Route path="dashboard/employer" element={<EmployerDashboardPage />} />
-      <Route path="dashboard/curator" element={<CuratorDashboardPage />} />
-      <Route path="dashboard" element={<Navigate to="/dashboard/seeker" replace />} />
+      <Route element={<GuestOnlyRoute />}>
+        <Route path="register" element={<RegisterPage />} />
+        <Route path="login" element={<LoginPage />} />
+      </Route>
+
+      <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Employer]} />}>
+        <Route path="verification/employer" element={<EmployerVerificationPage />} />
+        <Route path="dashboard/employer" element={<EmployerDashboardPage />} />
+      </Route>
+
+      <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Seeker]} />}>
+        <Route path="dashboard/seeker" element={<SeekerDashboardPage />} />
+      </Route>
+
+      <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Curator]} />}>
+        <Route path="dashboard/curator" element={<CuratorDashboardPage />} />
+      </Route>
+
+      <Route element={<ProtectedRoute />}>
+        <Route path="dashboard" element={<DashboardRedirect />} />
+      </Route>
     </Routes>
   )
 }
 
 export default App
-
