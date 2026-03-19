@@ -2,7 +2,8 @@ import { Eye, EyeOff } from 'lucide-react'
 import { type ChangeEvent, type FormEvent, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { loginUser } from '../api/auth'
-import { createAuthSession, getSafeRedirectPath, saveAuthSession } from '../utils/auth'
+import { useAuth } from '../hooks/useAuth'
+import { createAuthSession, getSafeRedirectPath } from '../utils/auth'
 
 type LoginFormState = {
   email: string
@@ -31,6 +32,7 @@ function readRedirectPath(state: unknown) {
 export function LoginPage() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { signIn } = useAuth()
   const [formState, setFormState] = useState(initialFormState)
   const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -69,7 +71,7 @@ export function LoginPage() {
       })
 
       const session = createAuthSession(response)
-      saveAuthSession(session)
+      signIn(session)
 
       navigate(getSafeRedirectPath(redirectPath, session.platformRole ?? null), { replace: true })
     } catch (error) {

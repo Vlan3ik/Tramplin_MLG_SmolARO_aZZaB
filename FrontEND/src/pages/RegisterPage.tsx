@@ -2,8 +2,9 @@ import { Building2, BriefcaseBusiness, Eye, EyeOff, UserCircle2 } from 'lucide-r
 import { type ChangeEvent, type FormEvent, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { registerUser } from '../api/auth'
+import { useAuth } from '../hooks/useAuth'
 import { PlatformRole } from '../types/auth'
-import { createAuthSession, getPostRegisterRoute, saveAuthSession } from '../utils/auth'
+import { createAuthSession, getPostRegisterRoute } from '../utils/auth'
 
 type RegisterFormState = {
   displayName: string
@@ -40,6 +41,7 @@ const roleOptions = [
 
 export function RegisterPage() {
   const navigate = useNavigate()
+  const { signIn } = useAuth()
   const [selectedRole, setSelectedRole] = useState<PlatformRole>(PlatformRole.Seeker)
   const [formState, setFormState] = useState(initialFormState)
   const [errorMessage, setErrorMessage] = useState('')
@@ -85,7 +87,7 @@ export function RegisterPage() {
       })
 
       const session = createAuthSession(response, selectedRole)
-      saveAuthSession(session)
+      signIn(session)
 
       navigate(getPostRegisterRoute(selectedRole), { replace: true })
     } catch (error) {

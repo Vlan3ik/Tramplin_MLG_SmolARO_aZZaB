@@ -1,8 +1,9 @@
 import { Navigate } from 'react-router-dom'
-import { getDefaultRouteForRole, loadAuthSession } from '../../utils/auth'
+import { useAuth } from '../../hooks/useAuth'
+import { getDefaultRouteForRole } from '../../utils/auth'
 
 export function DashboardRedirect() {
-  const session = loadAuthSession()
+  const { session } = useAuth()
 
   return <Navigate to={getDefaultRouteForRole(session?.platformRole ?? null)} replace />
 }

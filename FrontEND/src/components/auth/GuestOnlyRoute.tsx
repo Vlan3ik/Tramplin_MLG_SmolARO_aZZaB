@@ -1,10 +1,11 @@
 import { Navigate, Outlet } from 'react-router-dom'
-import { getDefaultRouteForRole, hasActiveSession, loadAuthSession } from '../../utils/auth'
+import { useAuth } from '../../hooks/useAuth'
+import { getDefaultRouteForRole } from '../../utils/auth'
 
 export function GuestOnlyRoute() {
-  const session = loadAuthSession()
+  const { isAuthenticated, session } = useAuth()
 
-  if (hasActiveSession(session)) {
+  if (isAuthenticated) {
     return <Navigate to={getDefaultRouteForRole(session?.platformRole ?? null)} replace />
   }
 

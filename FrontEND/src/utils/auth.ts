@@ -1,6 +1,7 @@
 import { PlatformRole, type AuthResponse, type AuthSession } from '../types/auth'
 
 const AUTH_STORAGE_KEY = 'tramplin.auth.session'
+const AUTH_SESSION_EVENT = 'tramplin:auth-session-change'
 
 function isBrowser() {
   return typeof window !== 'undefined'
@@ -8,6 +9,14 @@ function isBrowser() {
 
 function isKnownRole(value: number): value is PlatformRole {
   return value === PlatformRole.Seeker || value === PlatformRole.Employer || value === PlatformRole.Curator
+}
+
+function notifyAuthSessionChanged() {
+  if (!isBrowser()) {
+    return
+  }
+
+  window.dispatchEvent(new Event(AUTH_SESSION_EVENT))
 }
 
 export function resolvePlatformRole(roleNames: string[] | null | undefined) {
@@ -78,6 +87,7 @@ export function saveAuthSession(session: AuthSession) {
   }
 
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session))
+  notifyAuthSessionChanged()
 }
 
 export function clearAuthSession() {
@@ -86,6 +96,7 @@ export function clearAuthSession() {
   }
 
   window.localStorage.removeItem(AUTH_STORAGE_KEY)
+  notifyAuthSessionChanged()
 }
 
 export function hasActiveSession(session: AuthSession | null) {
@@ -110,6 +121,40 @@ export function getPostRegisterRoute(role: PlatformRole) {
   }
 
   return getDefaultRouteForRole(role)
+}
+
+export function getDashboardLabelForRole(role: PlatformRole | null) {
+  if (role === PlatformRole.Employer) {
+    return 'Кабинет работодателя'
+  }
+
+  if (role === PlatformRole.Curator) {
+    return 'Кураторская панель'
+  }
+
+  return 'Кабинет соискателя'
+}
+
+export function subscribeToAuthSession(listener: () => void) {
+  if (!isBrowser()) {
+    return () => undefined
+  }
+
+  const handleStorageChange = (event: StorageEvent) => {
+    if (event.key !== AUTH_STORAGE_KEY) {
+      return
+    }
+
+    listener()
+  }
+
+  window.addEventListener('storage', handleStorageChange)
+  window.addEventListener(AUTH_SESSION_EVENT, listener)
+
+  return () => {
+    window.removeEventListener('storage', handleStorageChange)
+    window.removeEventListener(AUTH_SESSION_EVENT, listener)
+  }
 }
 
 export function getSafeRedirectPath(candidate: string | null, role: PlatformRole | null) {

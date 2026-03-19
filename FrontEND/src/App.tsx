@@ -3,6 +3,7 @@ import { DashboardRedirect } from './components/auth/DashboardRedirect'
 import { GuestOnlyRoute } from './components/auth/GuestOnlyRoute'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { PublicLayout } from './components/layout/PublicLayout'
+import { AboutPlatformPage } from './pages/AboutPlatformPage'
 import { CompanyPage } from './pages/CompanyPage'
 import { EmployerVerificationPage } from './pages/EmployerVerificationPage'
 import { HomePage } from './pages/HomePage'
@@ -20,6 +21,7 @@ function App() {
     <Routes>
       <Route element={<PublicLayout />}>
         <Route index element={<HomePage />} />
+        <Route path="about" element={<AboutPlatformPage />} />
         <Route path="opportunity/:id" element={<OpportunityDetailsPage />} />
         <Route path="company/:slug" element={<CompanyPage />} />
         <Route path="*" element={<NotFoundPage />} />

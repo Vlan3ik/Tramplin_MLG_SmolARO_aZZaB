@@ -32,7 +32,8 @@
   padding: 0 0.75rem;
   min-height: 44px;
 
-  input {
+  input,
+  select {
     border: 0;
     padding: 0;
     background: transparent;
@@ -41,6 +42,12 @@
   svg {
     color: var(--text-secondary);
     flex-shrink: 0;
+  }
+}
+
+.input-wrap--select {
+  select {
+    appearance: none;
   }
 }
 
@@ -511,4 +518,3 @@
     padding: 0.9rem 1rem;
   }
 }
-

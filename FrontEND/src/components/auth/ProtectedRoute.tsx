@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth'
 import type { PlatformRole } from '../../types/auth'
-import { getDefaultRouteForRole, hasActiveSession, loadAuthSession } from '../../utils/auth'
+import { getDefaultRouteForRole } from '../../utils/auth'
 
 type ProtectedRouteProps = {
   allowedRoles?: PlatformRole[]
@@ -8,9 +9,9 @@ type ProtectedRouteProps = {
 
 export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   const location = useLocation()
-  const session = loadAuthSession()
+  const { isAuthenticated, session } = useAuth()
 
-  if (!hasActiveSession(session)) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
 

@@ -1,4 +1,5 @@
 import { Filter, List, Map, Search, SlidersHorizontal } from 'lucide-react'
+import { useCity } from '../../contexts/CityContext'
 import { quickTags } from '../../data/mockData'
 
 type SearchHeroProps = {
@@ -7,6 +8,8 @@ type SearchHeroProps = {
 }
 
 export function SearchHero({ viewMode, onModeChange }: SearchHeroProps) {
+  const { cities, isLoading, selectedCityId, selectCity } = useCity()
+
   return (
     <section className="search-hero container">
       <div className="search-hero__head">
@@ -19,9 +22,24 @@ export function SearchHero({ viewMode, onModeChange }: SearchHeroProps) {
           <Search size={18} />
           <input placeholder="Должность, навык, компания или мероприятие" />
         </label>
-        <label className="input-wrap">
+        <label className="input-wrap input-wrap--select">
           <Map size={18} />
-          <input placeholder="Город" defaultValue="Москва" />
+          <select
+            value={selectedCityId ?? ''}
+            onChange={(event) => selectCity(Number(event.target.value))}
+            disabled={isLoading || !cities.length}
+            aria-label="Выбор города в поиске"
+          >
+            <option value="" disabled>
+              {isLoading ? 'Загружаем города...' : 'Выберите город'}
+            </option>
+            {cities.map((city) => (
+              <option key={city.id} value={city.id}>
+                {city.name}
+                {city.region ? `, ${city.region}` : ''}
+              </option>
+            ))}
+          </select>
         </label>
         <button className="btn btn--ghost btn--icon" type="button">
           <SlidersHorizontal size={16} />
@@ -69,4 +87,3 @@ export function SearchHero({ viewMode, onModeChange }: SearchHeroProps) {
     </section>
   )
 }
-
