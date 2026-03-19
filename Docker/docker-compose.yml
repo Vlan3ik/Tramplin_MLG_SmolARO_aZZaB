@@ -27,7 +27,9 @@
       - minio_data:/data
 
   minio-init:
-    image: minio/mc:latest
+    build:
+      context: .
+      dockerfile: ./minio/mc-init.Dockerfile
     container_name: tramplin_minio_init
     depends_on:
       - minio
