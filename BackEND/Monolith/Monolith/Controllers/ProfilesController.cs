@@ -49,7 +49,6 @@ public class ProfilesController(AppDbContext dbContext) : ControllerBase
         return Ok(new PublicProfileResponse(
             profile.UserId,
             profile.User.Username,
-            canViewProfile ? profile.User.DisplayName : "Скрытый профиль",
             canViewProfile ? profile.FirstName : string.Empty,
             canViewProfile ? profile.LastName : string.Empty,
             canViewProfile ? profile.MiddleName : null,

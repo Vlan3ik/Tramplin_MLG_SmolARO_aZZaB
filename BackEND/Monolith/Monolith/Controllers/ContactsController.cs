@@ -24,7 +24,7 @@ public class ContactsController(AppDbContext dbContext) : ControllerBase
         var contacts = await dbContext.UserContacts
             .AsNoTracking()
             .Where(x => x.UserId == userId)
-            .Select(x => new ContactUserDto(x.ContactUserId, x.ContactUser.Username, x.ContactUser.DisplayName, x.ContactUser.AvatarUrl))
+            .Select(x => new ContactUserDto(x.ContactUserId, x.ContactUser.Username, x.ContactUser.AvatarUrl))
             .ToListAsync(cancellationToken);
         return Ok(contacts);
     }
@@ -95,8 +95,8 @@ public class ContactsController(AppDbContext dbContext) : ControllerBase
             .OrderByDescending(x => x.CreatedAt)
             .Select(x => new ContactRequestDto(
                 x.Id,
-                new ContactUserDto(x.FromUserId, x.FromUser.Username, x.FromUser.DisplayName, x.FromUser.AvatarUrl),
-                new ContactUserDto(x.ToUserId, x.ToUser.Username, x.ToUser.DisplayName, x.ToUser.AvatarUrl),
+                new ContactUserDto(x.FromUserId, x.FromUser.Username, x.FromUser.AvatarUrl),
+                new ContactUserDto(x.ToUserId, x.ToUser.Username, x.ToUser.AvatarUrl),
                 x.Status,
                 x.CreatedAt))
             .ToListAsync(cancellationToken);
@@ -117,8 +117,8 @@ public class ContactsController(AppDbContext dbContext) : ControllerBase
             .OrderByDescending(x => x.CreatedAt)
             .Select(x => new ContactRequestDto(
                 x.Id,
-                new ContactUserDto(x.FromUserId, x.FromUser.Username, x.FromUser.DisplayName, x.FromUser.AvatarUrl),
-                new ContactUserDto(x.ToUserId, x.ToUser.Username, x.ToUser.DisplayName, x.ToUser.AvatarUrl),
+                new ContactUserDto(x.FromUserId, x.FromUser.Username, x.FromUser.AvatarUrl),
+                new ContactUserDto(x.ToUserId, x.ToUser.Username, x.ToUser.AvatarUrl),
                 x.Status,
                 x.CreatedAt))
             .ToListAsync(cancellationToken);

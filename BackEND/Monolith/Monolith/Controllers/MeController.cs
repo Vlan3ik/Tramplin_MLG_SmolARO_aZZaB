@@ -38,7 +38,7 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             .Select(x => x.Role.ToString().ToLowerInvariant())
             .ToListAsync(cancellationToken);
 
-        return Ok(new MeResponse(user.Id, user.Email, user.Username, user.DisplayName, user.AvatarUrl, roles));
+        return Ok(new MeResponse(user.Id, user.Email, user.Username, user.AvatarUrl, roles));
     }
 
     /// <summary>
@@ -64,7 +64,6 @@ public class MeController(AppDbContext dbContext) : ControllerBase
         return Ok(new ProfileResponse(
             profile.UserId,
             profile.User.Username,
-            profile.User.DisplayName,
             profile.FirstName,
             profile.LastName,
             profile.MiddleName,
@@ -94,9 +93,9 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             return this.ToNotFoundError("me.profile.not_found", "Профиль соискателя не найден.");
         }
 
-        profile.User.DisplayName = request.DisplayName.Trim();
         profile.FirstName = request.FirstName.Trim();
         profile.LastName = request.LastName.Trim();
+        profile.User.DisplayName = $"{profile.FirstName} {profile.LastName}".Trim();
         profile.MiddleName = request.MiddleName?.Trim();
         profile.Phone = request.Phone?.Trim();
         profile.About = request.About?.Trim();
@@ -108,7 +107,6 @@ public class MeController(AppDbContext dbContext) : ControllerBase
         return Ok(new ProfileResponse(
             profile.UserId,
             profile.User.Username,
-            profile.User.DisplayName,
             profile.FirstName,
             profile.LastName,
             profile.MiddleName,

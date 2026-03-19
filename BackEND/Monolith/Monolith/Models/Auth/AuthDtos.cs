@@ -2,7 +2,7 @@ using Monolith.Entities;
 
 namespace Monolith.Models.Auth;
 
-public record RegisterRequest(string Email, string Password, string DisplayName, PlatformRole Role);
+public record RegisterRequest(string Email, string Password, string FirstName, string LastName, PlatformRole Role);
 
 public record LoginRequest(string Email, string Password);
 
@@ -20,7 +20,7 @@ public record AuthResponse(
     AuthUserDto User
 );
 
-public record AuthUserDto(long Id, string Email, string Username, string DisplayName, string? AvatarUrl, IReadOnlyCollection<string> Roles);
+public record AuthUserDto(long Id, string Email, string Username, string? AvatarUrl, IReadOnlyCollection<string> Roles);
 
 /// <summary>
 /// Элемент справочника ролей платформы.

@@ -46,12 +46,16 @@ public class AuthController(
             return this.ToConflictError("auth.registration.email_exists", "Пользователь с таким email уже зарегистрирован.");
         }
 
+        var firstName = request.FirstName.Trim();
+        var lastName = request.LastName.Trim();
+        var fullName = $"{firstName} {lastName}".Trim();
+
         var user = new User
         {
             Email = request.Email.Trim().ToLowerInvariant(),
-            Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, request.DisplayName, cancellationToken),
+            Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, fullName, cancellationToken),
             PasswordHash = passwordHasher.HashPassword(request.Password),
-            DisplayName = request.DisplayName.Trim(),
+            DisplayName = fullName,
             Status = AccountStatus.Active
         };
         dbContext.Users.Add(user);
@@ -69,8 +73,8 @@ public class AuthController(
             dbContext.CandidateProfiles.Add(new CandidateProfile
             {
                 UserId = user.Id,
-                LastName = "LastName",
-                FirstName = "FirstName"
+                LastName = lastName,
+                FirstName = firstName
             });
             dbContext.CandidatePrivacySettings.Add(new CandidatePrivacySettings { UserId = user.Id });
             dbContext.CandidateResumeProfiles.Add(new CandidateResumeProfile { UserId = user.Id });
@@ -166,7 +170,7 @@ public class AuthController(
             access.ExpiresAt,
             result.Value.NewToken.RefreshToken,
             result.Value.NewToken.ExpiresAt,
-            new AuthUserDto(user.Id, user.Email, user.Username, user.DisplayName, user.AvatarUrl, roles.Select(x => x.ToString().ToLowerInvariant()).ToArray())));
+            new AuthUserDto(user.Id, user.Email, user.Username, user.AvatarUrl, roles.Select(x => x.ToString().ToLowerInvariant()).ToArray())));
     }
 
     /// <summary>
@@ -227,6 +231,6 @@ public class AuthController(
             access.ExpiresAt,
             refresh.RefreshToken,
             refresh.ExpiresAt,
-            new AuthUserDto(user.Id, user.Email, user.Username, user.DisplayName, user.AvatarUrl, roles.Select(x => x.ToString().ToLowerInvariant()).ToArray()));
+            new AuthUserDto(user.Id, user.Email, user.Username, user.AvatarUrl, roles.Select(x => x.ToString().ToLowerInvariant()).ToArray()));
     }
 }

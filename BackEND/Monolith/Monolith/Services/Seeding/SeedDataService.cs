@@ -41,7 +41,7 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         }
     }
 
-    private async Task<User> EnsureUserAsync(string email, string displayName, string password, AccountStatus status, string? avatarUrl = null)
+    private async Task<User> EnsureUserAsync(string email, string fullName, string password, AccountStatus status, string? avatarUrl = null)
     {
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Email == normalizedEmail);
@@ -49,7 +49,7 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         {
             if (string.IsNullOrWhiteSpace(user.Username))
             {
-                user.Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, displayName, CancellationToken.None);
+                user.Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, fullName, CancellationToken.None);
             }
             if (!string.IsNullOrWhiteSpace(avatarUrl) && string.IsNullOrWhiteSpace(user.AvatarUrl))
             {
@@ -62,8 +62,8 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         user = new User
         {
             Email = normalizedEmail,
-            Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, displayName, CancellationToken.None),
-            DisplayName = displayName,
+            Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, fullName, CancellationToken.None),
+            DisplayName = fullName,
             AvatarUrl = avatarUrl,
             PasswordHash = passwordHasher.HashPassword(password),
             Status = status

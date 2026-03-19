@@ -7,20 +7,21 @@ namespace Monolith.Models.Admin;
 /// </summary>
 /// <param name="Id">Идентификатор пользователя.</param>
 /// <param name="Email">Email пользователя (уникальный).</param>
-/// <param name="DisplayName">Отображаемое имя.</param>
+/// <param name="Username">Username пользователя.</param>
 /// <param name="Status">Статус учетной записи.</param>
 /// <param name="Roles">Набор платформенных ролей (string-коды).</param>
 /// <param name="CreatedAt">Дата создания учетной записи.</param>
-public record AdminUserListItemDto(long Id, string Email, string DisplayName, AccountStatus Status, IReadOnlyCollection<string> Roles, DateTimeOffset CreatedAt);
+public record AdminUserListItemDto(long Id, string Email, string Username, AccountStatus Status, IReadOnlyCollection<string> Roles, DateTimeOffset CreatedAt);
 
 /// <summary>
 /// Данные для создания/обновления пользователя в админ-контуре.
 /// </summary>
 /// <param name="Email">Email пользователя.</param>
-/// <param name="DisplayName">Отображаемое имя.</param>
+/// <param name="FirstName">Имя пользователя.</param>
+/// <param name="LastName">Фамилия пользователя.</param>
 /// <param name="Status">Статус учетной записи.</param>
 /// <param name="Roles">Набор платформенных ролей.</param>
-public record AdminUserUpsertRequest(string Email, string DisplayName, AccountStatus Status, IReadOnlyCollection<PlatformRole> Roles);
+public record AdminUserUpsertRequest(string Email, string FirstName, string LastName, AccountStatus Status, IReadOnlyCollection<PlatformRole> Roles);
 
 /// <summary>
 /// Краткая карточка компании для административного списка.

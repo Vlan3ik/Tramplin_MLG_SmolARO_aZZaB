@@ -2,10 +2,9 @@ using Monolith.Entities;
 
 namespace Monolith.Models.Me;
 
-public record MeResponse(long Id, string Email, string Username, string DisplayName, string? AvatarUrl, IReadOnlyCollection<string> Roles);
+public record MeResponse(long Id, string Email, string Username, string? AvatarUrl, IReadOnlyCollection<string> Roles);
 
 public record UpdateProfileRequest(
-    string DisplayName,
     string FirstName,
     string LastName,
     string? MiddleName,
@@ -16,7 +15,6 @@ public record UpdateProfileRequest(
 public record ProfileResponse(
     long UserId,
     string Username,
-    string DisplayName,
     string FirstName,
     string LastName,
     string? MiddleName,
@@ -105,7 +103,6 @@ public record ProfileStatsResponse(
 public record PublicProfileResponse(
     long UserId,
     string Username,
-    string DisplayName,
     string FirstName,
     string LastName,
     string? MiddleName,
