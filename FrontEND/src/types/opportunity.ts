@@ -24,6 +24,7 @@ export type OpportunityDetail = Opportunity & {
   fullDescription: string
   publishAt: string | null
   applicationDeadline: string | null
+  isParticipating?: boolean
   companyId: number | null
   companyWebsiteUrl: string | null
   companyPublicEmail: string | null

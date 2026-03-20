@@ -1,4 +1,4 @@
-import { getJson, postJson } from './client'
+import { getJson, putJson } from './client'
 import type { SeekerProfile, SeekerProfileStats, UpdateSeekerProfileRequest } from '../types/me'
 import type { SeekerResume } from '../types/resume'
 
@@ -86,7 +86,7 @@ export function fetchSeekerProfile(signal?: AbortSignal) {
 }
 
 export function updateSeekerProfile(payload: UpdateSeekerProfileRequest) {
-  return postJson<SeekerProfile, UpdateSeekerProfileRequest>('/me/profile', payload)
+  return putJson<SeekerProfile, UpdateSeekerProfileRequest>('/me/profile', payload)
 }
 
 export async function fetchSeekerResume(signal?: AbortSignal): Promise<SeekerResume> {
@@ -177,7 +177,7 @@ export async function updateSeekerResume(payload: SeekerResume) {
     })),
   }
 
-  const response = await postJson<ResumeApiResponse, UpdateResumeDetailsRequest>('/me/resume/details', body)
+  const response = await putJson<ResumeApiResponse, UpdateResumeDetailsRequest>('/me/resume/details', body)
 
   return {
     userId: response.userId,

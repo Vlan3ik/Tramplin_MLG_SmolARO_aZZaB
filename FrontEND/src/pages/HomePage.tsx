@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createApplication } from '../api/applications'
-import { fetchHomeOpportunities, fetchOpportunityDetailById } from '../api/opportunities'
+import { fetchHomeOpportunities, fetchOpportunityDetailById, participateInOpportunity } from '../api/opportunities'
 import { FilterSidebar } from '../components/home/FilterSidebar'
 import { MapBoard } from '../components/home/MapBoard'
 import { OpportunityCard } from '../components/home/OpportunityCard'
@@ -129,6 +129,13 @@ export function HomePage() {
 
     try {
       const detail = await fetchOpportunityDetailById(opportunity.id)
+
+      if (detail.type === 'event') {
+        await participateInOpportunity(detail.id)
+        setActionError(false)
+        setActionMessage('Вы успешно записались на мероприятие.')
+        return
+      }
 
       if (!detail.companyId) {
         throw new Error('У вакансии не указан идентификатор компании.')

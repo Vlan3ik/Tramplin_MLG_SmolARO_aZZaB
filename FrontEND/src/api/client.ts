@@ -273,3 +273,129 @@ export async function postJson<TResponse, TRequest extends object>(
 
   return responseBody as TResponse
 }
+
+export async function putJson<TResponse, TRequest extends object>(
+  path: string,
+  payload: TRequest,
+  options?: {
+    signal?: AbortSignal
+    withAuth?: boolean
+    retryOnUnauthorized?: boolean
+  },
+) {
+  const withAuth = options?.withAuth ?? true
+  const retryOnUnauthorized = options?.retryOnUnauthorized ?? true
+  await ensureFreshAccessToken(path, withAuth)
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    headers: createHeaders(withAuth, true),
+    body: JSON.stringify(payload),
+    signal: options?.signal,
+  })
+
+  if (response.status === 401 && retryOnUnauthorized && canRetryWithRefresh(path, withAuth)) {
+    const refreshed = await refreshAccessTokenShared()
+
+    if (refreshed) {
+      return putJson<TResponse, TRequest>(path, payload, {
+        ...options,
+        withAuth,
+        retryOnUnauthorized: false,
+      })
+    }
+  }
+
+  const isJsonResponse = response.headers.get('content-type')?.includes('application/json')
+  const responseBody = isJsonResponse ? ((await response.json()) as TResponse | ApiErrorPayload) : null
+
+  if (!response.ok) {
+    throw new Error(toApiErrorMessage(responseBody as ApiErrorPayload | null, response.status))
+  }
+
+  return responseBody as TResponse
+}
+
+export async function patchJson<TResponse, TRequest extends object>(
+  path: string,
+  payload: TRequest,
+  options?: {
+    signal?: AbortSignal
+    withAuth?: boolean
+    retryOnUnauthorized?: boolean
+  },
+) {
+  const withAuth = options?.withAuth ?? true
+  const retryOnUnauthorized = options?.retryOnUnauthorized ?? true
+  await ensureFreshAccessToken(path, withAuth)
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PATCH',
+    headers: createHeaders(withAuth, true),
+    body: JSON.stringify(payload),
+    signal: options?.signal,
+  })
+
+  if (response.status === 401 && retryOnUnauthorized && canRetryWithRefresh(path, withAuth)) {
+    const refreshed = await refreshAccessTokenShared()
+
+    if (refreshed) {
+      return patchJson<TResponse, TRequest>(path, payload, {
+        ...options,
+        withAuth,
+        retryOnUnauthorized: false,
+      })
+    }
+  }
+
+  const isJsonResponse = response.headers.get('content-type')?.includes('application/json')
+  const responseBody = isJsonResponse ? ((await response.json()) as TResponse | ApiErrorPayload) : null
+
+  if (!response.ok) {
+    throw new Error(toApiErrorMessage(responseBody as ApiErrorPayload | null, response.status))
+  }
+
+  return responseBody as TResponse
+}
+
+export async function postForm<TResponse>(
+  path: string,
+  payload: FormData,
+  options?: {
+    signal?: AbortSignal
+    withAuth?: boolean
+    retryOnUnauthorized?: boolean
+  },
+) {
+  const withAuth = options?.withAuth ?? true
+  const retryOnUnauthorized = options?.retryOnUnauthorized ?? true
+  await ensureFreshAccessToken(path, withAuth)
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: createHeaders(withAuth, false),
+    body: payload,
+    signal: options?.signal,
+  })
+
+  if (response.status === 401 && retryOnUnauthorized && canRetryWithRefresh(path, withAuth)) {
+    const refreshed = await refreshAccessTokenShared()
+
+    if (refreshed) {
+      return postForm<TResponse>(path, payload, {
+        ...options,
+        withAuth,
+        retryOnUnauthorized: false,
+      })
+    }
+  }
+
+  const isJsonResponse = response.headers.get('content-type')?.includes('application/json')
+  const responseBody = isJsonResponse ? ((await response.json()) as TResponse | ApiErrorPayload) : null
+
+  if (!response.ok) {
+    throw new Error(toApiErrorMessage(responseBody as ApiErrorPayload | null, response.status))
+  }
+
+  return responseBody as TResponse
+}

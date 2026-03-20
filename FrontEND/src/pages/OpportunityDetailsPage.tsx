@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { createApplication } from '../api/applications'
-import { fetchHomeOpportunities, fetchOpportunityDetailById } from '../api/opportunities'
+import { fetchHomeOpportunities, fetchOpportunityDetailById, participateInOpportunity } from '../api/opportunities'
 import { OpportunityLocationMap } from '../components/home/OpportunityLocationMap'
 import { OpportunityCard } from '../components/home/OpportunityCard'
 import { useApplications } from '../hooks/useApplications'
@@ -51,6 +51,7 @@ export function OpportunityDetailsPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState(false)
+  const [eventParticipating, setEventParticipating] = useState(false)
 
   const opportunityId = Number(id)
 
@@ -75,6 +76,7 @@ export function OpportunityDetailsPage() {
         }
 
         setOpportunity(detail)
+        setEventParticipating(Boolean(detail.isParticipating))
         setIsFavorite(isFavoriteOpportunity(detail.id))
 
         const similarResponse = await fetchHomeOpportunities(
@@ -118,7 +120,17 @@ export function OpportunityDetailsPage() {
     return unsubscribe
   }, [opportunity])
 
-  const applied = useMemo(() => (opportunity ? hasApplied(opportunity.id) : false), [opportunity, hasApplied])
+  const applied = useMemo(() => {
+    if (!opportunity) {
+      return false
+    }
+
+    if (opportunity.type === 'event') {
+      return eventParticipating
+    }
+
+    return hasApplied(opportunity.id)
+  }, [eventParticipating, opportunity, hasApplied])
 
   function handleToggleFavorite() {
     if (!opportunity) {
@@ -148,7 +160,7 @@ export function OpportunityDetailsPage() {
       return
     }
 
-    if (!opportunity.companyId) {
+    if (opportunity.type !== 'event' && !opportunity.companyId) {
       setActionError(true)
       setActionMessage('У вакансии не указан идентификатор компании.')
       return
@@ -157,8 +169,22 @@ export function OpportunityDetailsPage() {
     setIsApplying(true)
 
     try {
+      if (opportunity.type === 'event') {
+        await participateInOpportunity(opportunity.id)
+        setEventParticipating(true)
+        setActionError(false)
+        setActionMessage('Вы успешно записались на мероприятие.')
+        return
+      }
+
+      const companyId = opportunity.companyId
+
+      if (companyId == null) {
+        throw new Error('У вакансии не указан идентификатор компании.')
+      }
+
       await createApplication({
-        companyId: opportunity.companyId,
+        companyId,
         candidateUserId: session.user.id,
         opportunityId: opportunity.id,
         initiatorRole: 1,

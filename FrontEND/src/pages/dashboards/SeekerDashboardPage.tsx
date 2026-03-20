@@ -428,7 +428,7 @@ export function SeekerDashboardPage() {
     setProfileError('')
 
     try {
-      const response = await uploadMyAvatar(session.accessToken, file)
+      const response = await uploadMyAvatar(file)
       setProfileForm((state) => ({ ...state, avatarUrl: response.url }))
       setProfile((current) => (current ? { ...current, avatarUrl: response.url } : current))
       setSuccess('Аватарка загружена.')

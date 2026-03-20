@@ -728,6 +728,82 @@
   gap: 0.6rem;
 }
 
+.employer-company-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.employer-company-header__identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.employer-analytics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+
+  article {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    padding: 0.75rem;
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  strong {
+    font-size: 1.1rem;
+  }
+
+  span {
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+  }
+}
+
+.employer-verification {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 0.8rem;
+}
+
+.employer-verification__status {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.8rem;
+  display: grid;
+  align-content: start;
+  gap: 0.65rem;
+}
+
+.employer-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.employer-company-contacts {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.45rem;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
 @media (max-width: 1080px) {
   .seeker-profile-hero {
     grid-template-columns: 1fr;
@@ -760,6 +836,14 @@
 
   .resume-output-grid {
     grid-template-columns: 1fr;
+  }
+
+  .employer-verification {
+    grid-template-columns: 1fr;
+  }
+
+  .employer-analytics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -795,5 +879,9 @@
     .btn {
       width: 100%;
     }
+  }
+
+  .employer-analytics {
+    grid-template-columns: 1fr;
   }
 }
