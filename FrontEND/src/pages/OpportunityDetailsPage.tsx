@@ -125,7 +125,7 @@ export function OpportunityDetailsPage() {
       return false
     }
 
-    if (opportunity.type === 'event') {
+    if (opportunity.type !== 'vacancy' && opportunity.type !== 'internship') {
       return eventParticipating
     }
 
@@ -160,7 +160,7 @@ export function OpportunityDetailsPage() {
       return
     }
 
-    if (opportunity.type !== 'event' && !opportunity.companyId) {
+    if ((opportunity.type === 'vacancy' || opportunity.type === 'internship') && !opportunity.companyId) {
       setActionError(true)
       setActionMessage('У вакансии не указан идентификатор компании.')
       return
@@ -169,7 +169,7 @@ export function OpportunityDetailsPage() {
     setIsApplying(true)
 
     try {
-      if (opportunity.type === 'event') {
+      if (opportunity.type !== 'vacancy' && opportunity.type !== 'internship') {
         await participateInOpportunity(opportunity.id)
         setEventParticipating(true)
         setActionError(false)
@@ -186,7 +186,7 @@ export function OpportunityDetailsPage() {
       await createApplication({
         companyId,
         candidateUserId: session.user.id,
-        opportunityId: opportunity.id,
+        vacancyId: opportunity.id,
         initiatorRole: 1,
       })
 
@@ -272,7 +272,7 @@ export function OpportunityDetailsPage() {
 
         <aside className="sticky-action card">
           <button className="btn btn--primary" type="button" disabled={isApplying || applied} onClick={() => void handleApply()}>
-            {isApplying ? 'Отправляем...' : applied ? 'Отклик отправлен' : opportunity.type === 'event' ? 'Записаться' : 'Откликнуться'}
+            {isApplying ? 'Отправляем...' : applied ? 'Отклик отправлен' : opportunity.type !== 'vacancy' && opportunity.type !== 'internship' ? 'Записаться' : 'Откликнуться'}
           </button>
           <button className={`btn ${isFavorite ? 'btn--primary' : 'btn--ghost'}`} type="button" onClick={handleToggleFavorite}>
             {isFavorite ? 'В избранном' : 'В избранное'}

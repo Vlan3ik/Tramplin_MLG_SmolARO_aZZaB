@@ -399,3 +399,43 @@ export async function postForm<TResponse>(
 
   return responseBody as TResponse
 }
+
+export async function deleteJson<TResponse>(
+  path: string,
+  options?: {
+    signal?: AbortSignal
+    withAuth?: boolean
+    retryOnUnauthorized?: boolean
+  },
+) {
+  const withAuth = options?.withAuth ?? true
+  const retryOnUnauthorized = options?.retryOnUnauthorized ?? true
+  await ensureFreshAccessToken(path, withAuth)
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'DELETE',
+    headers: createHeaders(withAuth, false),
+    signal: options?.signal,
+  })
+
+  if (response.status === 401 && retryOnUnauthorized && canRetryWithRefresh(path, withAuth)) {
+    const refreshed = await refreshAccessTokenShared()
+
+    if (refreshed) {
+      return deleteJson<TResponse>(path, {
+        ...options,
+        withAuth,
+        retryOnUnauthorized: false,
+      })
+    }
+  }
+
+  const isJsonResponse = response.headers.get('content-type')?.includes('application/json')
+  const responseBody = isJsonResponse ? ((await response.json()) as TResponse | ApiErrorPayload) : null
+
+  if (!response.ok) {
+    throw new Error(toApiErrorMessage(responseBody as ApiErrorPayload | null, response.status))
+  }
+
+  return responseBody as TResponse
+}

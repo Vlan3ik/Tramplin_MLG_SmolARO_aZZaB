@@ -1,21 +1,46 @@
 import { Building2, Clock3, Globe, Mail, MapPin, MessageSquare, Phone, ShieldCheck, UploadCloud } from 'lucide-react'
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { fetchCities } from '../../api/catalog'
+import { fetchCities, fetchLocations, fetchTags } from '../../api/catalog'
+import { fetchEmployerChats } from '../../api/chats'
 import {
   createEmployerCompany,
+  createEmployerOpportunity,
+  createEmployerVacancy,
+  deleteEmployerOpportunity,
+  deleteEmployerVacancy,
+  fetchEmployerApplicationDetail,
+  fetchEmployerApplications,
   fetchEmployerCompany,
   fetchEmployerCompanyOpportunities,
+  fetchEmployerOpportunityDetail,
+  fetchEmployerVacancyDetail,
   submitEmployerCompanyVerification,
+  updateEmployerOpportunity,
+  updateEmployerApplicationStatus,
   updateEmployerCompanyChatSettings,
   updateEmployerCompanyVerification,
+  updateEmployerVacancy,
+  type EmployerApplication,
+  type EmployerApplicationDetail,
   type EmployerCompany,
+  type EmployerOpportunity,
 } from '../../api/employer'
-import { fetchMyChats } from '../../api/chats'
 import { uploadCompanyLogo } from '../../api/media'
-import { DashboardLayout } from '../../components/dashboard/DashboardLayout'
-import type { City } from '../../types/catalog'
+import { Footer } from '../../components/layout/Footer'
+import { MainHeader } from '../../components/layout/MainHeader'
+import { TopServiceBar } from '../../components/layout/TopServiceBar'
+import type { City, Location, TagListItem } from '../../types/catalog'
 
-const menu = ['Обзор', 'Профиль компании', 'Создать возможность', 'Мои возможности', 'Отклики', 'Аналитика', 'Верификация']
+type EmployerTabId = 'overview' | 'company' | 'create' | 'opportunities' | 'applications' | 'verification'
+
+const employerTabs: Array<{ id: EmployerTabId; label: string }> = [
+  { id: 'overview', label: 'Обзор' },
+  { id: 'company', label: 'Профиль компании' },
+  { id: 'create', label: 'Создать возможность' },
+  { id: 'opportunities', label: 'Мои возможности' },
+  { id: 'applications', label: 'Отклики' },
+  { id: 'verification', label: 'Верификация' },
+]
 
 const companyStatusLabel: Record<string, string> = {
   draft: 'Черновик',
@@ -33,14 +58,25 @@ const companyStatusTone: Record<string, 'success' | 'warning' | 'danger'> = {
   draft: 'warning',
 }
 
+const applicationStatusLabel: Record<number, string> = {
+  1: 'Новый',
+  2: 'На рассмотрении',
+  3: 'Интервью',
+  4: 'Оффер',
+  5: 'Нанят',
+  6: 'Отклонен',
+  7: 'Отменен',
+}
+
+const applicationStatusUpdateOptions = [2, 3, 4, 5, 6, 7]
+
 function isAbortError(error: unknown) {
   if (error instanceof DOMException && error.name === 'AbortError') {
     return true
   }
 
   if (error instanceof Error) {
-    const message = error.message.toLowerCase()
-    return message.includes('abort')
+    return error.message.toLowerCase().includes('abort')
   }
 
   return false
@@ -60,6 +96,70 @@ function toTimeInputValue(value: string) {
   return ''
 }
 
+function toLocalDateTimeInputValue(value: string) {
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+function toIsoDateTimeFromLocalInput(value: string) {
+  const normalized = value.trim()
+  if (!normalized) {
+    return ''
+  }
+
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return date.toISOString()
+}
+
+function toNumberOrNull(value: string) {
+  const normalized = value.trim()
+  if (!normalized) {
+    return null
+  }
+
+  const parsed = Number(normalized.replace(',', '.'))
+  if (!Number.isFinite(parsed)) {
+    return null
+  }
+
+  return parsed
+}
+
+function normalizeCurrencyCode(value: string) {
+  const normalized = value.trim().toUpperCase()
+  return normalized ? normalized : null
+}
+
+function locationOptionLabel(location: Location) {
+  const addressParts = [location.streetName, location.houseNumber].filter(Boolean)
+  const address = addressParts.length ? addressParts.join(', ') : 'Адрес не указан'
+  return `${location.cityName}: ${address}`
+}
+
+function parseSelectedNumberOptions(options: HTMLOptionsCollection) {
+  return Array.from(options)
+    .filter((option) => option.selected)
+    .map((option) => Number(option.value))
+    .filter((value) => Number.isInteger(value) && value > 0)
+}
+
 function formatDate(value: string) {
   const date = new Date(value)
 
@@ -70,25 +170,47 @@ function formatDate(value: string) {
   return date.toLocaleDateString('ru-RU')
 }
 
+function formatMoneyRange(min: number | null | undefined, max: number | null | undefined, currencyCode: string | null | undefined) {
+  if (min == null && max == null) {
+    return 'По договоренности'
+  }
+
+  const currency = currencyCode ?? 'RUB'
+  const formatter = new Intl.NumberFormat('ru-RU')
+
+  if (min != null && max != null) {
+    return `${formatter.format(min)} - ${formatter.format(max)} ${currency}`
+  }
+
+  if (min != null) {
+    return `от ${formatter.format(min)} ${currency}`
+  }
+
+  return `до ${formatter.format(max ?? 0)} ${currency}`
+}
+
 function toLowerSafe(value: string | null | undefined) {
   return (value ?? '').toLowerCase()
 }
 
+function opportunityTypeLabel(value: EmployerOpportunity['type']) {
+  if (value === 'internship') return 'Стажировка'
+  if (value === 'mentorship') return 'Менторство'
+  if (value === 'event') return 'Мероприятие'
+  return 'Вакансия'
+}
+
 export function EmployerDashboardPage() {
+  const [tab, setTab] = useState<EmployerTabId>('overview')
   const [company, setCompany] = useState<EmployerCompany | null>(null)
   const [companyMissing, setCompanyMissing] = useState(false)
   const [cities, setCities] = useState<City[]>([])
-  const [opportunities, setOpportunities] = useState<
-    Array<{
-      id: number
-      title: string
-      format: string
-      locationName: string
-      salaryLabel: string
-      publishAt: string
-      tags: string[]
-    }>
-  >([])
+  const [tags, setTags] = useState<TagListItem[]>([])
+  const [vacancyLocations, setVacancyLocations] = useState<Location[]>([])
+  const [opportunityLocations, setOpportunityLocations] = useState<Location[]>([])
+  const [opportunities, setOpportunities] = useState<EmployerOpportunity[]>([])
+  const [applications, setApplications] = useState<EmployerApplication[]>([])
+  const [applicationStatusDrafts, setApplicationStatusDrafts] = useState<Record<number, number>>({})
   const [applicationChats, setApplicationChats] = useState<Array<{ id: number; title: string; lastMessageText: string; lastMessageAt: string }>>([])
 
   const [loading, setLoading] = useState(true)
@@ -97,6 +219,15 @@ export function EmployerDashboardPage() {
   const [submittingVerification, setSubmittingVerification] = useState(false)
   const [creatingCompany, setCreatingCompany] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [creatingVacancy, setCreatingVacancy] = useState(false)
+  const [creatingOpportunity, setCreatingOpportunity] = useState(false)
+  const [updatingApplicationId, setUpdatingApplicationId] = useState<number | null>(null)
+  const [loadingApplicationDetailId, setLoadingApplicationDetailId] = useState<number | null>(null)
+  const [selectedApplicationDetail, setSelectedApplicationDetail] = useState<EmployerApplicationDetail | null>(null)
+  const [editingVacancyId, setEditingVacancyId] = useState<number | null>(null)
+  const [editingOpportunityId, setEditingOpportunityId] = useState<number | null>(null)
+  const [loadingOpportunityEditorKey, setLoadingOpportunityEditorKey] = useState<string | null>(null)
+  const [deletingOpportunityKey, setDeletingOpportunityKey] = useState<string | null>(null)
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -105,6 +236,42 @@ export function EmployerDashboardPage() {
     legalName: '',
     brandName: '',
     logoUrl: '',
+  })
+
+  const [vacancyForm, setVacancyForm] = useState({
+    title: '',
+    shortDescription: '',
+    fullDescription: '',
+    kind: 2,
+    format: 2,
+    status: 1,
+    cityId: '',
+    locationId: '',
+    salaryFrom: '',
+    salaryTo: '',
+    currencyCode: 'RUB',
+    salaryTaxMode: 3,
+    publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
+    applicationDeadline: '',
+    tagIds: [] as number[],
+  })
+
+  const [opportunityForm, setOpportunityForm] = useState({
+    title: '',
+    shortDescription: '',
+    fullDescription: '',
+    kind: 4,
+    format: 2,
+    status: 1,
+    cityId: '',
+    locationId: '',
+    priceType: 1,
+    priceAmount: '',
+    priceCurrencyCode: 'RUB',
+    participantsCanWrite: true,
+    publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
+    eventDate: '',
+    tagIds: [] as number[],
   })
 
   const [profileForm, setProfileForm] = useState({
@@ -136,23 +303,37 @@ export function EmployerDashboardPage() {
     setError('')
 
     try {
-      const [citiesResult, chatsResult] = await Promise.allSettled([fetchCities(), fetchMyChats()])
+      const [citiesResult, tagsResult, chatsResult, applicationsResult] = await Promise.allSettled([
+        fetchCities(),
+        fetchTags(),
+        fetchEmployerChats(),
+        fetchEmployerApplications(),
+      ])
 
       if (citiesResult.status === 'fulfilled') {
         setCities(citiesResult.value)
       }
 
+      if (tagsResult.status === 'fulfilled') {
+        setTags(tagsResult.value)
+      }
+
       if (chatsResult.status === 'fulfilled') {
-        const chats = chatsResult.value
-          .filter((chat) => chat.type === 1)
-          .map((chat) => ({
-            id: chat.id,
-            title: chat.title?.trim() || `Чат #${chat.id}`,
-            lastMessageText: chat.lastMessage?.text?.trim() || 'Сообщений пока нет',
-            lastMessageAt: chat.lastMessage?.createdAt ?? chat.createdAt,
-          }))
+        const chats = chatsResult.value.map((chat) => ({
+          id: chat.id,
+          title: chat.title?.trim() || `Чат #${chat.id}`,
+          lastMessageText: chat.lastMessage?.text?.trim() || 'Сообщений пока нет',
+          lastMessageAt: chat.lastMessage?.createdAt ?? chat.createdAt,
+        }))
 
         setApplicationChats(chats)
+      }
+
+      if (applicationsResult.status === 'fulfilled') {
+        setApplications(applicationsResult.value)
+        setApplicationStatusDrafts(
+          Object.fromEntries(applicationsResult.value.map((application) => [application.id, application.status])),
+        )
       }
 
       const employerCompany = await fetchEmployerCompany()
@@ -183,7 +364,7 @@ export function EmployerDashboardPage() {
         workingHoursTo: toTimeInputValue(employerCompany.chatSettings.workingHoursTo),
       })
 
-      const companyOpportunities = await fetchEmployerCompanyOpportunities(employerCompany.id)
+      const companyOpportunities = await fetchEmployerCompanyOpportunities()
       setOpportunities(companyOpportunities)
     } catch (loadError) {
       if (isAbortError(loadError)) {
@@ -209,6 +390,56 @@ export function EmployerDashboardPage() {
     void loadDashboard()
   }, [loadDashboard])
 
+  useEffect(() => {
+    const cityId = Number(vacancyForm.cityId)
+    if (!Number.isInteger(cityId) || cityId <= 0) {
+      setVacancyLocations([])
+      return
+    }
+
+    let active = true
+    void fetchLocations(cityId)
+      .then((items) => {
+        if (active) {
+          setVacancyLocations(items)
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setVacancyLocations([])
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [vacancyForm.cityId])
+
+  useEffect(() => {
+    const cityId = Number(opportunityForm.cityId)
+    if (!Number.isInteger(cityId) || cityId <= 0) {
+      setOpportunityLocations([])
+      return
+    }
+
+    let active = true
+    void fetchLocations(cityId)
+      .then((items) => {
+        if (active) {
+          setOpportunityLocations(items)
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setOpportunityLocations([])
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [opportunityForm.cityId])
+
   const statusCode = toLowerSafe(company?.status)
   const companyStatusText = companyStatusLabel[statusCode] ?? 'Статус не определен'
   const companyStatusToneClass = companyStatusTone[statusCode] ?? 'warning'
@@ -225,11 +456,11 @@ export function EmployerDashboardPage() {
 
     return {
       opportunitiesTotal: opportunities.length,
-      responsesTotal: applicationChats.length,
+      responsesTotal: applications.length,
       responsesRecent: recentChats,
       status: companyStatusText,
     }
-  }, [applicationChats, companyStatusText, opportunities.length])
+  }, [applicationChats, applications.length, companyStatusText, opportunities.length])
 
   function onCreateFormChange(event: ChangeEvent<HTMLInputElement>) {
     const { name, value } = event.target
@@ -254,6 +485,96 @@ export function EmployerDashboardPage() {
     }))
   }
 
+  function onVacancyFormChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
+    const { name, value } = event.target
+    setVacancyForm((state) => ({
+      ...state,
+      [name]: name === 'kind' || name === 'format' || name === 'status' || name === 'salaryTaxMode' ? Number(value) || 0 : value,
+      ...(name === 'cityId' ? { locationId: '' } : {}),
+    }))
+  }
+
+  function onOpportunityFormChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
+    const { name, value, type } = event.target
+    const checked = (event.target as HTMLInputElement).checked
+
+    setOpportunityForm((state) => ({
+      ...state,
+      [name]:
+        name === 'kind' || name === 'format' || name === 'status' || name === 'priceType'
+          ? Number(value) || 0
+          : type === 'checkbox'
+            ? checked
+            : value,
+      ...(name === 'cityId' ? { locationId: '' } : {}),
+    }))
+  }
+
+  function onVacancyTagsChange(event: ChangeEvent<HTMLSelectElement>) {
+    const values = parseSelectedNumberOptions(event.target.options)
+    setVacancyForm((state) => ({
+      ...state,
+      tagIds: values,
+    }))
+  }
+
+  function onOpportunityTagsChange(event: ChangeEvent<HTMLSelectElement>) {
+    const values = parseSelectedNumberOptions(event.target.options)
+    setOpportunityForm((state) => ({
+      ...state,
+      tagIds: values,
+    }))
+  }
+
+  function mapTagNamesToIds(tagNames: string[] | null | undefined) {
+    if (!tagNames?.length) {
+      return []
+    }
+
+    const nameSet = new Set(tagNames.map((name) => name.trim().toLowerCase()))
+    return tags.filter((tag) => nameSet.has(tag.name.trim().toLowerCase())).map((tag) => tag.id)
+  }
+
+  function resetVacancyForm() {
+    setVacancyForm({
+      title: '',
+      shortDescription: '',
+      fullDescription: '',
+      kind: 2,
+      format: 2,
+      status: 1,
+      cityId: '',
+      locationId: '',
+      salaryFrom: '',
+      salaryTo: '',
+      currencyCode: 'RUB',
+      salaryTaxMode: 3,
+      publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
+      applicationDeadline: '',
+      tagIds: [],
+    })
+  }
+
+  function resetOpportunityForm() {
+    setOpportunityForm({
+      title: '',
+      shortDescription: '',
+      fullDescription: '',
+      kind: 4,
+      format: 2,
+      status: 1,
+      cityId: '',
+      locationId: '',
+      priceType: 1,
+      priceAmount: '',
+      priceCurrencyCode: 'RUB',
+      participantsCanWrite: true,
+      publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
+      eventDate: '',
+      tagIds: [],
+    })
+  }
+
   async function onCreateCompany(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
@@ -268,6 +589,352 @@ export function EmployerDashboardPage() {
       setError(createError instanceof Error ? createError.message : 'Не удалось создать компанию.')
     } finally {
       setCreatingCompany(false)
+    }
+  }
+
+  async function onCreateVacancy(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!vacancyForm.title.trim()) {
+      setError('Укажите название вакансии.')
+      return
+    }
+
+    if (!vacancyForm.shortDescription.trim()) {
+      setError('Укажите краткое описание вакансии.')
+      return
+    }
+
+    if (!vacancyForm.fullDescription.trim()) {
+      setError('Укажите полное описание вакансии.')
+      return
+    }
+
+    const publishAt = toIsoDateTimeFromLocalInput(vacancyForm.publishAt)
+    if (!publishAt) {
+      setError('Укажите корректную дату публикации вакансии.')
+      return
+    }
+
+    const applicationDeadline = vacancyForm.applicationDeadline.trim()
+      ? toIsoDateTimeFromLocalInput(vacancyForm.applicationDeadline)
+      : null
+    if (vacancyForm.applicationDeadline.trim() && !applicationDeadline) {
+      setError('Укажите корректный дедлайн откликов.')
+      return
+    }
+
+    if (applicationDeadline && Date.parse(applicationDeadline) < Date.parse(publishAt)) {
+      setError('Дедлайн откликов не может быть раньше даты публикации.')
+      return
+    }
+
+    const salaryFrom = toNumberOrNull(vacancyForm.salaryFrom)
+    const salaryTo = toNumberOrNull(vacancyForm.salaryTo)
+    if (salaryFrom !== null && salaryTo !== null && salaryTo < salaryFrom) {
+      setError('Зарплата "до" должна быть больше или равна зарплате "от".')
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setCreatingVacancy(true)
+
+    try {
+      const payload = {
+        title: vacancyForm.title,
+        shortDescription: vacancyForm.shortDescription,
+        fullDescription: vacancyForm.fullDescription,
+        kind: vacancyForm.kind,
+        format: vacancyForm.format,
+        status: vacancyForm.status,
+        cityId: vacancyForm.cityId.trim() ? Number(vacancyForm.cityId) : null,
+        locationId: vacancyForm.locationId.trim() ? Number(vacancyForm.locationId) : null,
+        salaryFrom,
+        salaryTo,
+        currencyCode: normalizeCurrencyCode(vacancyForm.currencyCode),
+        salaryTaxMode: vacancyForm.salaryTaxMode,
+        publishAt,
+        applicationDeadline,
+        tagIds: vacancyForm.tagIds,
+      }
+
+      if (editingVacancyId) {
+        await updateEmployerVacancy(editingVacancyId, payload)
+        setSuccess('Вакансия обновлена.')
+      } else {
+        await createEmployerVacancy(payload)
+        setSuccess('Вакансия создана.')
+      }
+
+      resetVacancyForm()
+      setEditingVacancyId(null)
+      await loadDashboard()
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : editingVacancyId ? 'Не удалось обновить вакансию.' : 'Не удалось создать вакансию.')
+    } finally {
+      setCreatingVacancy(false)
+    }
+  }
+
+  async function onCreateOpportunity(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!opportunityForm.title.trim()) {
+      setError('Укажите название возможности.')
+      return
+    }
+
+    if (!opportunityForm.shortDescription.trim()) {
+      setError('Укажите краткое описание возможности.')
+      return
+    }
+
+    if (!opportunityForm.fullDescription.trim()) {
+      setError('Укажите полное описание возможности.')
+      return
+    }
+
+    const publishAt = toIsoDateTimeFromLocalInput(opportunityForm.publishAt)
+    if (!publishAt) {
+      setError('Укажите корректную дату публикации возможности.')
+      return
+    }
+
+    const eventDate = opportunityForm.eventDate.trim() ? toIsoDateTimeFromLocalInput(opportunityForm.eventDate) : null
+    if (opportunityForm.eventDate.trim() && !eventDate) {
+      setError('Укажите корректную дату события.')
+      return
+    }
+
+    const priceAmount = toNumberOrNull(opportunityForm.priceAmount)
+    if ((opportunityForm.priceType === 2 || opportunityForm.priceType === 3) && priceAmount === null) {
+      setError('Для платной или призовой возможности укажите сумму.')
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setCreatingOpportunity(true)
+
+    try {
+      const normalizedPriceAmount = opportunityForm.priceType === 1 ? null : priceAmount
+      const normalizedPriceCurrency = opportunityForm.priceType === 1 ? null : normalizeCurrencyCode(opportunityForm.priceCurrencyCode)
+
+      const payload = {
+        title: opportunityForm.title,
+        shortDescription: opportunityForm.shortDescription,
+        fullDescription: opportunityForm.fullDescription,
+        kind: opportunityForm.kind,
+        format: opportunityForm.format,
+        status: opportunityForm.status,
+        cityId: opportunityForm.cityId.trim() ? Number(opportunityForm.cityId) : null,
+        locationId: opportunityForm.locationId.trim() ? Number(opportunityForm.locationId) : null,
+        priceType: opportunityForm.priceType,
+        priceAmount: normalizedPriceAmount,
+        priceCurrencyCode: normalizedPriceCurrency,
+        participantsCanWrite: opportunityForm.participantsCanWrite,
+        publishAt,
+        eventDate,
+        tagIds: opportunityForm.tagIds,
+      }
+
+      if (editingOpportunityId) {
+        await updateEmployerOpportunity(editingOpportunityId, payload)
+        setSuccess('Возможность обновлена.')
+      } else {
+        await createEmployerOpportunity(payload)
+        setSuccess('Возможность создана.')
+      }
+
+      resetOpportunityForm()
+      setEditingOpportunityId(null)
+      await loadDashboard()
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : editingOpportunityId ? 'Не удалось обновить возможность.' : 'Не удалось создать возможность.')
+    } finally {
+      setCreatingOpportunity(false)
+    }
+  }
+
+  async function onEditOpportunity(item: EmployerOpportunity) {
+    setError('')
+    setSuccess('')
+    const key = `${item.source}-${item.id}`
+    setLoadingOpportunityEditorKey(key)
+
+    try {
+      if (item.source === 'vacancy') {
+        const detail = await fetchEmployerVacancyDetail(item.id)
+        const cityId = detail.cityId
+        let resolvedLocationId = ''
+
+        if (cityId) {
+          const locationItems = await fetchLocations(cityId)
+          setVacancyLocations(locationItems)
+
+          const matchedLocation = locationItems.find((location) => {
+            const sameStreet = location.streetName.trim().toLowerCase() === detail.locationStreetName.trim().toLowerCase()
+            const sameHouse = location.houseNumber.trim().toLowerCase() === detail.locationHouseNumber.trim().toLowerCase()
+            return sameStreet && sameHouse
+          })
+          resolvedLocationId = matchedLocation ? String(matchedLocation.id) : ''
+        }
+
+        setVacancyForm({
+          title: detail.title,
+          shortDescription: detail.shortDescription,
+          fullDescription: detail.fullDescription,
+          kind: detail.kind,
+          format: detail.format,
+          status: detail.status,
+          cityId: cityId ? String(cityId) : '',
+          locationId: resolvedLocationId,
+          salaryFrom: detail.salaryFrom != null ? String(detail.salaryFrom) : '',
+          salaryTo: detail.salaryTo != null ? String(detail.salaryTo) : '',
+          currencyCode: detail.currencyCode ?? 'RUB',
+          salaryTaxMode: detail.salaryTaxMode,
+          publishAt: toLocalDateTimeInputValue(detail.publishAt),
+          applicationDeadline: detail.applicationDeadline ? toLocalDateTimeInputValue(detail.applicationDeadline) : '',
+          tagIds: mapTagNamesToIds(detail.tags),
+        })
+
+        setEditingVacancyId(item.id)
+        setEditingOpportunityId(null)
+      } else {
+        const detail = await fetchEmployerOpportunityDetail(item.id)
+        const cityId = detail.cityId
+        let resolvedLocationId = ''
+
+        if (cityId) {
+          const locationItems = await fetchLocations(cityId)
+          setOpportunityLocations(locationItems)
+
+          const matchedLocation = locationItems.find((location) => {
+            const sameStreet = location.streetName.trim().toLowerCase() === detail.locationStreetName.trim().toLowerCase()
+            const sameHouse = location.houseNumber.trim().toLowerCase() === detail.locationHouseNumber.trim().toLowerCase()
+            return sameStreet && sameHouse
+          })
+          resolvedLocationId = matchedLocation ? String(matchedLocation.id) : ''
+        }
+
+        setOpportunityForm({
+          title: detail.title,
+          shortDescription: detail.shortDescription,
+          fullDescription: detail.fullDescription,
+          kind: detail.kind,
+          format: detail.format,
+          status: detail.status,
+          cityId: cityId ? String(cityId) : '',
+          locationId: resolvedLocationId,
+          priceType: detail.priceType,
+          priceAmount: detail.priceAmount != null ? String(detail.priceAmount) : '',
+          priceCurrencyCode: detail.priceCurrencyCode ?? 'RUB',
+          participantsCanWrite: detail.participantsCanWrite,
+          publishAt: toLocalDateTimeInputValue(detail.publishAt),
+          eventDate: detail.eventDate ? toLocalDateTimeInputValue(detail.eventDate) : '',
+          tagIds: mapTagNamesToIds(detail.tags),
+        })
+
+        setEditingOpportunityId(item.id)
+        setEditingVacancyId(null)
+      }
+
+      setTab('create')
+    } catch (editError) {
+      setError(editError instanceof Error ? editError.message : 'Не удалось загрузить данные для редактирования.')
+    } finally {
+      setLoadingOpportunityEditorKey(null)
+    }
+  }
+
+  function onCancelVacancyEdit() {
+    setEditingVacancyId(null)
+    resetVacancyForm()
+  }
+
+  function onCancelOpportunityEdit() {
+    setEditingOpportunityId(null)
+    resetOpportunityForm()
+  }
+
+  async function onDeleteOpportunity(item: EmployerOpportunity) {
+    const entityLabel = item.source === 'vacancy' ? 'вакансию' : 'возможность'
+    if (typeof window !== 'undefined' && !window.confirm(`Удалить ${entityLabel} "${item.title}"?`)) {
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    const key = `${item.source}-${item.id}`
+    setDeletingOpportunityKey(key)
+
+    try {
+      if (item.source === 'vacancy') {
+        await deleteEmployerVacancy(item.id)
+        if (editingVacancyId === item.id) {
+          onCancelVacancyEdit()
+        }
+      } else {
+        await deleteEmployerOpportunity(item.id)
+        if (editingOpportunityId === item.id) {
+          onCancelOpportunityEdit()
+        }
+      }
+
+      setOpportunities((state) => state.filter((opportunity) => !(opportunity.id === item.id && opportunity.source === item.source)))
+      setSuccess(item.source === 'vacancy' ? 'Вакансия удалена.' : 'Возможность удалена.')
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Не удалось удалить публикацию.')
+    } finally {
+      setDeletingOpportunityKey(null)
+    }
+  }
+
+  function onApplicationStatusDraftChange(applicationId: number, nextStatus: number) {
+    setApplicationStatusDrafts((state) => ({
+      ...state,
+      [applicationId]: nextStatus,
+    }))
+  }
+
+  async function onUpdateApplicationStatus(application: EmployerApplication) {
+    const nextStatus = applicationStatusDrafts[application.id] ?? application.status
+    if (nextStatus === application.status) {
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setUpdatingApplicationId(application.id)
+
+    try {
+      await updateEmployerApplicationStatus(application.id, nextStatus)
+      setApplications((state) =>
+        state.map((item) => (item.id === application.id ? { ...item, status: nextStatus, updatedAt: new Date().toISOString() } : item)),
+      )
+      setSelectedApplicationDetail((state) =>
+        state && state.id === application.id ? { ...state, status: nextStatus, updatedAt: new Date().toISOString() } : state,
+      )
+      setSuccess(`Статус отклика #${application.id} обновлен.`)
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Не удалось обновить статус отклика.')
+    } finally {
+      setUpdatingApplicationId(null)
+    }
+  }
+
+  async function onOpenApplicationDetail(applicationId: number) {
+    setError('')
+    setLoadingApplicationDetailId(applicationId)
+
+    try {
+      const detail = await fetchEmployerApplicationDetail(applicationId)
+      setSelectedApplicationDetail(detail)
+    } catch (detailError) {
+      setError(detailError instanceof Error ? detailError.message : 'Не удалось загрузить данные кандидата.')
+    } finally {
+      setLoadingApplicationDetailId(null)
     }
   }
 
@@ -359,12 +1026,85 @@ export function EmployerDashboardPage() {
   }
 
   return (
-    <DashboardLayout
-      title="Личный кабинет работодателя"
-      subtitle="Управление компанией, откликами и публикациями на платформе"
-      navItems={menu}
-    >
-      <section id="section-0" className="dashboard-section card">
+    <div className="app-shell">
+      <TopServiceBar />
+      <MainHeader />
+      <main>
+        <section className="container seeker-profile-page">
+          <header className="card seeker-profile-hero employer-profile-hero">
+            <div className="seeker-profile-hero__avatar employer-profile-hero__avatar">
+              <span>
+                <Building2 size={28} />
+              </span>
+            </div>
+            <div className="seeker-profile-hero__content">
+              <h1>{companyName}</h1>
+              <p>Личный кабинет работодателя: профиль компании, публикации, отклики и верификация.</p>
+              <div className="seeker-profile-hero__meta">
+                <span className={`status-chip status-chip--${companyStatusToneClass}`}>{companyStatusText}</span>
+                <span>
+                  <Globe size={14} />
+                  {company?.websiteUrl || 'Сайт не указан'}
+                </span>
+                <span>
+                  <Mail size={14} />
+                  {company?.publicEmail || 'Email не указан'}
+                </span>
+                <span>
+                  <Phone size={14} />
+                  {company?.publicPhone || 'Телефон не указан'}
+                </span>
+              </div>
+            </div>
+            <div className="seeker-profile-hero__actions">
+              <button type="button" className="btn btn--primary" onClick={() => setTab('verification')} disabled={!company}>
+                <ShieldCheck size={16} />
+                Перейти к верификации
+              </button>
+            </div>
+          </header>
+
+          {loading ? (
+            <section className="card seeker-profile-state">
+              <p>Загружаем кабинет работодателя...</p>
+            </section>
+          ) : null}
+
+          {error ? <div className="auth-feedback auth-feedback--error">{error}</div> : null}
+          {success ? <div className="auth-feedback seeker-profile-feedback">{success}</div> : null}
+
+          {companyMissing ? (
+            <section className="card seeker-profile-panel">
+              <h2>Создание компании</h2>
+              <form className="form-grid form-grid--two" onSubmit={onCreateCompany}>
+                <label>
+                  Юридическое название
+                  <input name="legalName" type="text" value={createForm.legalName} onChange={onCreateFormChange} required />
+                </label>
+                <label>
+                  Бренд
+                  <input name="brandName" type="text" value={createForm.brandName} onChange={onCreateFormChange} />
+                </label>
+                <label className="full-width">
+                  URL логотипа (опционально)
+                  <input name="logoUrl" type="url" value={createForm.logoUrl} onChange={onCreateFormChange} />
+                </label>
+                <button type="submit" className="btn btn--primary full-width" disabled={creatingCompany}>
+                  {creatingCompany ? 'Создаем компанию...' : 'Создать компанию'}
+                </button>
+              </form>
+            </section>
+          ) : (
+            <>
+              <nav className="card seeker-profile-tabs">
+                {employerTabs.map((item) => (
+                  <button key={item.id} type="button" className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)}>
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+
+              {tab === 'overview' ? <section className="dashboard-section card seeker-profile-panel">
         <h2>Обзор</h2>
         {loading ? <p>Загружаем данные...</p> : null}
         {error ? <div className="auth-feedback auth-feedback--error">{error}</div> : null}
@@ -376,20 +1116,20 @@ export function EmployerDashboardPage() {
           </article>
           <article>
             <strong>{overview.responsesTotal}</strong>
-            <span>Откликов (application-чаты)</span>
+            <span>Откликов</span>
           </article>
           <article>
             <strong>{overview.responsesRecent}</strong>
-            <span>Активность за 24 часа</span>
+            <span>Активность в чатах за 24 часа</span>
           </article>
           <article>
             <strong>{overview.status}</strong>
             <span>Статус компании</span>
           </article>
         </div>
-      </section>
+              </section> : null}
 
-      <section id="section-1" className="dashboard-section card">
+              {tab === 'company' ? <section className="dashboard-section card seeker-profile-panel">
         <h2>Профиль компании</h2>
         {companyMissing ? (
           <form className="form-grid form-grid--two" onSubmit={onCreateCompany}>
@@ -436,7 +1176,7 @@ export function EmployerDashboardPage() {
               Тип компании
               <select name="legalType" value={profileForm.legalType} onChange={onProfileFormChange}>
                 <option value={1}>Юридическое лицо</option>
-                <option value={2}>ИП / Самозанятый</option>
+                <option value={2}>ИП</option>
               </select>
             </label>
             <label>
@@ -482,30 +1222,262 @@ export function EmployerDashboardPage() {
             </button>
           </form>
         )}
-      </section>
+              </section> : null}
 
-      <section id="section-2" className="dashboard-section card">
+              {tab === 'create' ? <section className="dashboard-section card seeker-profile-panel">
         <h2>Создать возможность</h2>
-        <p>
-          В текущем API работодателя отсутствует endpoint публикации вакансий из кабинета. Сейчас доступны управление компанией,
-          верификация и чат-настройки. Публикации выводятся в разделе «Мои возможности», если они уже созданы в системе.
-        </p>
-      </section>
+        <div className="form-grid form-grid--two">
+          <form className="form-grid" onSubmit={onCreateVacancy}>
+            <h3>Новая вакансия</h3>
+            {editingVacancyId ? <p>Редактирование вакансии #{editingVacancyId}</p> : null}
+            <label>
+              Название
+              <input
+                name="title"
+                type="text"
+                value={vacancyForm.title}
+                onChange={onVacancyFormChange}
+                required
+              />
+            </label>
+            <label>
+              Краткое описание
+              <textarea name="shortDescription" rows={2} value={vacancyForm.shortDescription} onChange={onVacancyFormChange} required />
+            </label>
+            <label>
+              Полное описание
+              <textarea name="fullDescription" rows={4} value={vacancyForm.fullDescription} onChange={onVacancyFormChange} required />
+            </label>
+            <label>
+              Вид
+              <select name="kind" value={vacancyForm.kind} onChange={onVacancyFormChange}>
+                <option value={1}>Стажировка</option>
+                <option value={2}>Работа</option>
+              </select>
+            </label>
+            <label>
+              Формат
+              <select name="format" value={vacancyForm.format} onChange={onVacancyFormChange}>
+                <option value={1}>Офис</option>
+                <option value={2}>Гибрид</option>
+                <option value={3}>Удаленно</option>
+              </select>
+            </label>
+            <label>
+              Статус
+              <select name="status" value={vacancyForm.status} onChange={onVacancyFormChange}>
+                <option value={1}>Черновик</option>
+                <option value={2}>На модерации</option>
+                <option value={3}>Активна</option>
+              </select>
+            </label>
+            <label>
+              Город
+              <select name="cityId" value={vacancyForm.cityId} onChange={onVacancyFormChange}>
+                <option value="">Не выбран</option>
+                {cities.map((city) => (
+                  <option key={city.id} value={city.id}>
+                    {city.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Локация
+              <select name="locationId" value={vacancyForm.locationId} onChange={onVacancyFormChange} disabled={!vacancyForm.cityId}>
+                <option value="">Не выбрана</option>
+                {vacancyLocations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {locationOptionLabel(location)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Зарплата от
+              <input name="salaryFrom" type="number" min={0} step="0.01" value={vacancyForm.salaryFrom} onChange={onVacancyFormChange} />
+            </label>
+            <label>
+              Зарплата до
+              <input name="salaryTo" type="number" min={0} step="0.01" value={vacancyForm.salaryTo} onChange={onVacancyFormChange} />
+            </label>
+            <label>
+              Валюта
+              <input name="currencyCode" type="text" value={vacancyForm.currencyCode} onChange={onVacancyFormChange} maxLength={3} />
+            </label>
+            <label>
+              Налоговый режим зарплаты
+              <select name="salaryTaxMode" value={vacancyForm.salaryTaxMode} onChange={onVacancyFormChange}>
+                <option value={1}>До вычета налогов</option>
+                <option value={2}>После вычета налогов</option>
+                <option value={3}>Не указано</option>
+              </select>
+            </label>
+            <label>
+              Дата публикации
+              <input name="publishAt" type="datetime-local" value={vacancyForm.publishAt} onChange={onVacancyFormChange} required />
+            </label>
+            <label>
+              Дедлайн откликов
+              <input name="applicationDeadline" type="datetime-local" value={vacancyForm.applicationDeadline} onChange={onVacancyFormChange} />
+            </label>
+            <label>
+              Теги
+              <select multiple value={vacancyForm.tagIds.map(String)} onChange={onVacancyTagsChange}>
+                {tags.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className="btn btn--primary" disabled={!company || creatingVacancy}>
+              {creatingVacancy ? (editingVacancyId ? 'Сохраняем...' : 'Создаем...') : editingVacancyId ? 'Сохранить вакансию' : 'Создать вакансию'}
+            </button>
+            {editingVacancyId ? (
+              <button type="button" className="btn btn--ghost" onClick={onCancelVacancyEdit} disabled={creatingVacancy}>
+                Отменить редактирование
+              </button>
+            ) : null}
+          </form>
 
-      <section id="section-3" className="dashboard-section card">
+          <form className="form-grid" onSubmit={onCreateOpportunity}>
+            <h3>Новая возможность</h3>
+            {editingOpportunityId ? <p>Редактирование возможности #{editingOpportunityId}</p> : null}
+            <label>
+              Название
+              <input
+                name="title"
+                type="text"
+                value={opportunityForm.title}
+                onChange={onOpportunityFormChange}
+                required
+              />
+            </label>
+            <label>
+              Краткое описание
+              <textarea name="shortDescription" rows={2} value={opportunityForm.shortDescription} onChange={onOpportunityFormChange} required />
+            </label>
+            <label>
+              Полное описание
+              <textarea name="fullDescription" rows={4} value={opportunityForm.fullDescription} onChange={onOpportunityFormChange} required />
+            </label>
+            <label>
+              Вид
+              <select name="kind" value={opportunityForm.kind} onChange={onOpportunityFormChange}>
+                <option value={1}>Хакатон</option>
+                <option value={2}>День открытых дверей</option>
+                <option value={3}>Лекция</option>
+                <option value={4}>Другое</option>
+              </select>
+            </label>
+            <label>
+              Формат
+              <select name="format" value={opportunityForm.format} onChange={onOpportunityFormChange}>
+                <option value={1}>Офис</option>
+                <option value={2}>Гибрид</option>
+                <option value={3}>Удаленно</option>
+              </select>
+            </label>
+            <label>
+              Статус
+              <select name="status" value={opportunityForm.status} onChange={onOpportunityFormChange}>
+                <option value={1}>Черновик</option>
+                <option value={2}>На модерации</option>
+                <option value={3}>Активна</option>
+              </select>
+            </label>
+            <label>
+              Город
+              <select name="cityId" value={opportunityForm.cityId} onChange={onOpportunityFormChange}>
+                <option value="">Не выбран</option>
+                {cities.map((city) => (
+                  <option key={city.id} value={city.id}>
+                    {city.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Локация
+              <select name="locationId" value={opportunityForm.locationId} onChange={onOpportunityFormChange} disabled={!opportunityForm.cityId}>
+                <option value="">Не выбрана</option>
+                {opportunityLocations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {locationOptionLabel(location)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Тип цены
+              <select name="priceType" value={opportunityForm.priceType} onChange={onOpportunityFormChange}>
+                <option value={1}>Бесплатно</option>
+                <option value={2}>Платно</option>
+                <option value={3}>Приз</option>
+              </select>
+            </label>
+            <label>
+              Сумма
+              <input name="priceAmount" type="number" min={0} step="0.01" value={opportunityForm.priceAmount} onChange={onOpportunityFormChange} />
+            </label>
+            <label>
+              Валюта
+              <input name="priceCurrencyCode" type="text" value={opportunityForm.priceCurrencyCode} onChange={onOpportunityFormChange} maxLength={3} />
+            </label>
+            <label className="employer-checkbox">
+              <input
+                type="checkbox"
+                name="participantsCanWrite"
+                checked={opportunityForm.participantsCanWrite}
+                onChange={onOpportunityFormChange}
+              />
+              Участники могут писать в чат
+            </label>
+            <label>
+              Дата публикации
+              <input name="publishAt" type="datetime-local" value={opportunityForm.publishAt} onChange={onOpportunityFormChange} required />
+            </label>
+            <label>
+              Дата события
+              <input name="eventDate" type="datetime-local" value={opportunityForm.eventDate} onChange={onOpportunityFormChange} />
+            </label>
+            <label>
+              Теги
+              <select multiple value={opportunityForm.tagIds.map(String)} onChange={onOpportunityTagsChange}>
+                {tags.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className="btn btn--secondary" disabled={!company || creatingOpportunity}>
+              {creatingOpportunity ? (editingOpportunityId ? 'Сохраняем...' : 'Создаем...') : editingOpportunityId ? 'Сохранить возможность' : 'Создать возможность'}
+            </button>
+            {editingOpportunityId ? (
+              <button type="button" className="btn btn--ghost" onClick={onCancelOpportunityEdit} disabled={creatingOpportunity}>
+                Отменить редактирование
+              </button>
+            ) : null}
+          </form>
+        </div>
+              </section> : null}
+
+              {tab === 'opportunities' ? <section className="dashboard-section card seeker-profile-panel">
         <h2>Мои возможности</h2>
         {!opportunities.length ? (
           <p>У компании пока нет опубликованных возможностей.</p>
         ) : (
           <div className="favorite-list">
             {opportunities.map((item) => (
-              <article key={item.id} className="favorite-card">
+              <article key={`${item.source}-${item.id}`} className="favorite-card">
                 <div className="favorite-card__head">
                   <div>
                     <h3>{item.title}</h3>
-                    <span className="favorite-card__salary">{item.salaryLabel}</span>
+                    <span className="favorite-card__salary">{item.compensationLabel}</span>
                   </div>
-                  <span className="status-chip">{item.format}</span>
+                  <span className="status-chip">{opportunityTypeLabel(item.type)}</span>
                 </div>
                 <div className="favorite-card__meta">
                   <span>
@@ -518,50 +1490,131 @@ export function EmployerDashboardPage() {
                   </span>
                 </div>
                 {item.tags.length ? <p>{item.tags.slice(0, 6).join(', ')}</p> : null}
+                <div className="favorite-card__actions">
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={() => void onEditOpportunity(item)}
+                    disabled={loadingOpportunityEditorKey === `${item.source}-${item.id}` || deletingOpportunityKey === `${item.source}-${item.id}`}
+                  >
+                    {loadingOpportunityEditorKey === `${item.source}-${item.id}` ? 'Загрузка...' : 'Редактировать'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    onClick={() => void onDeleteOpportunity(item)}
+                    disabled={deletingOpportunityKey === `${item.source}-${item.id}` || loadingOpportunityEditorKey === `${item.source}-${item.id}`}
+                  >
+                    {deletingOpportunityKey === `${item.source}-${item.id}` ? 'Удаляем...' : 'Удалить'}
+                  </button>
+                </div>
               </article>
             ))}
           </div>
         )}
-      </section>
+      </section> : null}
 
-      <section id="section-4" className="dashboard-section card">
+              {tab === 'applications' ? <section className="dashboard-section card seeker-profile-panel">
         <h2>Отклики</h2>
-        {!applicationChats.length ? (
+        {!applications.length ? (
           <p>Откликов пока нет.</p>
         ) : (
           <div className="status-table">
-            {applicationChats.map((chat) => (
-              <div key={chat.id}>
+            {applications.map((application) => (
+              <div key={application.id}>
                 <span>
                   <MessageSquare size={14} />
-                  {chat.title}: {chat.lastMessageText}
+                  {application.vacancyTitle} — {application.candidateName}
                 </span>
-                <span className="status-chip">Обновлено {formatDate(chat.lastMessageAt)}</span>
+                <div className="employer-application-actions">
+                  <span className="status-chip">{applicationStatusLabel[application.status] ?? `Статус ${application.status}`}</span>
+                  <select
+                    value={String(applicationStatusDrafts[application.id] ?? application.status)}
+                    onChange={(event) => onApplicationStatusDraftChange(application.id, Number(event.target.value))}
+                    disabled={updatingApplicationId === application.id}
+                  >
+                    <option value={String(application.status)}>
+                      Текущий: {applicationStatusLabel[application.status] ?? `Статус ${application.status}`}
+                    </option>
+                    {applicationStatusUpdateOptions
+                      .filter((status) => status !== application.status)
+                      .map((status) => (
+                        <option key={status} value={String(status)}>
+                          {applicationStatusLabel[status]}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    disabled={(applicationStatusDrafts[application.id] ?? application.status) === application.status || updatingApplicationId === application.id}
+                    onClick={() => void onUpdateApplicationStatus(application)}
+                  >
+                    {updatingApplicationId === application.id ? 'Сохраняем...' : 'Обновить статус'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    onClick={() => void onOpenApplicationDetail(application.id)}
+                    disabled={loadingApplicationDetailId === application.id}
+                  >
+                    {loadingApplicationDetailId === application.id ? 'Загружаем...' : 'Профиль кандидата'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
-      </section>
 
-      <section id="section-5" className="dashboard-section card">
+        {selectedApplicationDetail ? (
+          <article className="card employer-candidate-profile">
+            <div className="employer-candidate-profile__head">
+              <h3>{selectedApplicationDetail.candidateName}</h3>
+              <span className="status-chip">{applicationStatusLabel[selectedApplicationDetail.status] ?? `Статус ${selectedApplicationDetail.status}`}</span>
+            </div>
+            <p>Отклик на: {selectedApplicationDetail.vacancyTitle}</p>
+            <div className="employer-candidate-profile__grid">
+              <div>
+                <strong>Кандидат</strong>
+                <p>ID: {selectedApplicationDetail.candidateUserId}</p>
+                <p>{selectedApplicationDetail.candidateHeadline || 'Заголовок резюме не указан'}</p>
+                <p>{selectedApplicationDetail.candidateDesiredPosition || 'Желаемая позиция не указана'}</p>
+              </div>
+              <div>
+                <strong>Резюме</strong>
+                <p>Ожидания по доходу: {formatMoneyRange(selectedApplicationDetail.candidateSalaryFrom, selectedApplicationDetail.candidateSalaryTo, selectedApplicationDetail.candidateCurrencyCode)}</p>
+                <p>Дата отклика: {formatDate(selectedApplicationDetail.createdAt)}</p>
+                <p>Обновлено: {formatDate(selectedApplicationDetail.updatedAt)}</p>
+              </div>
+            </div>
+            <div className="employer-candidate-profile__actions">
+              <button type="button" className="btn btn--ghost" onClick={() => setSelectedApplicationDetail(null)}>
+                Закрыть профиль
+              </button>
+            </div>
+          </article>
+        ) : null}
+      </section> : null}
+
+              {tab === 'overview' ? <section className="dashboard-section card seeker-profile-panel">
         <h2>Аналитика</h2>
         <div className="employer-analytics">
           <article>
             <strong>{applicationChats.length}</strong>
-            <span>Всего диалогов по откликам</span>
+            <span>Всего чатов</span>
           </article>
           <article>
-            <strong>{opportunities.length}</strong>
-            <span>Активных публикаций компании</span>
+            <strong>{applications.length}</strong>
+            <span>Всего откликов</span>
           </article>
           <article>
-            <strong>{applicationChats.filter((chat) => chat.lastMessageText !== 'Сообщений пока нет').length}</strong>
-            <span>Чатов с сообщениями</span>
+            <strong>{applications.filter((item) => item.status === 1 || item.status === 2).length}</strong>
+            <span>В работе</span>
           </article>
         </div>
-      </section>
+              </section> : null}
 
-      <section id="section-6" className="dashboard-section card">
+              {tab === 'verification' ? <section className="dashboard-section card seeker-profile-panel">
         <h2>Верификация</h2>
         <div className="employer-verification">
           <div className="employer-verification__status">
@@ -569,7 +1622,7 @@ export function EmployerDashboardPage() {
               <ShieldCheck size={14} />
               {companyStatusText}
             </span>
-            <p>Для отправки на модерацию заполните все обязательные поля профиля компании и укажите публичные контакты.</p>
+            <p>Заполните профиль компании и отправьте данные на модерацию.</p>
             <button type="button" className="btn btn--primary" onClick={() => void onSubmitVerification()} disabled={submittingVerification || !company}>
               {submittingVerification ? 'Отправляем...' : 'Отправить на верификацию'}
             </button>
@@ -639,7 +1692,12 @@ export function EmployerDashboardPage() {
             </span>
           </div>
         ) : null}
-      </section>
-    </DashboardLayout>
+              </section> : null}
+            </>
+          )}
+        </section>
+      </main>
+      <Footer />
+    </div>
   )
 }

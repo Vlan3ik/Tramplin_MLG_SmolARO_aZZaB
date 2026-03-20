@@ -21,6 +21,22 @@ type VacancyListItemApi = {
   tags?: string[] | null
 }
 
+type OpportunityListItemApi = {
+  id: number
+  title: string | null
+  kind?: KindApi
+  format?: WorkFormatApi
+  companyName?: string | null
+  locationName?: string | null
+  priceType?: string | number | null
+  priceAmount?: number | null
+  priceCurrencyCode?: string | null
+  publishAt?: string
+  verifiedCompany?: boolean
+  participantsCanWrite?: boolean
+  tags?: string[] | null
+}
+
 type VacancyDetailApi = {
   id: number
   title: string | null
@@ -90,7 +106,7 @@ type MapOpportunityFeatureApi = {
   }
   properties?: {
     id?: number
-    entityType?: string
+    entityType?: string | number | null
   }
 }
 
@@ -224,13 +240,7 @@ function formatRelativeDate(publishAt: string | undefined) {
   return publishDate.toLocaleDateString('ru-RU')
 }
 
-function toOpportunity(
-  apiItem: VacancyListItemApi,
-  coordinates: {
-    latitude: number | null
-    longitude: number | null
-  },
-): Opportunity {
+function toOpportunityFromVacancy(apiItem: VacancyListItemApi, coordinates: { latitude: number | null; longitude: number | null }): Opportunity {
   const kind = apiItem.kind ?? apiItem.type
   const type = parseOpportunityType(kind)
   const normalizedFormat = parseFormat(apiItem.format)
@@ -252,6 +262,53 @@ function toOpportunity(
     latitude: coordinates.latitude,
     longitude: coordinates.longitude,
   }
+}
+
+function toOpportunityFromOpportunity(
+  apiItem: OpportunityListItemApi,
+  coordinates: {
+    latitude: number | null
+    longitude: number | null
+  },
+): Opportunity {
+  const type = parseOpportunityType(apiItem.kind)
+  const normalizedFormat = parseFormat(apiItem.format)
+
+  return {
+    id: apiItem.id,
+    title: apiItem.title ?? 'Р‘РµР· РЅР°Р·РІР°РЅРёСЏ',
+    type: type === 'vacancy' ? 'event' : type,
+    company: apiItem.companyName ?? 'РљРѕРјРїР°РЅРёСЏ',
+    location: apiItem.locationName ?? 'Р›РѕРєР°С†РёСЏ РЅРµ СѓРєР°Р·Р°РЅР°',
+    compensation: formatPrice(apiItem.priceType, apiItem.priceAmount, apiItem.priceCurrencyCode),
+    workFormat: normalizedFormat === 'onsite' ? 'РћС„РёСЃ' : normalizedFormat === 'remote' ? 'РЈРґР°Р»РµРЅРЅРѕ' : 'Р“РёР±СЂРёРґ',
+    date: formatRelativeDate(apiItem.publishAt),
+    description: (apiItem.tags ?? []).length
+      ? `РљР»СЋС‡РµРІС‹Рµ С‚РµРіРё: ${(apiItem.tags ?? []).slice(0, 4).join(', ')}.`
+      : 'РћРїРёСЃР°РЅРёРµ РґРѕР±Р°РІР»СЏРµС‚СЃСЏ РІ РєР°СЂС‚РѕС‡РєРµ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё.',
+    tags: apiItem.tags ?? [],
+    verified: Boolean(apiItem.verifiedCompany),
+    latitude: coordinates.latitude,
+    longitude: coordinates.longitude,
+  }
+}
+
+function parseMapEntityType(value: string | number | null | undefined) {
+  if (typeof value === 'number') {
+    return value === 1 ? 'vacancy' : value === 2 ? 'opportunity' : null
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.toLowerCase()
+    if (normalized.includes('vacancy')) return 'vacancy'
+    if (normalized.includes('opportunity')) return 'opportunity'
+  }
+
+  return null
+}
+
+function mapKeyFor(entityType: 'vacancy' | 'opportunity', id: number) {
+  return `${entityType}:${id}`
 }
 
 function buildVacanciesQueryString(query: HomeSearchQuery) {
@@ -294,6 +351,43 @@ function buildVacanciesQueryString(query: HomeSearchQuery) {
   return params.toString()
 }
 
+function buildOpportunitiesQueryString(query: HomeSearchQuery) {
+  const params = new URLSearchParams()
+
+  params.set('Page', String(query.page ?? 1))
+  params.set('PageSize', String(query.pageSize ?? 24))
+
+  if (query.search?.trim()) {
+    params.set('Search', query.search.trim())
+  }
+
+  if (query.cityId) {
+    params.set('CityId', String(query.cityId))
+  }
+
+  const hasEvent = query.filters.types.includes('event')
+  const hasMentorship = query.filters.types.includes('mentorship')
+
+  if (!query.filters.types.length || hasEvent || hasMentorship) {
+    params.append('Kinds', '1')
+    params.append('Kinds', '2')
+    params.append('Kinds', '3')
+    params.append('Kinds', '4')
+  }
+
+  for (const format of query.filters.formats) {
+    if (format === 'onsite') params.append('Formats', '1')
+    if (format === 'hybrid') params.append('Formats', '2')
+    if (format === 'remote') params.append('Formats', '3')
+  }
+
+  if (query.filters.verifiedOnly) {
+    params.set('VerifiedOnly', 'true')
+  }
+
+  return params.toString()
+}
+
 function buildMapQueryString(query: HomeSearchQuery) {
   const params = new URLSearchParams()
 
@@ -305,8 +399,8 @@ function buildMapQueryString(query: HomeSearchQuery) {
     params.set('CityId', String(query.cityId))
   }
 
-  // 1 = Vacancy.
   params.append('EntityTypes', '1')
+  params.append('EntityTypes', '2')
 
   const hasInternship = query.filters.types.includes('internship')
   const hasVacancy = query.filters.types.includes('vacancy')
@@ -319,6 +413,16 @@ function buildMapQueryString(query: HomeSearchQuery) {
     if (!query.filters.types.length || hasVacancy) {
       params.append('VacancyKinds', '2')
     }
+  }
+
+  const hasEvent = query.filters.types.includes('event')
+  const hasMentorship = query.filters.types.includes('mentorship')
+
+  if (!query.filters.types.length || hasEvent || hasMentorship) {
+    params.append('OpportunityKinds', '1')
+    params.append('OpportunityKinds', '2')
+    params.append('OpportunityKinds', '3')
+    params.append('OpportunityKinds', '4')
   }
 
   for (const format of query.filters.formats) {
@@ -336,42 +440,57 @@ function buildMapQueryString(query: HomeSearchQuery) {
 
 export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: AbortSignal) {
   const queryString = buildVacanciesQueryString(query)
+  const opportunitiesQueryString = buildOpportunitiesQueryString(query)
   const mapQueryString = buildMapQueryString(query)
-  const listResponse = await getJson<PagedResponse<VacancyListItemApi>>(`/vacancies?${queryString}`, { signal, withAuth: false })
-  const mapResponse = await getJson<MapOpportunityResponseApi>(`/map/opportunities?${mapQueryString}`, { signal, withAuth: false })
+  const [vacanciesResponse, opportunitiesResponse, mapResponse] = await Promise.all([
+    getJson<PagedResponse<VacancyListItemApi>>(`/vacancies?${queryString}`, { signal, withAuth: false }),
+    getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal, withAuth: false }),
+    getJson<MapOpportunityResponseApi>(`/map/opportunities?${mapQueryString}`, { signal, withAuth: false }),
+  ])
 
-  const coordinatesById = new Map<number, { latitude: number | null; longitude: number | null }>()
+  const coordinatesByEntityKey = new Map<string, { latitude: number | null; longitude: number | null }>()
 
   for (const feature of mapResponse.features ?? []) {
     if (!feature.properties?.id) {
       continue
     }
 
-    const entityType = (feature.properties.entityType ?? '').toLowerCase()
-    if (entityType && entityType !== 'vacancy') {
+    const entityType = parseMapEntityType(feature.properties.entityType)
+    if (!entityType) {
       continue
     }
 
     const [longitude, latitude] = feature.geometry?.coordinates ?? [null, null]
 
-    coordinatesById.set(feature.properties.id, {
+    coordinatesByEntityKey.set(mapKeyFor(entityType, feature.properties.id), {
       latitude,
       longitude,
     })
   }
 
-  const items = (listResponse.items ?? []).map((item) => {
-    const coordinates = coordinatesById.get(item.id) ?? {
+  const vacancyItems = (vacanciesResponse.items ?? []).map((item) => {
+    const coordinates = coordinatesByEntityKey.get(mapKeyFor('vacancy', item.id)) ?? {
       latitude: null,
       longitude: null,
     }
 
-    return toOpportunity(item, coordinates)
+    return toOpportunityFromVacancy(item, coordinates)
   })
+
+  const opportunityItems = (opportunitiesResponse.items ?? []).map((item) => {
+    const coordinates = coordinatesByEntityKey.get(mapKeyFor('opportunity', item.id)) ?? {
+      latitude: null,
+      longitude: null,
+    }
+
+    return toOpportunityFromOpportunity(item, coordinates)
+  })
+
+  const items = [...vacancyItems, ...opportunityItems].sort((a, b) => b.id - a.id)
 
   return {
     items,
-    total: listResponse.totalCount ?? listResponse.total ?? 0,
+    total: (vacanciesResponse.totalCount ?? vacanciesResponse.total ?? 0) + (opportunitiesResponse.totalCount ?? opportunitiesResponse.total ?? 0),
   }
 }
 

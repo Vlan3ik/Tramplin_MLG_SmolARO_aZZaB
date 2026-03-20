@@ -1,5 +1,12 @@
-import { getJson, patchJson, postJson } from './client'
+import { deleteJson, getJson, patchJson, postJson } from './client'
 import type { OpportunityType } from '../types/opportunity'
+
+type PagedResponse<TItem> = {
+  items?: TItem[] | null
+  totalCount?: number
+  page?: number
+  pageSize?: number
+}
 
 type EmployerCompanyChatSettingsApi = {
   autoGreetingEnabled: boolean
@@ -25,9 +32,76 @@ type EmployerCompanyApi = {
   publicEmail: string | null
   publicPhone: string | null
   baseCityId: number
-  status: string
-  membershipRole: string
+  status: number | string
+  membershipRole: number | string
   chatSettings: EmployerCompanyChatSettingsApi | null
+}
+
+type EmployerVacancyListItemApi = {
+  id: number
+  title: string | null
+  kind: number
+  format: number
+  status: number
+  salaryFrom: number | null
+  salaryTo: number | null
+  currencyCode: string | null
+  salaryTaxMode: number
+  publishAt: string
+  applicationDeadline: string | null
+  applicationsTotal: number
+  applicationsLast24Hours: number
+  tags: string[] | null
+}
+
+type EmployerOpportunityListItemApi = {
+  id: number
+  title: string | null
+  kind: number
+  format: number
+  status: number
+  priceType: number
+  priceAmount: number | null
+  priceCurrencyCode: string | null
+  participantsCanWrite: boolean
+  publishAt: string
+  eventDate: string | null
+  participantsCount: number
+  participantsLast24Hours: number
+  tags: string[] | null
+}
+
+type EmployerApplicationListItemApi = {
+  id: number
+  vacancyId: number
+  vacancyTitle: string | null
+  candidateUserId: number
+  candidateName: string | null
+  candidateAvatarUrl: string | null
+  status: number
+  createdAt: string
+  updatedAt: string
+  chatId: number | null
+}
+
+type EmployerApplicationDetailApi = {
+  id: number
+  companyId: number
+  vacancyId: number
+  vacancyTitle: string | null
+  candidateUserId: number
+  candidateName: string | null
+  candidateAvatarUrl: string | null
+  candidateHeadline: string | null
+  candidateDesiredPosition: string | null
+  candidateSalaryFrom: number | null
+  candidateSalaryTo: number | null
+  candidateCurrencyCode: string | null
+  status: number
+  initiatorRole: number
+  createdAt: string
+  updatedAt: string
+  chatId: number | null
 }
 
 type CreateEmployerCompanyApiRequest = {
@@ -60,26 +134,85 @@ type UpdateEmployerCompanyChatSettingsApiRequest = {
   workingHoursTo: string | null
 }
 
-type OpportunityListItemApi = {
-  id: number
+type EmployerVacancyUpsertRequest = {
   title: string
-  kind?: string | number
-  type?: string | number
-  format: string | number
-  companyName: string
-  locationName: string
+  shortDescription: string
+  fullDescription: string
+  kind: number
+  format: number
+  status: number
+  cityId: number | null
+  locationId: number | null
   salaryFrom: number | null
   salaryTo: number | null
   currencyCode: string | null
+  salaryTaxMode: number
   publishAt: string
-  verifiedCompany: boolean
-  tags: string[]
+  applicationDeadline: string | null
+  tagIds: number[]
 }
 
-type PagedResponse<TItem> = {
-  items: TItem[]
-  totalCount?: number
-  total?: number
+type EmployerOpportunityUpsertRequest = {
+  title: string
+  shortDescription: string
+  fullDescription: string
+  kind: number
+  format: number
+  status: number
+  cityId: number | null
+  locationId: number | null
+  priceType: number
+  priceAmount: number | null
+  priceCurrencyCode: string | null
+  participantsCanWrite: boolean
+  publishAt: string
+  eventDate: string | null
+  tagIds: number[]
+}
+
+type EmployerLocationApi = {
+  cityId: number | null
+  cityName: string | null
+  latitude: number | null
+  longitude: number | null
+  streetName: string | null
+  houseNumber: string | null
+}
+
+type EmployerVacancyDetailApi = {
+  id: number
+  title: string | null
+  shortDescription: string | null
+  fullDescription: string | null
+  kind: number
+  format: number
+  status: number
+  publishAt: string
+  applicationDeadline: string | null
+  salaryFrom: number | null
+  salaryTo: number | null
+  currencyCode: string | null
+  salaryTaxMode: number
+  location: EmployerLocationApi | null
+  tags: string[] | null
+}
+
+type EmployerOpportunityDetailApi = {
+  id: number
+  title: string | null
+  shortDescription: string | null
+  fullDescription: string | null
+  kind: number
+  format: number
+  status: number
+  publishAt: string
+  eventDate: string | null
+  priceType: number
+  priceAmount: number | null
+  priceCurrencyCode: string | null
+  participantsCanWrite: boolean
+  location: EmployerLocationApi | null
+  tags: string[] | null
 }
 
 export type EmployerCompany = {
@@ -141,20 +274,152 @@ export type UpdateEmployerCompanyChatSettingsRequest = {
 
 export type EmployerOpportunity = {
   id: number
+  source: 'vacancy' | 'opportunity'
   title: string
   type: OpportunityType
   format: string
   locationName: string
-  salaryLabel: string
+  compensationLabel: string
+  status: number
   publishAt: string
   tags: string[]
 }
 
-const typeMapByNumber: Record<number, OpportunityType> = {
-  1: 'internship',
-  2: 'vacancy',
-  3: 'mentorship',
-  4: 'event',
+export type EmployerApplication = {
+  id: number
+  vacancyId: number
+  vacancyTitle: string
+  candidateUserId: number
+  candidateName: string
+  status: number
+  createdAt: string
+  updatedAt: string
+  chatId: number | null
+}
+
+export type EmployerApplicationDetail = {
+  id: number
+  companyId: number
+  vacancyId: number
+  vacancyTitle: string
+  candidateUserId: number
+  candidateName: string
+  candidateAvatarUrl: string | null
+  candidateHeadline: string
+  candidateDesiredPosition: string
+  candidateSalaryFrom: number | null
+  candidateSalaryTo: number | null
+  candidateCurrencyCode: string | null
+  status: number
+  initiatorRole: number
+  createdAt: string
+  updatedAt: string
+  chatId: number | null
+}
+
+export type CreateEmployerVacancyRequest = {
+  title: string
+  shortDescription?: string
+  fullDescription?: string
+  kind?: number
+  format?: number
+  status?: number
+  cityId?: number | null
+  locationId?: number | null
+  salaryFrom?: number | null
+  salaryTo?: number | null
+  currencyCode?: string | null
+  salaryTaxMode?: number
+  publishAt?: string
+  applicationDeadline?: string | null
+  tagIds?: number[]
+}
+
+export type CreateEmployerOpportunityRequest = {
+  title: string
+  shortDescription?: string
+  fullDescription?: string
+  kind?: number
+  format?: number
+  status?: number
+  cityId?: number | null
+  locationId?: number | null
+  priceType?: number
+  priceAmount?: number | null
+  priceCurrencyCode?: string | null
+  participantsCanWrite?: boolean
+  publishAt?: string
+  eventDate?: string | null
+  tagIds?: number[]
+}
+
+export type EmployerVacancyDetail = {
+  id: number
+  title: string
+  shortDescription: string
+  fullDescription: string
+  kind: number
+  format: number
+  status: number
+  cityId: number | null
+  publishAt: string
+  applicationDeadline: string | null
+  salaryFrom: number | null
+  salaryTo: number | null
+  currencyCode: string | null
+  salaryTaxMode: number
+  locationStreetName: string
+  locationHouseNumber: string
+  tags: string[]
+}
+
+export type EmployerOpportunityDetail = {
+  id: number
+  title: string
+  shortDescription: string
+  fullDescription: string
+  kind: number
+  format: number
+  status: number
+  cityId: number | null
+  publishAt: string
+  eventDate: string | null
+  priceType: number
+  priceAmount: number | null
+  priceCurrencyCode: string | null
+  participantsCanWrite: boolean
+  locationStreetName: string
+  locationHouseNumber: string
+  tags: string[]
+}
+
+const companyStatusMap: Record<number, string> = {
+  1: 'draft',
+  2: 'pendingverification',
+  3: 'verified',
+  4: 'rejected',
+  5: 'blocked',
+}
+
+const memberRoleMap: Record<number, string> = {
+  1: 'owner',
+  2: 'admin',
+  3: 'staff',
+}
+
+const companyStatusStringMap: Record<string, string> = {
+  draft: 'draft',
+  pendingverification: 'pendingverification',
+  pending_verification: 'pendingverification',
+  verified: 'verified',
+  rejected: 'rejected',
+  blocked: 'blocked',
+}
+
+const memberRoleStringMap: Record<string, string> = {
+  owner: 'owner',
+  admin: 'admin',
+  staff: 'staff',
 }
 
 function toNullableString(value: string) {
@@ -162,50 +427,69 @@ function toNullableString(value: string) {
   return normalized.length ? normalized : null
 }
 
-function parseOpportunityType(value: string | number): OpportunityType {
+function parseCompanyStatus(value: number | string) {
   if (typeof value === 'number') {
-    if (value === 1) return 'internship'
-    if (value === 2) return 'vacancy'
-    return typeMapByNumber[value] ?? 'vacancy'
+    return companyStatusMap[value] ?? 'draft'
   }
 
-  const normalized = value.toLowerCase()
-  if (normalized.includes('intern')) return 'internship'
-  if (normalized.includes('ment')) return 'mentorship'
-  if (normalized.includes('event')) return 'event'
-  return 'vacancy'
+  return companyStatusStringMap[value.trim().toLowerCase()] ?? 'draft'
 }
 
-function parseOpportunityFormat(value: string | number) {
+function parseMemberRole(value: number | string) {
   if (typeof value === 'number') {
-    if (value === 1) return 'Офис'
-    if (value === 3) return 'Удаленно'
-    return 'Гибрид'
+    return memberRoleMap[value] ?? 'staff'
   }
 
-  const normalized = value.toLowerCase()
-  if (normalized.includes('remote')) return 'Удаленно'
-  if (normalized.includes('onsite')) return 'Офис'
-  return 'Гибрид'
+  return memberRoleStringMap[value.trim().toLowerCase()] ?? 'staff'
 }
 
-function formatSalary(from: number | null, to: number | null, currencyCode: string | null) {
-  if (from === null && to === null) {
+function formatCurrencyRange(min: number | null | undefined, max: number | null | undefined, currencyCode: string | null | undefined) {
+  if (min == null && max == null) {
     return 'По договоренности'
   }
 
   const currency = currencyCode ?? 'RUB'
   const formatter = new Intl.NumberFormat('ru-RU')
 
-  if (from !== null && to !== null) {
-    return `${formatter.format(from)} - ${formatter.format(to)} ${currency}`
+  if (min != null && max != null) {
+    return `${formatter.format(min)} - ${formatter.format(max)} ${currency}`
   }
 
-  if (from !== null) {
-    return `от ${formatter.format(from)} ${currency}`
+  if (min != null) {
+    return `от ${formatter.format(min)} ${currency}`
   }
 
-  return `до ${formatter.format(to ?? 0)} ${currency}`
+  return `до ${formatter.format(max ?? 0)} ${currency}`
+}
+
+function formatOpportunityPrice(priceType: number, amount: number | null | undefined, currencyCode: string | null | undefined) {
+  if (priceType === 1) {
+    return 'Бесплатно'
+  }
+
+  if (amount == null) {
+    return 'Условия уточняются'
+  }
+
+  const formatter = new Intl.NumberFormat('ru-RU')
+  const currency = currencyCode ?? 'RUB'
+  return `${formatter.format(amount)} ${currency}`
+}
+
+function parseFormatLabel(value: number) {
+  if (value === 1) return 'Офис'
+  if (value === 3) return 'Удаленно'
+  return 'Гибрид'
+}
+
+function parseVacancyType(kind: number): OpportunityType {
+  if (kind === 1) return 'internship'
+  return 'vacancy'
+}
+
+function parseOpportunityType(kind: number): OpportunityType {
+  if (kind === 3) return 'mentorship'
+  return 'event'
 }
 
 function mapEmployerCompany(response: EmployerCompanyApi): EmployerCompany {
@@ -223,8 +507,8 @@ function mapEmployerCompany(response: EmployerCompanyApi): EmployerCompany {
     publicEmail: response.publicEmail ?? '',
     publicPhone: response.publicPhone ?? '',
     baseCityId: response.baseCityId ?? 0,
-    status: response.status ?? 'draft',
-    membershipRole: response.membershipRole ?? 'staff',
+    status: parseCompanyStatus(response.status),
+    membershipRole: parseMemberRole(response.membershipRole),
     chatSettings: {
       autoGreetingEnabled: response.chatSettings?.autoGreetingEnabled ?? false,
       autoGreetingText: response.chatSettings?.autoGreetingText ?? '',
@@ -234,6 +518,98 @@ function mapEmployerCompany(response: EmployerCompanyApi): EmployerCompany {
       workingHoursFrom: response.chatSettings?.workingHoursFrom ?? '',
       workingHoursTo: response.chatSettings?.workingHoursTo ?? '',
     },
+  }
+}
+
+function toIsoDateOrNow(value?: string) {
+  if (value && value.trim()) {
+    return value
+  }
+
+  return new Date().toISOString()
+}
+
+function mapVacancyForCreate(payload: CreateEmployerVacancyRequest): EmployerVacancyUpsertRequest {
+  return {
+    title: payload.title.trim(),
+    shortDescription: payload.shortDescription?.trim() ?? '',
+    fullDescription: payload.fullDescription?.trim() ?? '',
+    kind: payload.kind ?? 2,
+    format: payload.format ?? 2,
+    status: payload.status ?? 1,
+    cityId: payload.cityId ?? null,
+    locationId: payload.locationId ?? null,
+    salaryFrom: payload.salaryFrom ?? null,
+    salaryTo: payload.salaryTo ?? null,
+    currencyCode: payload.currencyCode?.trim() || null,
+    salaryTaxMode: payload.salaryTaxMode ?? 3,
+    publishAt: toIsoDateOrNow(payload.publishAt),
+    applicationDeadline: payload.applicationDeadline?.trim() || null,
+    tagIds: payload.tagIds ?? [],
+  }
+}
+
+function mapOpportunityForCreate(payload: CreateEmployerOpportunityRequest): EmployerOpportunityUpsertRequest {
+  return {
+    title: payload.title.trim(),
+    shortDescription: payload.shortDescription?.trim() ?? '',
+    fullDescription: payload.fullDescription?.trim() ?? '',
+    kind: payload.kind ?? 4,
+    format: payload.format ?? 2,
+    status: payload.status ?? 1,
+    cityId: payload.cityId ?? null,
+    locationId: payload.locationId ?? null,
+    priceType: payload.priceType ?? 1,
+    priceAmount: payload.priceAmount ?? null,
+    priceCurrencyCode: payload.priceCurrencyCode?.trim() || null,
+    participantsCanWrite: payload.participantsCanWrite ?? true,
+    publishAt: toIsoDateOrNow(payload.publishAt),
+    eventDate: payload.eventDate?.trim() || null,
+    tagIds: payload.tagIds ?? [],
+  }
+}
+
+function mapVacancyDetail(response: EmployerVacancyDetailApi): EmployerVacancyDetail {
+  return {
+    id: response.id,
+    title: response.title ?? '',
+    shortDescription: response.shortDescription ?? '',
+    fullDescription: response.fullDescription ?? '',
+    kind: response.kind ?? 2,
+    format: response.format ?? 2,
+    status: response.status ?? 1,
+    cityId: response.location?.cityId ?? null,
+    publishAt: response.publishAt,
+    applicationDeadline: response.applicationDeadline ?? null,
+    salaryFrom: response.salaryFrom ?? null,
+    salaryTo: response.salaryTo ?? null,
+    currencyCode: response.currencyCode ?? null,
+    salaryTaxMode: response.salaryTaxMode ?? 3,
+    locationStreetName: response.location?.streetName ?? '',
+    locationHouseNumber: response.location?.houseNumber ?? '',
+    tags: response.tags ?? [],
+  }
+}
+
+function mapOpportunityDetail(response: EmployerOpportunityDetailApi): EmployerOpportunityDetail {
+  return {
+    id: response.id,
+    title: response.title ?? '',
+    shortDescription: response.shortDescription ?? '',
+    fullDescription: response.fullDescription ?? '',
+    kind: response.kind ?? 4,
+    format: response.format ?? 2,
+    status: response.status ?? 1,
+    cityId: response.location?.cityId ?? null,
+    publishAt: response.publishAt,
+    eventDate: response.eventDate ?? null,
+    priceType: response.priceType ?? 1,
+    priceAmount: response.priceAmount ?? null,
+    priceCurrencyCode: response.priceCurrencyCode ?? null,
+    participantsCanWrite: response.participantsCanWrite ?? true,
+    locationStreetName: response.location?.streetName ?? '',
+    locationHouseNumber: response.location?.houseNumber ?? '',
+    tags: response.tags ?? [],
   }
 }
 
@@ -288,20 +664,127 @@ export function submitEmployerCompanyVerification() {
   return postJson<unknown, Record<string, never>>('/employer/company/submit-verification', {})
 }
 
-export async function fetchEmployerCompanyOpportunities(companyId: number, signal?: AbortSignal) {
-  const response = await getJson<PagedResponse<OpportunityListItemApi>>(
-    `/vacancies?Page=1&PageSize=100&CompanyId=${companyId}`,
-    { signal, withAuth: false },
-  )
+export async function fetchEmployerVacancies(signal?: AbortSignal) {
+  const response = await getJson<PagedResponse<EmployerVacancyListItemApi>>('/employer/vacancies?Page=1&PageSize=100', { signal })
 
-  return (response.items ?? []).map((item) => ({
+  return (response.items ?? []).map((item): EmployerOpportunity => ({
     id: item.id,
-    title: item.title,
-    type: parseOpportunityType((item.kind ?? item.type ?? 2) as string | number),
-    format: parseOpportunityFormat(item.format),
-    locationName: item.locationName || 'Локация не указана',
-    salaryLabel: formatSalary(item.salaryFrom, item.salaryTo, item.currencyCode),
+    source: 'vacancy',
+    title: item.title ?? 'Без названия',
+    type: parseVacancyType(item.kind),
+    format: parseFormatLabel(item.format),
+    locationName: 'Локация в карточке',
+    compensationLabel: formatCurrencyRange(item.salaryFrom, item.salaryTo, item.currencyCode),
+    status: item.status,
     publishAt: item.publishAt,
     tags: item.tags ?? [],
   }))
+}
+
+export async function fetchEmployerOpportunities(signal?: AbortSignal) {
+  const response = await getJson<PagedResponse<EmployerOpportunityListItemApi>>('/employer/opportunities?Page=1&PageSize=100', { signal })
+
+  return (response.items ?? []).map((item): EmployerOpportunity => ({
+    id: item.id,
+    source: 'opportunity',
+    title: item.title ?? 'Без названия',
+    type: parseOpportunityType(item.kind),
+    format: parseFormatLabel(item.format),
+    locationName: 'Локация в карточке',
+    compensationLabel: formatOpportunityPrice(item.priceType, item.priceAmount, item.priceCurrencyCode),
+    status: item.status,
+    publishAt: item.publishAt,
+    tags: item.tags ?? [],
+  }))
+}
+
+export async function fetchEmployerCompanyOpportunities(signal?: AbortSignal) {
+  const [vacancies, opportunities] = await Promise.all([fetchEmployerVacancies(signal), fetchEmployerOpportunities(signal)])
+  return [...vacancies, ...opportunities].sort((a, b) => Date.parse(b.publishAt) - Date.parse(a.publishAt))
+}
+
+export function createEmployerVacancy(payload: CreateEmployerVacancyRequest) {
+  return postJson<unknown, EmployerVacancyUpsertRequest>('/employer/vacancies', mapVacancyForCreate(payload))
+}
+
+export function createEmployerOpportunity(payload: CreateEmployerOpportunityRequest) {
+  return postJson<unknown, EmployerOpportunityUpsertRequest>('/employer/opportunities', mapOpportunityForCreate(payload))
+}
+
+export async function fetchEmployerVacancyDetail(id: number, signal?: AbortSignal) {
+  const response = await getJson<EmployerVacancyDetailApi>(`/employer/vacancies/${id}`, { signal })
+  return mapVacancyDetail(response)
+}
+
+export async function fetchEmployerOpportunityDetail(id: number, signal?: AbortSignal) {
+  const response = await getJson<EmployerOpportunityDetailApi>(`/employer/opportunities/${id}`, { signal })
+  return mapOpportunityDetail(response)
+}
+
+export function updateEmployerVacancy(id: number, payload: CreateEmployerVacancyRequest) {
+  return patchJson<unknown, EmployerVacancyUpsertRequest>(`/employer/vacancies/${id}`, mapVacancyForCreate(payload))
+}
+
+export function updateEmployerOpportunity(id: number, payload: CreateEmployerOpportunityRequest) {
+  return patchJson<unknown, EmployerOpportunityUpsertRequest>(`/employer/opportunities/${id}`, mapOpportunityForCreate(payload))
+}
+
+export function deleteEmployerVacancy(id: number) {
+  return deleteJson<unknown>(`/employer/vacancies/${id}`)
+}
+
+export function deleteEmployerOpportunity(id: number) {
+  return deleteJson<unknown>(`/employer/opportunities/${id}`)
+}
+
+export async function fetchEmployerApplications(signal?: AbortSignal) {
+  const response = await getJson<PagedResponse<EmployerApplicationListItemApi>>('/employer/applications?Page=1&PageSize=100', { signal })
+
+  return (response.items ?? []).map((item): EmployerApplication => ({
+    id: item.id,
+    vacancyId: item.vacancyId,
+    vacancyTitle: item.vacancyTitle ?? 'Вакансия',
+    candidateUserId: item.candidateUserId,
+    candidateName: item.candidateName ?? `Пользователь #${item.candidateUserId}`,
+    status: item.status,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    chatId: item.chatId ?? null,
+  }))
+}
+
+export async function fetchEmployerApplicationDetail(applicationId: number, signal?: AbortSignal) {
+  const response = await getJson<EmployerApplicationDetailApi>(`/employer/applications/${applicationId}`, { signal })
+
+  return {
+    id: response.id,
+    companyId: response.companyId,
+    vacancyId: response.vacancyId,
+    vacancyTitle: response.vacancyTitle ?? 'Вакансия',
+    candidateUserId: response.candidateUserId,
+    candidateName: response.candidateName ?? `Пользователь #${response.candidateUserId}`,
+    candidateAvatarUrl: response.candidateAvatarUrl ?? null,
+    candidateHeadline: response.candidateHeadline ?? '',
+    candidateDesiredPosition: response.candidateDesiredPosition ?? '',
+    candidateSalaryFrom: response.candidateSalaryFrom ?? null,
+    candidateSalaryTo: response.candidateSalaryTo ?? null,
+    candidateCurrencyCode: response.candidateCurrencyCode ?? null,
+    status: response.status,
+    initiatorRole: response.initiatorRole,
+    createdAt: response.createdAt,
+    updatedAt: response.updatedAt,
+    chatId: response.chatId ?? null,
+  } satisfies EmployerApplicationDetail
+}
+
+type UpdateEmployerApplicationStatusApiRequest = {
+  status: number
+}
+
+export function updateEmployerApplicationStatus(applicationId: number, status: number) {
+  const payload: UpdateEmployerApplicationStatusApiRequest = {
+    status,
+  }
+
+  return patchJson<unknown, UpdateEmployerApplicationStatusApiRequest>(`/employer/applications/${applicationId}/status`, payload)
 }

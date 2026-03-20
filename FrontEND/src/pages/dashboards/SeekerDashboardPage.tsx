@@ -6,7 +6,7 @@ import { createApplication } from '../../api/applications'
 import { fetchTags } from '../../api/catalog'
 import { fetchSeekerProfile, fetchSeekerResume, updateSeekerProfile, updateSeekerResume } from '../../api/me'
 import { uploadMyAvatar } from '../../api/media'
-import { fetchOpportunityById, fetchOpportunityDetailById } from '../../api/opportunities'
+import { fetchOpportunityById, fetchOpportunityDetailById, participateInOpportunity } from '../../api/opportunities'
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
@@ -354,6 +354,12 @@ export function SeekerDashboardPage() {
     try {
       const detail = await fetchOpportunityDetailById(opportunityId)
 
+      if (detail.type !== 'vacancy' && detail.type !== 'internship') {
+        await participateInOpportunity(detail.id)
+        setSuccess('Вы успешно записались на мероприятие.')
+        return
+      }
+
       if (!detail.companyId) {
         throw new Error('У вакансии не указан идентификатор компании.')
       }
@@ -361,7 +367,7 @@ export function SeekerDashboardPage() {
       await createApplication({
         companyId: detail.companyId,
         candidateUserId: session.user.id,
-        opportunityId: detail.id,
+        vacancyId: detail.id,
         initiatorRole: 1,
       })
 

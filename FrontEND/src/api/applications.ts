@@ -3,7 +3,7 @@ import { postJson } from './client'
 export type CreateApplicationRequest = {
   companyId: number
   candidateUserId: number
-  opportunityId: number | null
+  vacancyId: number
   initiatorRole: 1 | 2 | 3
 }
 

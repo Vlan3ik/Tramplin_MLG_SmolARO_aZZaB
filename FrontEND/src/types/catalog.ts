@@ -22,3 +22,11 @@ export type TagListItem = {
   name: string
   slug: string
 }
+
+export type Location = {
+  id: number
+  cityId: number
+  cityName: string
+  streetName: string
+  houseNumber: string
+}

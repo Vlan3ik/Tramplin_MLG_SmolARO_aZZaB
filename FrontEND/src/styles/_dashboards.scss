@@ -804,6 +804,68 @@
   }
 }
 
+.employer-application-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+
+  select {
+    min-height: 36px;
+    min-width: 180px;
+  }
+}
+
+.employer-profile-hero {
+  background:
+    radial-gradient(circle at 10% -15%, rgba(22, 163, 74, 0.14), transparent 42%),
+    linear-gradient(180deg, #ffffff 0%, #f7fcf8 100%);
+}
+
+.employer-profile-hero__avatar {
+  background: linear-gradient(145deg, #16a34a 0%, #22c55e 100%);
+  border-color: rgba(22, 163, 74, 0.24);
+  box-shadow: 0 12px 22px rgba(22, 163, 74, 0.24);
+
+  span {
+    font-size: 1.2rem;
+  }
+}
+
+.employer-candidate-profile {
+  margin-top: 0.85rem;
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.employer-candidate-profile__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.employer-candidate-profile__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+
+  > div {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    padding: 0.7rem;
+    display: grid;
+    gap: 0.2rem;
+  }
+}
+
+.employer-candidate-profile__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (max-width: 1080px) {
   .seeker-profile-hero {
     grid-template-columns: 1fr;
@@ -844,6 +906,10 @@
 
   .employer-analytics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .employer-candidate-profile__grid {
+    grid-template-columns: 1fr;
   }
 }
 

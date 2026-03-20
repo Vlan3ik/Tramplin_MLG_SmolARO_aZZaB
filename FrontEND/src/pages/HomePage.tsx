@@ -130,7 +130,7 @@ export function HomePage() {
     try {
       const detail = await fetchOpportunityDetailById(opportunity.id)
 
-      if (detail.type === 'event') {
+      if (detail.type !== 'vacancy' && detail.type !== 'internship') {
         await participateInOpportunity(detail.id)
         setActionError(false)
         setActionMessage('Вы успешно записались на мероприятие.')
@@ -144,7 +144,7 @@ export function HomePage() {
       await createApplication({
         companyId: detail.companyId,
         candidateUserId: session.user.id,
-        opportunityId: detail.id,
+        vacancyId: detail.id,
         initiatorRole: 1,
       })
 

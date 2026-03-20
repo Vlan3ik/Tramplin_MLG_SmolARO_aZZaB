@@ -7,6 +7,8 @@ type ChatMessageApi = {
   id: number
   chatId: number
   senderUserId: number
+  senderDisplayName?: string | null
+  senderAvatarUrl?: string | null
   text: string | null
   isSystem: boolean
   createdAt: string
@@ -17,6 +19,7 @@ type ChatListItemApi = {
   type: ChatTypeApi
   title: string | null
   participantIds: number[] | null
+  participantsCount?: number
   createdAt: string
   lastMessage: ChatMessageApi | null
 }
@@ -41,6 +44,8 @@ function mapMessage(item: ChatMessageApi): ChatMessage {
     id: item.id,
     chatId: item.chatId,
     senderUserId: item.senderUserId,
+    senderDisplayName: item.senderDisplayName ?? null,
+    senderAvatarUrl: item.senderAvatarUrl ?? null,
     text: item.text ?? '',
     isSystem: item.isSystem,
     createdAt: item.createdAt,
@@ -50,9 +55,10 @@ function mapMessage(item: ChatMessageApi): ChatMessage {
 function mapChat(item: ChatListItemApi): ChatListItem {
   return {
     id: item.id,
-    type: item.type === 2 ? 2 : 1,
+    type: item.type === 2 ? 2 : item.type === 3 ? 3 : 1,
     title: item.title ?? null,
     participantIds: item.participantIds ?? [],
+    participantsCount: item.participantsCount ?? item.participantIds?.length ?? 0,
     createdAt: item.createdAt,
     lastMessage: item.lastMessage ? mapMessage(item.lastMessage) : null,
   }
@@ -60,6 +66,11 @@ function mapChat(item: ChatListItemApi): ChatListItem {
 
 export async function fetchMyChats(signal?: AbortSignal) {
   const response = await getJson<ChatListItemApi[]>('/chats', { signal })
+  return response.map(mapChat)
+}
+
+export async function fetchEmployerChats(signal?: AbortSignal) {
+  const response = await getJson<ChatListItemApi[]>('/employer/chats', { signal })
   return response.map(mapChat)
 }
 
@@ -86,6 +97,69 @@ export async function fetchChatHistory(chatId: number, beforeMessageId?: number,
     messages: (response.messages ?? []).map(mapMessage),
     hasMore: response.hasMore,
     nextBeforeMessageId: response.nextBeforeMessageId,
+  }
+}
+
+type ChatDetailApi = {
+  id: number
+  type: ChatTypeApi
+  title: string | null
+  participantsCount: number
+  createdAt: string
+  history: ChatHistoryPageApi
+}
+
+export async function fetchChatDetail(chatId: number, beforeMessageId?: number, limit = 50, signal?: AbortSignal) {
+  const params = new URLSearchParams()
+
+  if (typeof beforeMessageId === 'number') {
+    params.set('beforeMessageId', String(beforeMessageId))
+  }
+
+  params.set('limit', String(limit))
+
+  const query = params.toString() ? `?${params.toString()}` : ''
+  const response = await getJson<ChatDetailApi>(`/chats/${chatId}/detail${query}`, { signal })
+
+  return {
+    id: response.id,
+    type: response.type === 2 ? 2 : response.type === 3 ? 3 : 1,
+    title: response.title ?? null,
+    participantsCount: response.participantsCount,
+    createdAt: response.createdAt,
+    history: {
+      chatId: response.history.chatId,
+      messages: (response.history.messages ?? []).map(mapMessage),
+      hasMore: response.history.hasMore,
+      nextBeforeMessageId: response.history.nextBeforeMessageId,
+    },
+  }
+}
+
+export async function fetchEmployerChatDetail(chatId: number, beforeMessageId?: number, limit = 50, signal?: AbortSignal) {
+  const params = new URLSearchParams()
+
+  if (typeof beforeMessageId === 'number') {
+    params.set('beforeMessageId', String(beforeMessageId))
+  }
+
+  params.set('limit', String(limit))
+
+  const query = params.toString() ? `?${params.toString()}` : ''
+  const response = await getJson<ChatDetailApi>(`/employer/chats/${chatId}/detail${query}`, { signal })
+
+  return {
+    id: response.id,
+    type: response.type === 2 ? 2 : response.type === 3 ? 3 : 1,
+    title: response.title ?? null,
+    participantsCount: response.participantsCount,
+    createdAt: response.createdAt,
+    history: {
+      chatId: response.history.chatId,
+      messages: (response.history.messages ?? []).map(mapMessage),
+      hasMore: response.history.hasMore,
+      nextBeforeMessageId: response.history.nextBeforeMessageId,
+    },
   }
 }
 
