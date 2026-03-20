@@ -26,8 +26,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CompanyMember> CompanyMembers => Set<CompanyMember>();
     public DbSet<CompanyInvite> CompanyInvites => Set<CompanyInvite>();
     public DbSet<CompanyChatSettings> CompanyChatSettings => Set<CompanyChatSettings>();
+    public DbSet<Vacancy> Vacancies => Set<Vacancy>();
+    public DbSet<VacancyTag> VacancyTags => Set<VacancyTag>();
     public DbSet<Opportunity> Opportunities => Set<Opportunity>();
     public DbSet<OpportunityTag> OpportunityTags => Set<OpportunityTag>();
+    public DbSet<OpportunityParticipant> OpportunityParticipants => Set<OpportunityParticipant>();
     public DbSet<Application> Applications => Set<Application>();
     public DbSet<Chat> Chats => Set<Chat>();
     public DbSet<ChatParticipant> ChatParticipants => Set<ChatParticipant>();
@@ -362,6 +365,44 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasOne(x => x.Company).WithOne(x => x.ChatSettings).HasForeignKey<CompanyChatSettings>(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<Vacancy>(entity =>
+        {
+            entity.ToTable("vacancies");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.CompanyId).HasColumnName("company_id");
+            entity.Property(x => x.CreatedByUserId).HasColumnName("created_by_user_id");
+            entity.Property(x => x.Title).HasColumnName("title").HasMaxLength(300);
+            entity.Property(x => x.ShortDescription).HasColumnName("short_description").HasMaxLength(500);
+            entity.Property(x => x.FullDescription).HasColumnName("full_description");
+            entity.Property(x => x.Kind).HasColumnName("kind");
+            entity.Property(x => x.Format).HasColumnName("format");
+            entity.Property(x => x.Status).HasColumnName("status");
+            entity.Property(x => x.CityId).HasColumnName("city_id");
+            entity.Property(x => x.LocationId).HasColumnName("location_id");
+            entity.Property(x => x.SalaryFrom).HasColumnName("salary_from").HasColumnType("numeric(12,2)");
+            entity.Property(x => x.SalaryTo).HasColumnName("salary_to").HasColumnType("numeric(12,2)");
+            entity.Property(x => x.CurrencyCode).HasColumnName("currency_code").HasMaxLength(3);
+            entity.Property(x => x.SalaryTaxMode).HasColumnName("salary_tax_mode");
+            entity.Property(x => x.PublishAt).HasColumnName("publish_at");
+            entity.Property(x => x.ApplicationDeadline).HasColumnName("application_deadline");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasOne(x => x.Company).WithMany(x => x.Vacancies).HasForeignKey(x => x.CompanyId);
+            entity.HasOne(x => x.City).WithMany().HasForeignKey(x => x.CityId);
+            entity.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId);
+        });
+
+        modelBuilder.Entity<VacancyTag>(entity =>
+        {
+            entity.ToTable("vacancy_tags");
+            entity.HasKey(x => new { x.VacancyId, x.TagId });
+            entity.Property(x => x.VacancyId).HasColumnName("vacancy_id");
+            entity.Property(x => x.TagId).HasColumnName("tag_id");
+            entity.HasOne(x => x.Vacancy).WithMany(x => x.VacancyTags).HasForeignKey(x => x.VacancyId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Tag).WithMany(x => x.VacancyTags).HasForeignKey(x => x.TagId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<Opportunity>(entity =>
         {
             entity.ToTable("opportunities");
@@ -372,16 +413,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Title).HasColumnName("title").HasMaxLength(300);
             entity.Property(x => x.ShortDescription).HasColumnName("short_description").HasMaxLength(500);
             entity.Property(x => x.FullDescription).HasColumnName("full_description");
-            entity.Property(x => x.OppType).HasColumnName("opp_type");
+            entity.Property(x => x.Kind).HasColumnName("kind");
             entity.Property(x => x.Format).HasColumnName("format");
             entity.Property(x => x.Status).HasColumnName("status");
             entity.Property(x => x.CityId).HasColumnName("city_id");
             entity.Property(x => x.LocationId).HasColumnName("location_id");
-            entity.Property(x => x.SalaryFrom).HasColumnName("salary_from").HasColumnType("numeric(12,2)");
-            entity.Property(x => x.SalaryTo).HasColumnName("salary_to").HasColumnType("numeric(12,2)");
-            entity.Property(x => x.CurrencyCode).HasColumnName("currency_code").HasMaxLength(3);
+            entity.Property(x => x.PriceType).HasColumnName("price_type");
+            entity.Property(x => x.PriceAmount).HasColumnName("price_amount").HasColumnType("numeric(12,2)");
+            entity.Property(x => x.PriceCurrencyCode).HasColumnName("price_currency_code").HasMaxLength(3);
+            entity.Property(x => x.ParticipantsCanWrite).HasColumnName("participants_can_write");
             entity.Property(x => x.PublishAt).HasColumnName("publish_at");
-            entity.Property(x => x.ApplicationDeadline).HasColumnName("application_deadline");
+            entity.Property(x => x.EventDate).HasColumnName("event_date");
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasOne(x => x.Company).WithMany(x => x.Opportunities).HasForeignKey(x => x.CompanyId);
@@ -395,8 +437,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasKey(x => new { x.OpportunityId, x.TagId });
             entity.Property(x => x.OpportunityId).HasColumnName("opportunity_id");
             entity.Property(x => x.TagId).HasColumnName("tag_id");
-            entity.HasOne(x => x.Opportunity).WithMany(x => x.OpportunityTags).HasForeignKey(x => x.OpportunityId);
-            entity.HasOne(x => x.Tag).WithMany(x => x.OpportunityTags).HasForeignKey(x => x.TagId);
+            entity.HasOne(x => x.Opportunity).WithMany(x => x.OpportunityTags).HasForeignKey(x => x.OpportunityId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Tag).WithMany(x => x.OpportunityTags).HasForeignKey(x => x.TagId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OpportunityParticipant>(entity =>
+        {
+            entity.ToTable("opportunity_participants");
+            entity.HasKey(x => new { x.OpportunityId, x.UserId });
+            entity.Property(x => x.OpportunityId).HasColumnName("opportunity_id");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.JoinedAt).HasColumnName("joined_at");
+            entity.HasOne(x => x.Opportunity).WithMany(x => x.Participants).HasForeignKey(x => x.OpportunityId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.User).WithMany(x => x.OpportunityParticipations).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Application>(entity =>
@@ -406,16 +459,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Id).HasColumnName("id");
             entity.Property(x => x.CompanyId).HasColumnName("company_id");
             entity.Property(x => x.CandidateUserId).HasColumnName("candidate_user_id");
-            entity.Property(x => x.OpportunityId).HasColumnName("opportunity_id");
+            entity.Property(x => x.VacancyId).HasColumnName("vacancy_id");
             entity.Property(x => x.InitiatorRole).HasColumnName("initiator_role");
             entity.Property(x => x.Status).HasColumnName("status");
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasIndex(x => x.CompanyId);
             entity.HasIndex(x => x.CandidateUserId);
+            entity.HasIndex(x => x.VacancyId);
             entity.HasOne(x => x.Company).WithMany(x => x.Applications).HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.CandidateUser).WithMany(x => x.CandidateApplications).HasForeignKey(x => x.CandidateUserId).OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(x => x.Opportunity).WithMany(x => x.Applications).HasForeignKey(x => x.OpportunityId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Vacancy).WithMany(x => x.Applications).HasForeignKey(x => x.VacancyId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Chat>(entity =>
@@ -425,9 +479,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Id).HasColumnName("id");
             entity.Property(x => x.Type).HasColumnName("type");
             entity.Property(x => x.ApplicationId).HasColumnName("application_id");
+            entity.Property(x => x.OpportunityId).HasColumnName("opportunity_id");
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
-            entity.HasIndex(x => x.ApplicationId).IsUnique();
+            entity.HasIndex(x => x.ApplicationId).IsUnique().HasFilter("application_id IS NOT NULL");
+            entity.HasIndex(x => x.OpportunityId).IsUnique().HasFilter("opportunity_id IS NOT NULL");
             entity.HasOne(x => x.Application).WithOne(x => x.Chat).HasForeignKey<Chat>(x => x.ApplicationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Opportunity).WithOne(x => x.Chat).HasForeignKey<Chat>(x => x.OpportunityId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ChatParticipant>(entity =>

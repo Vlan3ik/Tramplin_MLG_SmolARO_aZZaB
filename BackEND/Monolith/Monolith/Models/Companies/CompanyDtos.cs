@@ -27,4 +27,4 @@ public record CompanyDetailDto(
     IReadOnlyCollection<CompanyOpportunityDto> ActiveOpportunities);
 
 public record CompanyLinkDto(string Kind, string Url, string? Label);
-public record CompanyOpportunityDto(long Id, string Title, string Type, string Format, DateTimeOffset PublishAt);
+public record CompanyOpportunityDto(long Id, string EntityType, string Title, string Type, string Format, DateTimeOffset PublishAt);

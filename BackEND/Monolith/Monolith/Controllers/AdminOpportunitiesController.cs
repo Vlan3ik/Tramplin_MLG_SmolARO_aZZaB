@@ -9,28 +9,14 @@ using Monolith.Services.Common;
 
 namespace Monolith.Controllers;
 
-/// <summary>
-/// Административные операции над вакансиями/возможностями.
-/// Доступ только для роли curator.
-/// </summary>
 [ApiController]
 [Authorize(Roles = "curator")]
 [Route("admin/opportunities")]
 [Produces("application/json")]
 public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBase
 {
-    /// <summary>
-    /// Возвращает список вакансий с пагинацией и поиском.
-    /// </summary>
-    /// <param name="page">Номер страницы (начиная с 1).</param>
-    /// <param name="pageSize">Размер страницы (максимум 100).</param>
-    /// <param name="search">Поиск по title и shortDescription.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Пагинированный список вакансий.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<AdminOpportunityListItemDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<PagedResponse<AdminOpportunityListItemDto>>> GetList(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
@@ -51,76 +37,64 @@ public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBa
             .OrderByDescending(x => x.CreatedAt)
             .Skip((safePage - 1) * safePageSize)
             .Take(safePageSize)
-            .Select(x => new AdminOpportunityListItemDto(x.Id, x.CompanyId, x.Title, x.Status, x.OppType, x.Format, x.PublishAt))
+            .Select(x => new AdminOpportunityListItemDto(x.Id, x.CompanyId, x.Title, x.Status, x.Kind, x.Format, x.PublishAt))
             .ToListAsync(cancellationToken);
+
         return Ok(new PagedResponse<AdminOpportunityListItemDto>(rows, total, safePage, safePageSize));
     }
 
-    /// <summary>
-    /// Создает вакансию в административном контуре.
-    /// </summary>
-    /// <param name="request">Полный набор полей вакансии.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Созданная вакансия.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(AdminOpportunityListItemDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<AdminOpportunityListItemDto>> Create(AdminOpportunityUpsertRequest request, CancellationToken cancellationToken)
     {
+        var validationError = ValidateEventPricing(request.PriceType, request.PriceAmount, request.PriceCurrencyCode);
+        if (validationError is not null)
+        {
+            return this.ToBadRequestError("admin.opportunities.invalid_price", validationError);
+        }
+
         var opportunity = new Opportunity();
         Apply(opportunity, request);
         dbContext.Opportunities.Add(opportunity);
         await dbContext.SaveChangesAsync(cancellationToken);
-        var dto = new AdminOpportunityListItemDto(opportunity.Id, opportunity.CompanyId, opportunity.Title, opportunity.Status, opportunity.OppType, opportunity.Format, opportunity.PublishAt);
+        var dto = new AdminOpportunityListItemDto(opportunity.Id, opportunity.CompanyId, opportunity.Title, opportunity.Status, opportunity.Kind, opportunity.Format, opportunity.PublishAt);
         return CreatedAtAction(nameof(GetList), new { id = opportunity.Id }, dto);
     }
 
-    /// <summary>
-    /// Обновляет вакансию.
-    /// </summary>
-    /// <param name="id">Идентификатор вакансии.</param>
-    /// <param name="request">Новые значения полей вакансии.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Обновленная вакансия.</returns>
     [HttpPut("{id:long}")]
     [ProducesResponseType(typeof(AdminOpportunityListItemDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<AdminOpportunityListItemDto>> Update(long id, AdminOpportunityUpsertRequest request, CancellationToken cancellationToken)
     {
+        var validationError = ValidateEventPricing(request.PriceType, request.PriceAmount, request.PriceCurrencyCode);
+        if (validationError is not null)
+        {
+            return this.ToBadRequestError("admin.opportunities.invalid_price", validationError);
+        }
+
         var opportunity = await dbContext.Opportunities.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (opportunity is null)
         {
-            return this.ToNotFoundError("admin.opportunities.not_found", "Вакансия не найдена.");
+            return this.ToNotFoundError("admin.opportunities.not_found", "Opportunity not found.");
         }
 
         Apply(opportunity, request);
         await dbContext.SaveChangesAsync(cancellationToken);
-        var dto = new AdminOpportunityListItemDto(opportunity.Id, opportunity.CompanyId, opportunity.Title, opportunity.Status, opportunity.OppType, opportunity.Format, opportunity.PublishAt);
+        var dto = new AdminOpportunityListItemDto(opportunity.Id, opportunity.CompanyId, opportunity.Title, opportunity.Status, opportunity.Kind, opportunity.Format, opportunity.PublishAt);
         return Ok(dto);
     }
 
-    /// <summary>
-    /// Удаляет вакансию.
-    /// </summary>
-    /// <remarks>
-    /// Удаление физическое (hard delete), включая зависимые записи по каскадным FK.
-    /// </remarks>
-    /// <param name="id">Идентификатор вакансии.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Delete(long id, CancellationToken cancellationToken)
     {
         var opportunity = await dbContext.Opportunities.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (opportunity is null)
         {
-            return this.ToNotFoundError("admin.opportunities.not_found", "Вакансия не найдена.");
+            return this.ToNotFoundError("admin.opportunities.not_found", "Opportunity not found.");
         }
 
         dbContext.Opportunities.Remove(opportunity);
@@ -135,15 +109,41 @@ public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBa
         opportunity.Title = request.Title.Trim();
         opportunity.ShortDescription = request.ShortDescription.Trim();
         opportunity.FullDescription = request.FullDescription.Trim();
-        opportunity.OppType = request.OppType;
+        opportunity.Kind = request.Kind;
         opportunity.Format = request.Format;
         opportunity.Status = request.Status;
         opportunity.CityId = request.CityId;
         opportunity.LocationId = request.LocationId;
-        opportunity.SalaryFrom = request.SalaryFrom;
-        opportunity.SalaryTo = request.SalaryTo;
-        opportunity.CurrencyCode = request.CurrencyCode;
+        opportunity.PriceType = request.PriceType;
+        opportunity.PriceAmount = request.PriceAmount;
+        opportunity.PriceCurrencyCode = request.PriceCurrencyCode?.Trim().ToUpperInvariant();
+        opportunity.ParticipantsCanWrite = request.ParticipantsCanWrite;
         opportunity.PublishAt = request.PublishAt;
-        opportunity.ApplicationDeadline = request.ApplicationDeadline;
+        opportunity.EventDate = request.EventDate;
+    }
+
+    private static string? ValidateEventPricing(PriceType priceType, decimal? priceAmount, string? priceCurrencyCode)
+    {
+        if (priceAmount is < 0)
+        {
+            return "Price amount must be >= 0.";
+        }
+
+        if (priceType == PriceType.Free)
+        {
+            if (priceAmount is not null || !string.IsNullOrWhiteSpace(priceCurrencyCode))
+            {
+                return "Free event cannot have amount or currency.";
+            }
+
+            return null;
+        }
+
+        if (priceAmount is null || string.IsNullOrWhiteSpace(priceCurrencyCode))
+        {
+            return "Paid and prize events require amount and currency.";
+        }
+
+        return null;
     }
 }

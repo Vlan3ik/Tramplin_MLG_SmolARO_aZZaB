@@ -16,6 +16,18 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class ProfilesController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает публичный профиль кандидата по уникальному username.
+    /// </summary>
+    /// <remarks>
+    /// Параметр маршрута <c>username</c> — это строковый логин пользователя, а не числовой идентификатор.
+    /// Поиск выполняется по нормализованному значению username.
+    /// В ответе применяются настройки приватности профиля: часть полей может быть скрыта
+    /// для неавторизованных пользователей или пользователей вне контактов владельца профиля.
+    /// </remarks>
+    /// <param name="username">Уникальное имя пользователя (handle) из профиля.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Публичное представление профиля с учетом правил приватности.</returns>
     [HttpGet("{username}")]
     [ProducesResponseType(typeof(PublicProfileResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -94,17 +106,25 @@ public class ProfilesController(AppDbContext dbContext) : ControllerBase
         var applications = await dbContext.Applications
             .AsNoTracking()
             .Where(x => x.CandidateUserId == userId)
-            .Select(x => new { x.Status, OpportunityType = x.Opportunity != null ? x.Opportunity.OppType : (OpportunityType?)null })
+            .Select(x => new { x.Status, VacancyKind = x.Vacancy.Kind })
             .ToListAsync(cancellationToken);
+
+        var participationsCount = await dbContext.OpportunityParticipants
+            .AsNoTracking()
+            .CountAsync(x => x.UserId == userId, cancellationToken);
 
         return new ProfileStatsResponse(
             applications.Count,
-            applications.Count(x => x.Status == ApplicationStatus.Open),
-            applications.Count(x => x.Status == ApplicationStatus.Closed),
+            applications.Count(x => x.Status == ApplicationStatus.New),
+            applications.Count(x => x.Status == ApplicationStatus.InReview),
+            applications.Count(x => x.Status == ApplicationStatus.Interview),
+            applications.Count(x => x.Status == ApplicationStatus.Offer),
+            applications.Count(x => x.Status == ApplicationStatus.Hired),
             applications.Count(x => x.Status == ApplicationStatus.Rejected),
-            applications.Count(x => x.Status == ApplicationStatus.Closed && x.OpportunityType == OpportunityType.Internship),
-            applications.Count(x => x.Status == ApplicationStatus.Closed && x.OpportunityType == OpportunityType.CareerEvent),
-            applications.Count(x => x.Status == ApplicationStatus.Closed && x.OpportunityType == OpportunityType.MentorshipProgram));
+            applications.Count(x => x.Status == ApplicationStatus.Canceled),
+            applications.Count(x => x.Status == ApplicationStatus.Hired && x.VacancyKind == VacancyKind.Internship),
+            applications.Count(x => x.Status == ApplicationStatus.Hired && x.VacancyKind == VacancyKind.Job),
+            participationsCount);
     }
 
     private async Task<ResumeDetailsResponse> BuildResumeDetails(long userId, CancellationToken cancellationToken)

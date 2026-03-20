@@ -9,9 +9,6 @@ using Monolith.Services.Common;
 
 namespace Monolith.Controllers;
 
-/// <summary>
-/// Операции работодателя со своей компанией.
-/// </summary>
 [ApiController]
 [Authorize(Roles = "employer")]
 [Route("employer/company")]
@@ -19,27 +16,18 @@ namespace Monolith.Controllers;
 public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBase
 {
     /// <summary>
-    /// Создает черновик компании для текущего работодателя.
+    /// Create company draft for current employer user.
     /// </summary>
-    /// <remarks>
-    /// Пользователь может состоять только в одной компании.
-    /// При создании добавляется owner membership и базовые настройки чата.
-    /// </remarks>
-    /// <param name="request">Минимальные данные компании на этапе черновика.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Идентификатор созданной компании и статус.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<object>> Create(CreateEmployerCompanyRequest request, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         var alreadyMember = await dbContext.CompanyMembers.AnyAsync(x => x.UserId == userId, cancellationToken);
         if (alreadyMember)
         {
-            return this.ToConflictError("companies.membership.exists", "Пользователь уже состоит в компании.");
+            return this.ToConflictError("companies.membership.exists", "User already belongs to a company.");
         }
 
         var company = new Company
@@ -50,8 +38,8 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
             LegalType = CompanyLegalType.LegalEntity,
             TaxId = $"draft-{Guid.NewGuid():N}"[..20],
             RegistrationNumber = $"draft-{Guid.NewGuid():N}"[..20],
-            Industry = "Не указано",
-            Description = "Черновик компании",
+            Industry = "Not specified",
+            Description = "Company draft",
             BaseCityId = 1,
             Status = CompanyStatus.Draft
         };
@@ -64,80 +52,48 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
             UserId = userId,
             Role = CompanyMemberRole.Owner
         });
+
         dbContext.CompanyChatSettings.Add(new CompanyChatSettings
         {
             CompanyId = company.Id,
             AutoGreetingEnabled = false,
             WorkingHoursTimezone = "Europe/Moscow"
         });
-        await dbContext.SaveChangesAsync(cancellationToken);
 
+        await dbContext.SaveChangesAsync(cancellationToken);
         return CreatedAtAction(nameof(GetMine), new { }, new { companyId = company.Id, status = company.Status.ToString().ToLowerInvariant() });
     }
 
     /// <summary>
-    /// Возвращает компанию текущего работодателя.
+    /// Get current employer company.
     /// </summary>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Карточка компании, роль участника и настройки чата.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(EmployerCompanyResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<object>> GetMine(CancellationToken cancellationToken)
+    public async Task<ActionResult<EmployerCompanyResponse>> GetMine(CancellationToken cancellationToken)
     {
-        var userId = User.GetUserId();
-        var membership = await dbContext.CompanyMembers
-            .Include(x => x.Company)
-            .ThenInclude(x => x.ChatSettings)
-            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+        var membership = await GetMembershipWithCompany(User.GetUserId(), cancellationToken);
         if (membership is null)
         {
-            return this.ToNotFoundError("companies.membership.not_found", "Компания пользователя не найдена.");
+            return this.ToNotFoundError("companies.membership.not_found", "Company not found for current user.");
         }
 
-        var c = membership.Company;
-        return Ok(new
-        {
-            c.Id,
-            c.LegalName,
-            c.BrandName,
-            c.LegalType,
-            c.TaxId,
-            c.RegistrationNumber,
-            c.Industry,
-            c.Description,
-            c.LogoUrl,
-            c.WebsiteUrl,
-            c.PublicEmail,
-            c.PublicPhone,
-            c.BaseCityId,
-            status = c.Status.ToString().ToLowerInvariant(),
-            membershipRole = membership.Role.ToString().ToLowerInvariant(),
-            chatSettings = c.ChatSettings
-        });
+        return Ok(ToEmployerCompanyResponse(membership));
     }
 
     /// <summary>
-    /// Обновляет данные компании для прохождения верификации.
+    /// Update legal and verification data.
     /// </summary>
-    /// <remarks>
-    /// Доступно ролям company owner/admin.
-    /// </remarks>
-    /// <param name="request">Юридические и публичные данные компании.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
     [HttpPatch("verification")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> UpdateVerification(UpdateCompanyVerificationRequest request, CancellationToken cancellationToken)
     {
-        var company = await GetEditableCompany(cancellationToken);
+        var company = await GetOwnedCompany(cancellationToken);
         if (company is null)
         {
-            return this.ToNotFoundError("companies.membership.not_found", "Компания пользователя не найдена.");
+            return StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse("companies.verification.forbidden", "Only company owner can edit legal data."));
         }
 
         company.LegalName = request.LegalName.Trim();
@@ -151,30 +107,24 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
         company.WebsiteUrl = string.IsNullOrWhiteSpace(request.WebsiteUrl) ? null : request.WebsiteUrl.Trim();
         company.PublicEmail = string.IsNullOrWhiteSpace(request.PublicEmail) ? null : request.PublicEmail.Trim();
         company.PublicPhone = string.IsNullOrWhiteSpace(request.PublicPhone) ? null : request.PublicPhone.Trim();
+
         await dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
     /// <summary>
-    /// Отправляет компанию на верификацию.
+    /// Submit company for verification.
     /// </summary>
-    /// <remarks>
-    /// Проверяет обязательные поля: legalName, legalType, taxId, registrationNumber, industry, description,
-    /// baseCityId и хотя бы один публичный контакт (email или phone).
-    /// </remarks>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
     [HttpPost("submit-verification")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> SubmitVerification(CancellationToken cancellationToken)
     {
-        var company = await GetEditableCompany(cancellationToken);
+        var company = await GetOwnedCompany(cancellationToken);
         if (company is null)
         {
-            return this.ToNotFoundError("companies.membership.not_found", "Компания пользователя не найдена.");
+            return StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse("companies.verification.forbidden", "Only company owner can submit verification."));
         }
 
         if (string.IsNullOrWhiteSpace(company.LegalName) ||
@@ -185,7 +135,7 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
             company.BaseCityId <= 0 ||
             (string.IsNullOrWhiteSpace(company.PublicEmail) && string.IsNullOrWhiteSpace(company.PublicPhone)))
         {
-            return this.ToBadRequestError("companies.verification.required_fields", "Не заполнены обязательные поля верификации компании.");
+            return this.ToBadRequestError("companies.verification.required_fields", "Required verification fields are not filled.");
         }
 
         company.Status = CompanyStatus.PendingVerification;
@@ -194,21 +144,17 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
     }
 
     /// <summary>
-    /// Обновляет настройки чата компании (авто-приветствие и рабочие часы).
+    /// Update company chat settings.
     /// </summary>
-    /// <param name="request">Новые значения настроек чата.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
     [HttpPatch("chat-settings")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> UpdateChatSettings(UpdateCompanyChatSettingsRequest request, CancellationToken cancellationToken)
     {
-        var company = await GetEditableCompany(cancellationToken);
+        var company = await GetCompanyForManagement(cancellationToken);
         if (company is null)
         {
-            return this.ToNotFoundError("companies.membership.not_found", "Компания пользователя не найдена.");
+            return this.ToNotFoundError("companies.membership.not_found", "Company membership not found.");
         }
 
         var settings = await dbContext.CompanyChatSettings.FirstOrDefaultAsync(x => x.CompanyId == company.Id, cancellationToken)
@@ -231,16 +177,154 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
         return NoContent();
     }
 
-    private async Task<Company?> GetEditableCompany(CancellationToken cancellationToken)
+    /// <summary>
+    /// Get company members.
+    /// </summary>
+    [HttpGet("members")]
+    [ProducesResponseType(typeof(IReadOnlyCollection<EmployerCompanyMemberDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyCollection<EmployerCompanyMemberDto>>> GetMembers(CancellationToken cancellationToken)
     {
-        var userId = User.GetUserId();
+        var membership = await GetMembership(User.GetUserId(), cancellationToken);
+        if (membership is null)
+        {
+            return this.ToNotFoundError("companies.membership.not_found", "Company membership not found.");
+        }
+
+        var members = await dbContext.CompanyMembers
+            .AsNoTracking()
+            .Where(x => x.CompanyId == membership.CompanyId)
+            .OrderBy(x => x.Role)
+            .ThenBy(x => x.CreatedAt)
+            .Select(x => new EmployerCompanyMemberDto(
+                x.UserId,
+                x.User.Email,
+                x.User.Username,
+                x.User.DisplayName,
+                x.User.AvatarUrl,
+                x.Role,
+                x.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return Ok(members);
+    }
+
+    /// <summary>
+    /// Transfer company owner role to another member.
+    /// </summary>
+    [HttpPost("owner/transfer")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> TransferOwner(TransferCompanyOwnerRequest request, CancellationToken cancellationToken)
+    {
+        var currentUserId = User.GetUserId();
+        var currentOwnerMembership = await dbContext.CompanyMembers
+            .FirstOrDefaultAsync(x => x.UserId == currentUserId && x.Role == CompanyMemberRole.Owner, cancellationToken);
+        if (currentOwnerMembership is null)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse("companies.owner_transfer.forbidden", "Only current owner can transfer ownership."));
+        }
+
+        if (request.NewOwnerUserId == currentUserId)
+        {
+            return this.ToBadRequestError("companies.owner_transfer.same_user", "New owner must be another user.");
+        }
+
+        var newOwnerMembership = await dbContext.CompanyMembers
+            .FirstOrDefaultAsync(x => x.CompanyId == currentOwnerMembership.CompanyId && x.UserId == request.NewOwnerUserId, cancellationToken);
+        if (newOwnerMembership is null)
+        {
+            return this.ToNotFoundError("companies.owner_transfer.target_not_found", "Target user is not a company member.");
+        }
+
+        if (newOwnerMembership.Role == CompanyMemberRole.Owner)
+        {
+            return NoContent();
+        }
+
+        var owners = await dbContext.CompanyMembers
+            .Where(x => x.CompanyId == currentOwnerMembership.CompanyId && x.Role == CompanyMemberRole.Owner)
+            .ToListAsync(cancellationToken);
+        foreach (var owner in owners)
+        {
+            owner.Role = CompanyMemberRole.Admin;
+        }
+
+        newOwnerMembership.Role = CompanyMemberRole.Owner;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    private async Task<Company?> GetOwnedCompany(CancellationToken cancellationToken)
+    {
         var membership = await dbContext.CompanyMembers
-            .FirstOrDefaultAsync(x => x.UserId == userId && (x.Role == CompanyMemberRole.Owner || x.Role == CompanyMemberRole.Admin), cancellationToken);
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == User.GetUserId() && x.Role == CompanyMemberRole.Owner, cancellationToken);
         if (membership is null)
         {
             return null;
         }
 
         return await dbContext.Companies.FirstOrDefaultAsync(x => x.Id == membership.CompanyId, cancellationToken);
+    }
+
+    private async Task<Company?> GetCompanyForManagement(CancellationToken cancellationToken)
+    {
+        var membership = await dbContext.CompanyMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.UserId == User.GetUserId() &&
+                     (x.Role == CompanyMemberRole.Owner || x.Role == CompanyMemberRole.Admin),
+                cancellationToken);
+        if (membership is null)
+        {
+            return null;
+        }
+
+        return await dbContext.Companies.FirstOrDefaultAsync(x => x.Id == membership.CompanyId, cancellationToken);
+    }
+
+    private Task<CompanyMember?> GetMembership(long userId, CancellationToken cancellationToken)
+        => dbContext.CompanyMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+
+    private Task<CompanyMember?> GetMembershipWithCompany(long userId, CancellationToken cancellationToken)
+        => dbContext.CompanyMembers
+            .AsNoTracking()
+            .Include(x => x.Company)
+                .ThenInclude(x => x.ChatSettings)
+            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+
+    private static EmployerCompanyResponse ToEmployerCompanyResponse(CompanyMember membership)
+    {
+        var c = membership.Company;
+        var chatSettings = c.ChatSettings;
+        return new EmployerCompanyResponse(
+            c.Id,
+            c.LegalName,
+            c.BrandName,
+            c.LegalType,
+            c.TaxId,
+            c.RegistrationNumber,
+            c.Industry,
+            c.Description,
+            c.LogoUrl,
+            c.WebsiteUrl,
+            c.PublicEmail,
+            c.PublicPhone,
+            c.BaseCityId,
+            c.Status,
+            membership.Role,
+            new EmployerCompanyChatSettingsDto(
+                chatSettings?.AutoGreetingEnabled == true,
+                chatSettings?.AutoGreetingText,
+                chatSettings?.OutsideHoursEnabled == true,
+                chatSettings?.OutsideHoursText,
+                chatSettings?.WorkingHoursTimezone ?? "Europe/Moscow",
+                chatSettings?.WorkingHoursFrom,
+                chatSettings?.WorkingHoursTo));
     }
 }

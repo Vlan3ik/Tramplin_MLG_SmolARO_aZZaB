@@ -7,15 +7,17 @@ public class UnifiedOperationDocumentationFilter : IOperationFilter
 {
     private static readonly IReadOnlyDictionary<string, string> ParameterHints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
-        ["cityId"] = "ID города из GET /catalog/cities.",
-        ["locationId"] = "ID локации из GET /catalog/locations.",
-        ["groupId"] = "ID группы тегов из GET /catalog/tag-groups.",
-        ["tagIds"] = "ID тегов из GET /catalog/tags (можно передавать несколько значений).",
-        ["companyId"] = "ID компании из GET /companies или профильных API работодателя/администратора.",
-        ["opportunityId"] = "ID возможности из GET /opportunities.",
-        ["userId"] = "ID пользователя из API профилей или административных API пользователей.",
-        ["chatId"] = "ID чата из GET /chats.",
-        ["messageId"] = "ID сообщения из GET /chats/{chatId}/messages."
+        ["cityId"] = "City id from GET /catalog/cities.",
+        ["locationId"] = "Location id from GET /catalog/locations.",
+        ["groupId"] = "Tag group id from GET /catalog/tag-groups.",
+        ["tagIds"] = "Tag ids from GET /catalog/tags.",
+        ["companyId"] = "Company id from GET /companies.",
+        ["opportunityId"] = "Opportunity id from GET /opportunities.",
+        ["vacancyId"] = "Vacancy id from GET /vacancies.",
+        ["userId"] = "User id.",
+        ["newOwnerUserId"] = "Target user id for ownership transfer.",
+        ["chatId"] = "Chat id from GET /chats.",
+        ["messageId"] = "Message id from GET /chats/{chatId}/messages."
     };
 
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
@@ -28,21 +30,24 @@ public class UnifiedOperationDocumentationFilter : IOperationFilter
                 parameter.Description = hint;
             }
 
-            if (parameter.Schema?.Enum is { Count: > 0 })
+            if (parameter.Schema?.Enum is not { Count: > 0 })
             {
-                var enumPairs = parameter.Schema.Enum
-                    .Select(x => x.ToString())
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .ToArray();
-
-                if (enumPairs.Length > 0)
-                {
-                    var enumHint = $"Допустимые коды: {string.Join(", ", enumPairs)}.";
-                    parameter.Description = string.IsNullOrWhiteSpace(parameter.Description)
-                        ? enumHint
-                        : $"{parameter.Description} {enumHint}";
-                }
+                continue;
             }
+
+            var enumValues = parameter.Schema.Enum
+                .Select(x => x.ToString())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToArray();
+            if (enumValues.Length == 0)
+            {
+                continue;
+            }
+
+            var enumHint = $"Allowed codes: {string.Join(", ", enumValues)}.";
+            parameter.Description = string.IsNullOrWhiteSpace(parameter.Description)
+                ? enumHint
+                : $"{parameter.Description} {enumHint}";
         }
     }
 }

@@ -133,12 +133,16 @@ public record UpdateResumeDetailsRequest(
 
 public record ProfileStatsResponse(
     int ApplicationsTotal,
-    int ApplicationsOpen,
-    int ApplicationsClosed,
+    int ApplicationsNew,
+    int ApplicationsInReview,
+    int ApplicationsInterview,
+    int ApplicationsOffer,
+    int ApplicationsHired,
     int ApplicationsRejected,
+    int ApplicationsCanceled,
     int InternshipsCompleted,
-    int EventsAttended,
-    int MentorshipParticipations);
+    int JobsCompleted,
+    int EventsParticipations);
 
 public record PublicProfileResponse(
     long UserId,
