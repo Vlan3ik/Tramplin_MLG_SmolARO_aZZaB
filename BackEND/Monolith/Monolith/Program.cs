@@ -5,7 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Monolith.Hubs;
+using Monolith.Infrastructure.Swagger;
 using Monolith.Services.Auth;
+using Monolith.Services.Chats;
 using Monolith.Services.Storage;
 using Monolith.Services.Seeding;
 using Monolith.Contexts;
@@ -27,6 +29,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<ISeedDataService, SeedDataService>();
 builder.Services.AddScoped<IObjectStorageService, MinioObjectStorageService>();
+builder.Services.AddScoped<IChatCacheService, ChatCacheService>();
 
 builder.Services.AddCors(options =>
 {
@@ -43,6 +46,11 @@ var redisConnection = builder.Configuration.GetConnectionString("Redis");
 if (!string.IsNullOrWhiteSpace(redisConnection))
 {
     signalRBuilder.AddStackExchangeRedis(redisConnection);
+    builder.Services.AddStackExchangeRedisCache(options => options.Configuration = redisConnection);
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
 }
 
 builder.Services.AddControllers();
@@ -58,6 +66,8 @@ builder.Services.AddSwaggerGen(options =>
     {
         options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
     }
+    options.SchemaFilter<UnifiedSchemaDocumentationFilter>();
+    options.OperationFilter<UnifiedOperationDocumentationFilter>();
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",

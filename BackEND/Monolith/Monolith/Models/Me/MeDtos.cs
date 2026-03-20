@@ -26,12 +26,39 @@ public record UpdateUsernameRequest(string Username);
 
 public record UsernameResponse(string Username);
 
+/// <summary>
+/// Обновление настроек приватности профиля соискателя.
+/// </summary>
+/// <param name="ProfileVisibility">
+/// Видимость профиля (enum PrivacyScope):
+/// 1 = Private, 2 = ContactsOnly, 3 = AuthorizedUsers.
+/// </param>
+/// <param name="ResumeVisibility">
+/// Видимость резюме (enum PrivacyScope):
+/// 1 = Private, 2 = ContactsOnly, 3 = AuthorizedUsers.
+/// </param>
+/// <param name="OpenToWork">Флаг готовности к предложениям.</param>
+/// <param name="ShowContactsInResume">Показывать ли контакты в резюме.</param>
 public record UpdateSettingsRequest(
     PrivacyScope ProfileVisibility,
     PrivacyScope ResumeVisibility,
     bool OpenToWork,
     bool ShowContactsInResume);
 
+/// <summary>
+/// Текущие настройки приватности профиля соискателя.
+/// </summary>
+/// <param name="UserId">ID пользователя, для которого возвращены настройки.</param>
+/// <param name="ProfileVisibility">
+/// Видимость профиля (enum PrivacyScope):
+/// 1 = Private, 2 = ContactsOnly, 3 = AuthorizedUsers.
+/// </param>
+/// <param name="ResumeVisibility">
+/// Видимость резюме (enum PrivacyScope):
+/// 1 = Private, 2 = ContactsOnly, 3 = AuthorizedUsers.
+/// </param>
+/// <param name="OpenToWork">Флаг готовности к предложениям.</param>
+/// <param name="ShowContactsInResume">Показывать ли контакты в резюме.</param>
 public record SettingsResponse(
     long UserId,
     PrivacyScope ProfileVisibility,
@@ -56,6 +83,13 @@ public record ResumeResponse(
     decimal? SalaryTo,
     string? CurrencyCode);
 
+/// <summary>
+/// Элемент навыка в резюме.
+/// </summary>
+/// <param name="TagId">ID тега навыка из GET /catalog/tags.</param>
+/// <param name="TagName">Название тега навыка.</param>
+/// <param name="Level">Уровень навыка от 1 до 5.</param>
+/// <param name="YearsExperience">Опыт в годах.</param>
 public record ResumeSkillItemDto(long TagId, string TagName, int? Level, decimal? YearsExperience);
 public record ResumeProjectItemDto(long Id, string Title, string? Role, string? Description, DateOnly? StartDate, DateOnly? EndDate, string? RepoUrl, string? DemoUrl);
 public record ResumeEducationItemDto(long Id, string University, string? Faculty, string? Specialty, int? Course, int? GraduationYear);
@@ -74,6 +108,12 @@ public record ResumeDetailsResponse(
     IReadOnlyCollection<ResumeEducationItemDto> Education,
     IReadOnlyCollection<ResumeLinkItemDto> Links);
 
+/// <summary>
+/// Навык для сохранения в резюме.
+/// </summary>
+/// <param name="TagId">ID тега навыка из GET /catalog/tags.</param>
+/// <param name="Level">Уровень навыка от 1 до 5.</param>
+/// <param name="YearsExperience">Опыт в годах.</param>
 public record ResumeSkillUpsertDto(long TagId, int? Level, decimal? YearsExperience);
 public record ResumeProjectUpsertDto(string Title, string? Role, string? Description, DateOnly? StartDate, DateOnly? EndDate, string? RepoUrl, string? DemoUrl);
 public record ResumeEducationUpsertDto(string University, string? Faculty, string? Specialty, int? Course, int? GraduationYear);

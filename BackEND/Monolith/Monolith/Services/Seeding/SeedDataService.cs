@@ -248,7 +248,8 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
             new TagGroup { Code = "technology", Name = "Технологии", Description = "Языки и инструменты", IsSystem = true },
             new TagGroup { Code = "grade", Name = "Уровень", Description = "Уровень позиции", IsSystem = true },
             new TagGroup { Code = "employment", Name = "Занятость", Description = "Тип занятости", IsSystem = true },
-            new TagGroup { Code = "specialization", Name = "Специализация", Description = "Направление", IsSystem = true }
+            new TagGroup { Code = "specialization", Name = "Специализация", Description = "Направление", IsSystem = true },
+            new TagGroup { Code = "event_kind", Name = "Тип события", Description = "Подтипы карьерных мероприятий", IsSystem = true }
         };
 
         foreach (var group in groups)
@@ -280,7 +281,8 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
             ["specialization"] = new[]
             {
                 "Backend", "Frontend", "Data Science", "QA", "DevOps", "Product", "Marketing", "Sales", "1C", "Support"
-            }
+            },
+            ["event_kind"] = new[] { "Hackathon", "Open Day", "Lecture" }
         };
 
         foreach (var pair in tagMap)
@@ -629,12 +631,16 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
 
         var templates = new[]
         {
-            new { Title = "Junior Backend Developer", Type = OpportunityType.Vacancy, Format = WorkFormat.Hybrid, SalaryFrom = 90000m, SalaryTo = 150000m },
-            new { Title = "Стажер QA Engineer", Type = OpportunityType.Internship, Format = WorkFormat.Onsite, SalaryFrom = 50000m, SalaryTo = 80000m },
-            new { Title = "Frontend Developer (React)", Type = OpportunityType.Vacancy, Format = WorkFormat.Hybrid, SalaryFrom = 100000m, SalaryTo = 170000m },
-            new { Title = "Data Analyst Internship", Type = OpportunityType.Internship, Format = WorkFormat.Remote, SalaryFrom = 60000m, SalaryTo = 90000m },
-            new { Title = "DevOps Engineer", Type = OpportunityType.Vacancy, Format = WorkFormat.Hybrid, SalaryFrom = 140000m, SalaryTo = 220000m },
-            new { Title = "Product Manager (Junior+)", Type = OpportunityType.Vacancy, Format = WorkFormat.Onsite, SalaryFrom = 110000m, SalaryTo = 180000m }
+            new { Title = "Junior Backend Developer", Type = OpportunityType.Vacancy, Format = WorkFormat.Hybrid, SalaryFrom = (decimal?)90000m, SalaryTo = (decimal?)150000m },
+            new { Title = "Стажер QA Engineer", Type = OpportunityType.Internship, Format = WorkFormat.Onsite, SalaryFrom = (decimal?)50000m, SalaryTo = (decimal?)80000m },
+            new { Title = "Frontend Developer (React)", Type = OpportunityType.Vacancy, Format = WorkFormat.Hybrid, SalaryFrom = (decimal?)100000m, SalaryTo = (decimal?)170000m },
+            new { Title = "Data Analyst Internship", Type = OpportunityType.Internship, Format = WorkFormat.Remote, SalaryFrom = (decimal?)60000m, SalaryTo = (decimal?)90000m },
+            new { Title = "DevOps Engineer", Type = OpportunityType.Vacancy, Format = WorkFormat.Hybrid, SalaryFrom = (decimal?)140000m, SalaryTo = (decimal?)220000m },
+            new { Title = "Product Manager (Junior+)", Type = OpportunityType.Vacancy, Format = WorkFormat.Onsite, SalaryFrom = (decimal?)110000m, SalaryTo = (decimal?)180000m },
+            new { Title = "Mentorship Program: Product Career Boost", Type = OpportunityType.MentorshipProgram, Format = WorkFormat.Remote, SalaryFrom = (decimal?)null, SalaryTo = (decimal?)null },
+            new { Title = "Career Hackathon 2026", Type = OpportunityType.CareerEvent, Format = WorkFormat.Onsite, SalaryFrom = (decimal?)null, SalaryTo = (decimal?)null },
+            new { Title = "Open Day: IT Company Tour", Type = OpportunityType.CareerEvent, Format = WorkFormat.Onsite, SalaryFrom = (decimal?)null, SalaryTo = (decimal?)null },
+            new { Title = "Tech Lecture: AI in Product Teams", Type = OpportunityType.CareerEvent, Format = WorkFormat.Hybrid, SalaryFrom = (decimal?)null, SalaryTo = (decimal?)null }
         };
 
         var companyOrder = new[]
@@ -647,7 +653,7 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         {
             var company = companyByBrand[companyName];
 
-            for (var i = 0; i < 4; i++)
+            for (var i = 0; i < 6; i++)
             {
                 var t = templates[(i + companyName.Length) % templates.Length];
 
@@ -657,15 +663,15 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
                     CreatedByUserId = employerUserId,
                     Title = $"{t.Title} — {companyName}",
                     ShortDescription = $"Позиция {t.Title} в компании {companyName}.",
-                    FullDescription = $"Реальная вакансия/стажировка для развития карьеры в компании {companyName}. Обязанности, требования и условия соответствуют профилю роли {t.Title}.",
+                    FullDescription = $"Реальная карьерная возможность в компании {companyName}. Формат, требования и условия соответствуют профилю {t.Title}.",
                     OppType = t.Type,
                     Format = t.Format,
                     Status = OpportunityStatus.Published,
                     CityId = null,
                     LocationId = NextSmolenskLocationId(),
-                    SalaryFrom = t.Type == OpportunityType.CareerEvent ? null : t.SalaryFrom,
-                    SalaryTo = t.Type == OpportunityType.CareerEvent ? null : t.SalaryTo,
-                    CurrencyCode = t.Type == OpportunityType.CareerEvent ? null : "RUB",
+                    SalaryFrom = t.Type is OpportunityType.CareerEvent or OpportunityType.MentorshipProgram ? null : t.SalaryFrom,
+                    SalaryTo = t.Type is OpportunityType.CareerEvent or OpportunityType.MentorshipProgram ? null : t.SalaryTo,
+                    CurrencyCode = t.Type is OpportunityType.CareerEvent or OpportunityType.MentorshipProgram ? null : "RUB",
                     PublishAt = now.AddDays(-(8 + i + companyName.Length % 5)),
                     ApplicationDeadline = now.AddDays(20 + i)
                 });
@@ -815,6 +821,47 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
                     ("Junior", "grade"),
                     ("Full-time", "employment"),
                     ("Google Analytics", "technology")
+                ];
+            }
+
+            if (title.StartsWith("Mentorship Program: Product Career Boost", StringComparison.OrdinalIgnoreCase))
+            {
+                return
+                [
+                    ("Product", "specialization"),
+                    ("Middle", "grade"),
+                    ("Part-time", "employment")
+                ];
+            }
+
+            if (title.StartsWith("Career Hackathon", StringComparison.OrdinalIgnoreCase))
+            {
+                return
+                [
+                    ("Hackathon", "event_kind"),
+                    ("Backend", "specialization"),
+                    ("Frontend", "specialization"),
+                    ("Python", "technology")
+                ];
+            }
+
+            if (title.StartsWith("Open Day:", StringComparison.OrdinalIgnoreCase))
+            {
+                return
+                [
+                    ("Open Day", "event_kind"),
+                    ("Product", "specialization"),
+                    ("Marketing", "specialization")
+                ];
+            }
+
+            if (title.StartsWith("Tech Lecture:", StringComparison.OrdinalIgnoreCase))
+            {
+                return
+                [
+                    ("Lecture", "event_kind"),
+                    ("Data Science", "specialization"),
+                    ("Python", "technology")
                 ];
             }
 
