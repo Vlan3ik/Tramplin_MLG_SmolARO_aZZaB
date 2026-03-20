@@ -7,9 +7,9 @@ public enum OpportunityStatus
 {
     Draft = 1,
     PendingModeration = 2,
-    Planned = 3,
-    Published = 4,
-    Closed = 5,
+    Active = 3,
+    Finished = 4,
+    Canceled = 5,
     Rejected = 6,
     Archived = 7
 }

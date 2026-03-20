@@ -1,0 +1,204 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Monolith.Contexts;
+using Monolith.Entities;
+using Monolith.Models.Common;
+using Monolith.Models.Employer;
+using Monolith.Services.Common;
+
+namespace Monolith.Controllers;
+
+[ApiController]
+[Authorize(Roles = "employer")]
+[Route("employer/applications")]
+[Produces("application/json")]
+public class EmployerApplicationsController(AppDbContext dbContext) : ControllerBase
+{
+    /// <summary>
+    /// Get company applications with filters and paging.
+    /// </summary>
+    [HttpGet]
+    [ProducesResponseType(typeof(PagedResponse<EmployerApplicationListItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PagedResponse<EmployerApplicationListItemDto>>> GetList([FromQuery] EmployerApplicationListQuery query, CancellationToken cancellationToken)
+    {
+        var membership = await GetManagementMembership(cancellationToken);
+        if (membership is null)
+        {
+            return this.ToNotFoundError("employer.company.not_found", "Employer company not found.");
+        }
+
+        var page = query.Page <= 0 ? 1 : query.Page;
+        var pageSize = query.PageSize <= 0 ? 20 : Math.Min(query.PageSize, 100);
+
+        var applications = dbContext.Applications
+            .AsNoTracking()
+            .Include(x => x.Vacancy)
+            .Include(x => x.CandidateUser)
+            .Include(x => x.Chat)
+            .Where(x => x.CompanyId == membership.CompanyId);
+
+        if (query.VacancyId is not null)
+        {
+            applications = applications.Where(x => x.VacancyId == query.VacancyId.Value);
+        }
+
+        if (query.Statuses is { Length: > 0 })
+        {
+            applications = applications.Where(x => query.Statuses.Contains(x.Status));
+        }
+
+        if (query.CreatedFrom is not null)
+        {
+            applications = applications.Where(x => x.CreatedAt >= query.CreatedFrom.Value);
+        }
+
+        if (query.CreatedTo is not null)
+        {
+            applications = applications.Where(x => x.CreatedAt <= query.CreatedTo.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var term = query.Search.Trim().ToLowerInvariant();
+            applications = applications.Where(x =>
+                x.Vacancy.Title.ToLower().Contains(term) ||
+                x.CandidateUser.DisplayName.ToLower().Contains(term) ||
+                x.CandidateUser.Username.ToLower().Contains(term) ||
+                x.CandidateUser.Email.ToLower().Contains(term));
+        }
+
+        var total = await applications.CountAsync(cancellationToken);
+        var rows = await applications
+            .OrderByDescending(x => x.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new EmployerApplicationListItemDto(
+                x.Id,
+                x.VacancyId,
+                x.Vacancy.Title,
+                x.CandidateUserId,
+                x.CandidateUser.DisplayName,
+                x.CandidateUser.AvatarUrl,
+                x.Status,
+                x.CreatedAt,
+                x.UpdatedAt,
+                x.Chat != null ? (long?)x.Chat.Id : null))
+            .ToListAsync(cancellationToken);
+
+        return Ok(new PagedResponse<EmployerApplicationListItemDto>(rows, total, page, pageSize));
+    }
+
+    /// <summary>
+    /// Get application detail for employer.
+    /// </summary>
+    [HttpGet("{id:long}")]
+    [ProducesResponseType(typeof(EmployerApplicationDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<EmployerApplicationDetailDto>> GetById(long id, CancellationToken cancellationToken)
+    {
+        var membership = await GetManagementMembership(cancellationToken);
+        if (membership is null)
+        {
+            return this.ToNotFoundError("employer.company.not_found", "Employer company not found.");
+        }
+
+        var application = await dbContext.Applications
+            .AsNoTracking()
+            .Include(x => x.Vacancy)
+            .Include(x => x.CandidateUser)
+                .ThenInclude(x => x.CandidateProfile!)
+                    .ThenInclude(x => x.ResumeProfile)
+            .Include(x => x.Chat)
+            .FirstOrDefaultAsync(x => x.Id == id && x.CompanyId == membership.CompanyId, cancellationToken);
+
+        if (application is null)
+        {
+            return this.ToNotFoundError("employer.applications.not_found", "Application not found.");
+        }
+
+        var resume = application.CandidateUser.CandidateProfile?.ResumeProfile;
+        var dto = new EmployerApplicationDetailDto(
+            application.Id,
+            application.CompanyId,
+            application.VacancyId,
+            application.Vacancy.Title,
+            application.CandidateUserId,
+            application.CandidateUser.DisplayName,
+            application.CandidateUser.AvatarUrl,
+            resume?.Headline,
+            resume?.DesiredPosition,
+            resume?.SalaryFrom,
+            resume?.SalaryTo,
+            resume?.CurrencyCode,
+            application.Status,
+            application.InitiatorRole,
+            application.CreatedAt,
+            application.UpdatedAt,
+            application.Chat?.Id);
+
+        return Ok(dto);
+    }
+
+    /// <summary>
+    /// Update application status with transition validation.
+    /// </summary>
+    [HttpPatch("{id:long}/status")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateStatus(long id, EmployerApplicationStatusUpdateRequest request, CancellationToken cancellationToken)
+    {
+        var membership = await GetManagementMembership(cancellationToken);
+        if (membership is null)
+        {
+            return this.ToNotFoundError("employer.company.not_found", "Employer company not found.");
+        }
+
+        var application = await dbContext.Applications.FirstOrDefaultAsync(x => x.Id == id && x.CompanyId == membership.CompanyId, cancellationToken);
+        if (application is null)
+        {
+            return this.ToNotFoundError("employer.applications.not_found", "Application not found.");
+        }
+
+        if (!CanTransition(application.Status, request.Status))
+        {
+            return this.ToBadRequestError(
+                "employer.applications.transition_invalid",
+                $"Invalid status transition from {application.Status} to {request.Status}.");
+        }
+
+        application.Status = request.Status;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    private async Task<CompanyMember?> GetManagementMembership(CancellationToken cancellationToken)
+        => await dbContext.CompanyMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.UserId == User.GetUserId() &&
+                     (x.Role == CompanyMemberRole.Owner || x.Role == CompanyMemberRole.Admin || x.Role == CompanyMemberRole.Staff),
+                cancellationToken);
+
+    private static bool CanTransition(ApplicationStatus from, ApplicationStatus to)
+    {
+        if (from == to)
+        {
+            return true;
+        }
+
+        return from switch
+        {
+            ApplicationStatus.New => to is ApplicationStatus.InReview or ApplicationStatus.Rejected or ApplicationStatus.Canceled,
+            ApplicationStatus.InReview => to is ApplicationStatus.Interview or ApplicationStatus.Offer or ApplicationStatus.Rejected or ApplicationStatus.Canceled,
+            ApplicationStatus.Interview => to is ApplicationStatus.Offer or ApplicationStatus.Rejected or ApplicationStatus.Canceled,
+            ApplicationStatus.Offer => to is ApplicationStatus.Hired or ApplicationStatus.Rejected or ApplicationStatus.Canceled,
+            ApplicationStatus.Hired => false,
+            ApplicationStatus.Rejected => false,
+            ApplicationStatus.Canceled => false,
+            _ => false
+        };
+    }
+}

@@ -12,30 +12,15 @@ using Monolith.Services.Common;
 
 namespace Monolith.Controllers;
 
-/// <summary>
-/// REST-операции модуля чатов.
-/// Realtime-события передаются через SignalR hub /hubs/chat.
-/// </summary>
 [ApiController]
 [Authorize]
 [Route("chats")]
 [Produces("application/json")]
 public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubContext, IChatCacheService chatCache) : ControllerBase
 {
-    /// <summary>
-    /// Возвращает список чатов текущего пользователя.
-    /// </summary>
-    /// <remarks>
-    /// Поле <c>title</c> содержит:
-    /// 1) для application-чата: название компании (для соискателя) или ФИО кандидата в формате "Иванов И.И." (для работодателя);
-    /// 2) для direct-чата: ФИО второго участника в формате "Иванов И.И." (если доступен профиль кандидата), иначе displayName.
-    /// Для снижения нагрузки используется Redis-кэш списка чатов пользователя.
-    /// </remarks>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Список чатов с отображаемым названием, участниками и последним сообщением.</returns>
     [HttpGet]
+    [HttpGet("/employer/chats")]
     [ProducesResponseType(typeof(IReadOnlyCollection<ChatListItemDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IReadOnlyCollection<ChatListItemDto>>> GetMyChats(CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
@@ -58,16 +43,27 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
                 x.CreatedAt,
                 x.Application == null ? null : (x.Application.Company.BrandName ?? x.Application.Company.LegalName),
                 x.Application == null ? null : (long?)x.Application.CandidateUserId,
+                x.Opportunity == null ? null : x.Opportunity.Title,
+                x.Participants.Count,
                 x.Participants.Select(p => new ChatParticipantProjection(
                     p.UserId,
                     p.User.DisplayName,
+                    p.User.AvatarUrl,
                     p.User.CandidateProfile != null ? p.User.CandidateProfile.LastName : null,
                     p.User.CandidateProfile != null ? p.User.CandidateProfile.FirstName : null,
                     p.User.CandidateProfile != null ? p.User.CandidateProfile.MiddleName : null))
                     .ToArray(),
                 x.Messages
                     .OrderByDescending(m => m.CreatedAt)
-                    .Select(m => new ChatMessageDto(m.Id, m.ChatId, m.SenderUserId, m.Text, m.IsSystem, m.CreatedAt))
+                    .Select(m => new ChatMessageProjection(
+                        m.Id,
+                        m.ChatId,
+                        m.SenderUserId,
+                        m.SenderUser.DisplayName,
+                        m.SenderUser.AvatarUrl,
+                        m.Text,
+                        m.IsSystem,
+                        m.CreatedAt))
                     .FirstOrDefault()))
             .ToListAsync(cancellationToken);
 
@@ -75,35 +71,25 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
                 x.Id,
                 x.Type,
                 ResolveChatTitle(userId, x),
-                x.Participants.Select(p => p.UserId).ToArray(),
+                x.Type == ChatType.Opportunity ? null : x.Participants.Select(p => p.UserId).ToArray(),
+                x.ParticipantsCount,
                 x.CreatedAt,
-                x.LastMessage))
+                x.LastMessage is null ? null : ToDto(x.LastMessage)))
             .ToList();
 
         await chatCache.SetAsync(cacheKey, result, TimeSpan.FromSeconds(20), cancellationToken);
         return Ok(result);
     }
 
-    /// <summary>
-    /// Создает direct-чат между текущим пользователем и указанным пользователем.
-    /// </summary>
-    /// <remarks>
-    /// Создание разрешено только при наличии общего контекста (совместная компания или связь через application).
-    /// При наличии существующего direct-чата возвращается его идентификатор.
-    /// </remarks>
-    /// <param name="request">Идентификатор второго участника чата.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Идентификатор созданного или найденного чата.</returns>
     [HttpPost("direct")]
     [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<object>> CreateDirectChat(CreateDirectChatRequest request, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (request.UserId == userId)
         {
-            return this.ToBadRequestError("chats.direct.self", "Нельзя создать direct-чат с самим собой.");
+            return this.ToBadRequestError("chats.direct.self", "Cannot create direct chat with self.");
         }
 
         var hasMutualContext =
@@ -116,7 +102,7 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
 
         if (!hasMutualContext)
         {
-            return this.ToBadRequestError("chats.direct.mutual_context_required", "Нельзя создать direct-чат без общего контекста.");
+            return this.ToBadRequestError("chats.direct.mutual_context_required", "Cannot create direct chat without mutual context.");
         }
 
         var existingChatId = await dbContext.Chats
@@ -145,25 +131,9 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         return Created(string.Empty, new { chatId = chat.Id });
     }
 
-    /// <summary>
-    /// Возвращает страницу истории сообщений чата для подгрузки вверх.
-    /// </summary>
-    /// <remarks>
-    /// Сценарий infinite-scroll:
-    /// 1) первый вызов без <c>beforeMessageId</c> вернет последние <c>limit</c> сообщений;
-    /// 2) для подгрузки старых сообщений передайте <c>beforeMessageId = nextBeforeMessageId</c> из предыдущего ответа;
-    /// 3) если <c>hasMore = false</c>, история загружена полностью.
-    /// Для снижения нагрузки используется Redis-кэш страниц истории.
-    /// </remarks>
-    /// <param name="chatId">Идентификатор чата.</param>
-    /// <param name="beforeMessageId">Курсор: вернуть сообщения с id меньше указанного.</param>
-    /// <param name="limit">Размер страницы (1..200, по умолчанию 50).</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Страница истории с курсором для следующей подгрузки.</returns>
     [HttpGet("{chatId:long}/history")]
     [ProducesResponseType(typeof(ChatHistoryPageDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<ChatHistoryPageDto>> GetHistory(
         long chatId,
         [FromQuery] long? beforeMessageId,
@@ -173,7 +143,7 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         var userId = User.GetUserId();
         if (!await IsParticipant(chatId, userId, cancellationToken))
         {
-            return this.ToNotFoundError("chats.not_found", "Чат не найден.");
+            return this.ToNotFoundError("chats.not_found", "Chat not found.");
         }
 
         var normalizedLimit = Math.Clamp(limit, 1, 200);
@@ -192,25 +162,70 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
     }
 
     /// <summary>
-    /// Возвращает сообщения чата с курсорной пагинацией "вперед".
+    /// Returns chat detail with linked card and first page of history.
     /// </summary>
-    /// <remarks>
-    /// Legacy endpoint для выборки новых сообщений (id &gt; cursor). Для подгрузки истории "вверх" используйте <c>GET /chats/{chatId}/history</c>.
-    /// </remarks>
-    /// <param name="chatId">Идентификатор чата.</param>
-    /// <param name="cursor">Опциональный курсор: вернуть сообщения с id больше указанного.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Список сообщений чата (до 200 записей).</returns>
+    [HttpGet("{chatId:long}/detail")]
+    [HttpGet("/employer/chats/{chatId:long}/detail")]
+    [ProducesResponseType(typeof(ChatDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ChatDetailDto>> GetDetail(
+        long chatId,
+        [FromQuery] long? beforeMessageId,
+        [FromQuery] int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = User.GetUserId();
+        if (!await IsParticipant(chatId, userId, cancellationToken))
+        {
+            return this.ToNotFoundError("chats.not_found", "Chat not found.");
+        }
+
+        var chat = await dbContext.Chats
+            .AsNoTracking()
+            .Include(x => x.Participants)
+                .ThenInclude(x => x.User)
+                    .ThenInclude(x => x.CandidateProfile)
+            .Include(x => x.Opportunity)
+            .Include(x => x.Application!)
+                .ThenInclude(x => x.Company)
+            .Include(x => x.Application!)
+                .ThenInclude(x => x.Vacancy)
+            .Include(x => x.Application!)
+                .ThenInclude(x => x.CandidateUser)
+                    .ThenInclude(x => x.CandidateProfile!)
+                        .ThenInclude(x => x.ResumeProfile)
+            .FirstOrDefaultAsync(x => x.Id == chatId, cancellationToken);
+
+        if (chat is null)
+        {
+            return this.ToNotFoundError("chats.not_found", "Chat not found.");
+        }
+
+        var normalizedLimit = Math.Clamp(limit, 1, 200);
+        var history = await BuildHistoryPageAsync(chatId, beforeMessageId, normalizedLimit, cancellationToken);
+        var linkedCard = BuildLinkedCard(chat, userId);
+
+        var dto = new ChatDetailDto(
+            chat.Id,
+            chat.Type,
+            ResolveChatTitle(userId, chat),
+            chat.Participants.Count,
+            chat.CreatedAt,
+            linkedCard,
+            history);
+
+        return Ok(dto);
+    }
+
     [HttpGet("{chatId:long}/messages")]
     [ProducesResponseType(typeof(IReadOnlyCollection<ChatMessageDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IReadOnlyCollection<ChatMessageDto>>> GetMessages(long chatId, [FromQuery] long? cursor, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (!await IsParticipant(chatId, userId, cancellationToken))
         {
-            return this.ToNotFoundError("chats.not_found", "Чат не найден.");
+            return this.ToNotFoundError("chats.not_found", "Chat not found.");
         }
 
         var query = dbContext.ChatMessages.AsNoTracking().Where(x => x.ChatId == chatId);
@@ -222,31 +237,48 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         var messages = await query
             .OrderBy(x => x.Id)
             .Take(200)
-            .Select(x => new ChatMessageDto(x.Id, x.ChatId, x.SenderUserId, x.Text, x.IsSystem, x.CreatedAt))
+            .Select(x => new ChatMessageDto(
+                x.Id,
+                x.ChatId,
+                x.SenderUserId,
+                x.SenderUser.DisplayName,
+                x.SenderUser.AvatarUrl,
+                x.Text,
+                x.IsSystem,
+                x.CreatedAt))
             .ToListAsync(cancellationToken);
         return Ok(messages);
     }
 
-    /// <summary>
-    /// Отправляет сообщение в чат.
-    /// </summary>
-    /// <remarks>
-    /// После сохранения сообщения публикуется realtime-событие <c>new</c> в группу чата.
-    /// </remarks>
-    /// <param name="chatId">Идентификатор чата.</param>
-    /// <param name="request">Текст сообщения.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Созданное сообщение.</returns>
     [HttpPost("{chatId:long}/messages")]
     [ProducesResponseType(typeof(ChatMessageDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<ChatMessageDto>> SendMessage(long chatId, SendChatMessageRequest request, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (!await IsParticipant(chatId, userId, cancellationToken))
         {
-            return this.ToNotFoundError("chats.not_found", "Чат не найден.");
+            return this.ToNotFoundError("chats.not_found", "Chat not found.");
+        }
+
+        var chatMeta = await dbContext.Chats
+            .AsNoTracking()
+            .Where(x => x.Id == chatId)
+            .Select(x => new { x.Type, x.OpportunityId })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (chatMeta is null)
+        {
+            return this.ToNotFoundError("chats.not_found", "Chat not found.");
+        }
+
+        if (chatMeta.Type == ChatType.Opportunity && chatMeta.OpportunityId is not null)
+        {
+            var canSend = await CanSendToOpportunityChat(chatMeta.OpportunityId.Value, userId, cancellationToken);
+            if (!canSend)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse("chats.opportunity.write_forbidden", "Writing in this event chat is disabled."));
+            }
         }
 
         var message = new ChatMessage
@@ -262,37 +294,41 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         await chatCache.InvalidateChatHistoryAsync(chatId, cancellationToken);
         await InvalidateChatListForParticipants(chatId, cancellationToken);
 
-        var dto = new ChatMessageDto(message.Id, message.ChatId, message.SenderUserId, message.Text, message.IsSystem, message.CreatedAt);
+        var sender = await dbContext.Users
+            .AsNoTracking()
+            .Where(x => x.Id == userId)
+            .Select(x => new { x.DisplayName, x.AvatarUrl })
+            .FirstAsync(cancellationToken);
+
+        var dto = new ChatMessageDto(
+            message.Id,
+            message.ChatId,
+            message.SenderUserId,
+            sender.DisplayName,
+            sender.AvatarUrl,
+            message.Text,
+            message.IsSystem,
+            message.CreatedAt);
+
         await hubContext.Clients.Group(ChatHub.GroupName(chatId)).SendAsync("new", dto, cancellationToken);
         return Created(string.Empty, dto);
     }
 
-    /// <summary>
-    /// Помечает сообщение как прочитанное текущим пользователем.
-    /// </summary>
-    /// <remarks>
-    /// Если запись о прочтении уже существует, операция является идемпотентной.
-    /// После фиксации отправляется realtime-событие <c>read</c>.
-    /// </remarks>
-    /// <param name="chatId">Идентификатор чата.</param>
-    /// <param name="request">Идентификатор сообщения для отметки прочтения.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
     [HttpPost("{chatId:long}/read")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Read(long chatId, MarkChatReadRequest request, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (!await IsParticipant(chatId, userId, cancellationToken))
         {
-            return this.ToNotFoundError("chats.not_found", "Чат не найден.");
+            return this.ToNotFoundError("chats.not_found", "Chat not found.");
         }
 
         var messageExists = await dbContext.ChatMessages.AnyAsync(x => x.Id == request.MessageId && x.ChatId == chatId, cancellationToken);
         if (!messageExists)
         {
-            return this.ToNotFoundError("chats.message.not_found", "Сообщение не найдено.");
+            return this.ToNotFoundError("chats.message.not_found", "Message not found.");
         }
 
         var existing = await dbContext.ChatMessageReads.FirstOrDefaultAsync(x => x.MessageId == request.MessageId && x.UserId == userId, cancellationToken);
@@ -314,11 +350,43 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
     private Task<bool> IsParticipant(long chatId, long userId, CancellationToken cancellationToken)
         => dbContext.ChatParticipants.AnyAsync(x => x.ChatId == chatId && x.UserId == userId, cancellationToken);
 
-    private async Task<ChatHistoryPageDto> BuildHistoryPageAsync(
-        long chatId,
-        long? beforeMessageId,
-        int limit,
-        CancellationToken cancellationToken)
+    private async Task<bool> CanSendToOpportunityChat(long opportunityId, long userId, CancellationToken cancellationToken)
+    {
+        var opportunity = await dbContext.Opportunities
+            .AsNoTracking()
+            .Where(x => x.Id == opportunityId)
+            .Select(x => new { x.CompanyId, x.ParticipantsCanWrite })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (opportunity is null)
+        {
+            return false;
+        }
+
+        if (opportunity.ParticipantsCanWrite)
+        {
+            return true;
+        }
+
+        var isCurator = await dbContext.UserRoles
+            .AsNoTracking()
+            .AnyAsync(x => x.UserId == userId && x.Role == PlatformRole.Curator, cancellationToken);
+        if (isCurator)
+        {
+            return true;
+        }
+
+        var isCompanyMember = await dbContext.CompanyMembers
+            .AsNoTracking()
+            .AnyAsync(x =>
+                x.CompanyId == opportunity.CompanyId &&
+                x.UserId == userId &&
+                (x.Role == CompanyMemberRole.Owner || x.Role == CompanyMemberRole.Admin || x.Role == CompanyMemberRole.Staff),
+                cancellationToken);
+
+        return isCompanyMember;
+    }
+
+    private async Task<ChatHistoryPageDto> BuildHistoryPageAsync(long chatId, long? beforeMessageId, int limit, CancellationToken cancellationToken)
     {
         var query = dbContext.ChatMessages.AsNoTracking().Where(x => x.ChatId == chatId);
         if (beforeMessageId is not null)
@@ -329,7 +397,15 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         var chunk = await query
             .OrderByDescending(x => x.Id)
             .Take(limit + 1)
-            .Select(x => new ChatMessageDto(x.Id, x.ChatId, x.SenderUserId, x.Text, x.IsSystem, x.CreatedAt))
+            .Select(x => new ChatMessageDto(
+                x.Id,
+                x.ChatId,
+                x.SenderUserId,
+                x.SenderUser.DisplayName,
+                x.SenderUser.AvatarUrl,
+                x.Text,
+                x.IsSystem,
+                x.CreatedAt))
             .ToListAsync(cancellationToken);
 
         var hasMore = chunk.Count > limit;
@@ -356,13 +432,103 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         }
     }
 
+    private static ChatMessageDto ToDto(ChatMessageProjection projection) => new(
+        projection.Id,
+        projection.ChatId,
+        projection.SenderUserId,
+        projection.SenderDisplayName,
+        projection.SenderAvatarUrl,
+        projection.Text,
+        projection.IsSystem,
+        projection.CreatedAt);
+
+    private static ChatLinkedCardDto? BuildLinkedCard(Chat chat, long currentUserId)
+    {
+        if (chat.Type == ChatType.Opportunity && chat.Opportunity is not null)
+        {
+            var opportunity = chat.Opportunity;
+            return new ChatLinkedCardDto(
+                "opportunity",
+                new OpportunityLinkedCardDto(
+                    opportunity.Id,
+                    opportunity.Title,
+                    opportunity.Kind,
+                    opportunity.Format,
+                    opportunity.Status,
+                    opportunity.EventDate,
+                    opportunity.PriceType,
+                    opportunity.PriceAmount,
+                    opportunity.PriceCurrencyCode),
+                null,
+                null);
+        }
+
+        if (chat.Type == ChatType.Application && chat.Application is not null)
+        {
+            var application = chat.Application;
+            var vacancy = application.Vacancy;
+            var vacancyCard = new VacancyLinkedCardDto(
+                vacancy.Id,
+                vacancy.Title,
+                vacancy.Kind,
+                vacancy.Format,
+                vacancy.Status,
+                vacancy.SalaryTaxMode,
+                vacancy.SalaryFrom,
+                vacancy.SalaryTo,
+                vacancy.CurrencyCode);
+
+            if (application.CandidateUserId == currentUserId)
+            {
+                return new ChatLinkedCardDto(
+                    "application-seeker",
+                    null,
+                    null,
+                    new ApplicationSeekerLinkedCardDto(
+                        application.Id,
+                        application.Status,
+                        application.CreatedAt,
+                        vacancyCard));
+            }
+
+            var resume = application.CandidateUser.CandidateProfile?.ResumeProfile;
+            var candidateCard = new CandidateLinkedCardDto(
+                application.CandidateUserId,
+                application.CandidateUser.DisplayName,
+                application.CandidateUser.AvatarUrl,
+                resume?.Headline,
+                resume?.DesiredPosition,
+                resume?.SalaryFrom,
+                resume?.SalaryTo,
+                resume?.CurrencyCode);
+
+            return new ChatLinkedCardDto(
+                "application-employer",
+                null,
+                new ApplicationEmployerLinkedCardDto(
+                    application.Id,
+                    application.Status,
+                    application.CreatedAt,
+                    vacancyCard,
+                    candidateCard),
+                null);
+        }
+
+        return null;
+    }
+
     private static string ResolveChatTitle(long currentUserId, ChatProjection chat)
     {
+        if (chat.Type == ChatType.Opportunity)
+        {
+            return string.IsNullOrWhiteSpace(chat.OpportunityTitle) ? "Event chat" : chat.OpportunityTitle;
+        }
+
         if (chat.Type == ChatType.Application)
         {
             if (chat.CandidateUserId == currentUserId)
             {
-                return string.IsNullOrWhiteSpace(chat.ApplicationCompanyName) ? "Компания" : chat.ApplicationCompanyName;
+                return string.IsNullOrWhiteSpace(chat.ApplicationCompanyName) ? "Company" : chat.ApplicationCompanyName;
             }
 
             var candidate = chat.Participants.FirstOrDefault(x => x.UserId == chat.CandidateUserId);
@@ -378,7 +544,50 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         }
 
         var other = chat.Participants.FirstOrDefault(x => x.UserId != currentUserId);
-        return other is null ? "Чат" : FormatUserTitle(other);
+        return other is null ? "Chat" : FormatUserTitle(other);
+    }
+
+    private static string ResolveChatTitle(long currentUserId, Chat chat)
+    {
+        if (chat.Type == ChatType.Opportunity)
+        {
+            return string.IsNullOrWhiteSpace(chat.Opportunity?.Title) ? "Event chat" : chat.Opportunity.Title;
+        }
+
+        if (chat.Type == ChatType.Application)
+        {
+            if (chat.Application?.CandidateUserId == currentUserId)
+            {
+                var companyName = chat.Application.Company.BrandName ?? chat.Application.Company.LegalName;
+                return string.IsNullOrWhiteSpace(companyName) ? "Company" : companyName;
+            }
+
+            var candidateParticipant = chat.Participants.FirstOrDefault(x => x.UserId == chat.Application?.CandidateUserId);
+            if (candidateParticipant is not null)
+            {
+                return FormatUserTitle(new ChatParticipantProjection(
+                    candidateParticipant.UserId,
+                    candidateParticipant.User.DisplayName,
+                    candidateParticipant.User.AvatarUrl,
+                    candidateParticipant.User.CandidateProfile?.LastName,
+                    candidateParticipant.User.CandidateProfile?.FirstName,
+                    candidateParticipant.User.CandidateProfile?.MiddleName));
+            }
+        }
+
+        var other = chat.Participants.FirstOrDefault(x => x.UserId != currentUserId);
+        if (other is null)
+        {
+            return "Chat";
+        }
+
+        return FormatUserTitle(new ChatParticipantProjection(
+            other.UserId,
+            other.User.DisplayName,
+            other.User.AvatarUrl,
+            other.User.CandidateProfile?.LastName,
+            other.User.CandidateProfile?.FirstName,
+            other.User.CandidateProfile?.MiddleName));
     }
 
     private static string FormatUserTitle(ChatParticipantProjection participant)
@@ -395,7 +604,7 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
                 : $"{participant.LastName.Trim()} {firstInitial}.{middleInitial}.";
         }
 
-        return string.IsNullOrWhiteSpace(participant.DisplayName) ? "Пользователь" : participant.DisplayName.Trim();
+        return string.IsNullOrWhiteSpace(participant.DisplayName) ? "User" : participant.DisplayName.Trim();
     }
 
     private sealed record ChatProjection(
@@ -404,13 +613,26 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         DateTimeOffset CreatedAt,
         string? ApplicationCompanyName,
         long? CandidateUserId,
+        string? OpportunityTitle,
+        int ParticipantsCount,
         ChatParticipantProjection[] Participants,
-        ChatMessageDto? LastMessage);
+        ChatMessageProjection? LastMessage);
 
     private sealed record ChatParticipantProjection(
         long UserId,
         string DisplayName,
+        string? AvatarUrl,
         string? LastName,
         string? FirstName,
         string? MiddleName);
+
+    private sealed record ChatMessageProjection(
+        long Id,
+        long ChatId,
+        long SenderUserId,
+        string SenderDisplayName,
+        string? SenderAvatarUrl,
+        string Text,
+        bool IsSystem,
+        DateTimeOffset CreatedAt);
 }

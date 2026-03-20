@@ -12,4 +12,5 @@ public class Tag
     public DateTimeOffset UpdatedAt { get; set; }
     public TagGroup Group { get; set; } = null!;
     public List<OpportunityTag> OpportunityTags { get; set; } = new();
+    public List<VacancyTag> VacancyTags { get; set; } = new();
 }

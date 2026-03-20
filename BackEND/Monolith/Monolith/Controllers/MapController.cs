@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Monolith.Models.Opportunities;
-using Monolith.Entities;
 using Monolith.Contexts;
+using Monolith.Entities;
+using Monolith.Models.Opportunities;
 
 namespace Monolith.Controllers;
 
@@ -11,19 +11,235 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class MapController(AppDbContext dbContext) : ControllerBase
 {
-    /// <summary>
-    /// Возвращает набор гео-объектов возможностей в формате GeoJSON.
-    /// </summary>
-    /// <remarks>
-    /// В ответе формируется FeatureCollection c координатами и краткими свойствами карточек.
-    /// Поддерживаются фильтры по территории, типу, формату, тегам, зарплате и верификации компании.
-    /// </remarks>
-    /// <param name="query">Параметры фильтрации и границ карты.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>GeoJSON FeatureCollection.</returns>
     [HttpGet("opportunities")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMapData([FromQuery] MapQuery query, CancellationToken cancellationToken)
+    {
+        var includeVacancies = query.EntityTypes is null || query.EntityTypes.Length == 0 || query.EntityTypes.Contains(MapEntityType.Vacancy);
+        var includeOpportunities = query.EntityTypes is null || query.EntityTypes.Length == 0 || query.EntityTypes.Contains(MapEntityType.Opportunity);
+
+        var features = new List<object>();
+
+        if (includeVacancies)
+        {
+            var vacancies = BuildVacancyQuery(query);
+            var vacancyRows = await vacancies
+                .OrderByDescending(x => x.PublishAt)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Title,
+                    x.ShortDescription,
+                    x.Kind,
+                    x.Format,
+                    x.SalaryFrom,
+                    x.SalaryTo,
+                    x.CurrencyCode,
+                    x.SalaryTaxMode,
+                    x.PublishAt,
+                    CompanyId = x.CompanyId,
+                    CompanyName = x.Company.BrandName ?? x.Company.LegalName,
+                    Verified = x.Company.Status == CompanyStatus.Verified,
+                    CityId = x.City != null ? x.City.Id : (x.Location != null ? x.Location.City.Id : 0),
+                    CityName = x.City != null ? x.City.CityName : (x.Location != null ? x.Location.City.CityName : "Unknown"),
+                    Lat = x.City != null ? x.City.Latitude : (x.Location != null ? x.Location.City.Latitude : null),
+                    Lng = x.City != null ? x.City.Longitude : (x.Location != null ? x.Location.City.Longitude : null),
+                    Street = x.Location != null ? x.Location.StreetName : null,
+                    House = x.Location != null ? x.Location.HouseNumber : null,
+                    Tags = x.VacancyTags.Select(t => t.Tag.Name).ToArray()
+                })
+                .ToListAsync(cancellationToken);
+
+            features.AddRange(vacancyRows
+                .Where(x => x.Lat is not null && x.Lng is not null)
+                .Select(x => new
+                {
+                    type = "Feature",
+                    geometry = new
+                    {
+                        type = "Point",
+                        coordinates = new[] { x.Lng!.Value, x.Lat!.Value }
+                    },
+                    properties = new
+                    {
+                        id = x.Id,
+                        entityType = "vacancy",
+                        title = x.Title,
+                        shortDescription = x.ShortDescription,
+                        kind = x.Kind.ToString().ToLowerInvariant(),
+                        format = x.Format.ToString().ToLowerInvariant(),
+                        publishAt = x.PublishAt,
+                        salaryFrom = x.SalaryFrom,
+                        salaryTo = x.SalaryTo,
+                        currencyCode = x.CurrencyCode,
+                        salaryTaxMode = x.SalaryTaxMode.ToString().ToLowerInvariant(),
+                        company = new
+                        {
+                            id = x.CompanyId,
+                            name = x.CompanyName,
+                            verified = x.Verified
+                        },
+                        location = new
+                        {
+                            cityId = x.CityId,
+                            cityName = x.CityName,
+                            street = x.Street,
+                            houseNumber = x.House
+                        },
+                        tags = x.Tags
+                    }
+                }));
+        }
+
+        if (includeOpportunities)
+        {
+            var opportunities = BuildOpportunityQuery(query);
+            var opportunityRows = await opportunities
+                .OrderByDescending(x => x.PublishAt)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Title,
+                    x.ShortDescription,
+                    x.Kind,
+                    x.Format,
+                    x.PriceType,
+                    x.PriceAmount,
+                    x.PriceCurrencyCode,
+                    x.PublishAt,
+                    x.EventDate,
+                    x.ParticipantsCanWrite,
+                    CompanyId = x.CompanyId,
+                    CompanyName = x.Company.BrandName ?? x.Company.LegalName,
+                    Verified = x.Company.Status == CompanyStatus.Verified,
+                    CityId = x.City != null ? x.City.Id : (x.Location != null ? x.Location.City.Id : 0),
+                    CityName = x.City != null ? x.City.CityName : (x.Location != null ? x.Location.City.CityName : "Unknown"),
+                    Lat = x.City != null ? x.City.Latitude : (x.Location != null ? x.Location.City.Latitude : null),
+                    Lng = x.City != null ? x.City.Longitude : (x.Location != null ? x.Location.City.Longitude : null),
+                    Street = x.Location != null ? x.Location.StreetName : null,
+                    House = x.Location != null ? x.Location.HouseNumber : null,
+                    ParticipantsCount = x.Participants.Count,
+                    Tags = x.OpportunityTags.Select(t => t.Tag.Name).ToArray()
+                })
+                .ToListAsync(cancellationToken);
+
+            features.AddRange(opportunityRows
+                .Where(x => x.Lat is not null && x.Lng is not null)
+                .Select(x => new
+                {
+                    type = "Feature",
+                    geometry = new
+                    {
+                        type = "Point",
+                        coordinates = new[] { x.Lng!.Value, x.Lat!.Value }
+                    },
+                    properties = new
+                    {
+                        id = x.Id,
+                        entityType = "opportunity",
+                        title = x.Title,
+                        shortDescription = x.ShortDescription,
+                        kind = x.Kind.ToString().ToLowerInvariant(),
+                        format = x.Format.ToString().ToLowerInvariant(),
+                        publishAt = x.PublishAt,
+                        eventDate = x.EventDate,
+                        priceType = x.PriceType.ToString().ToLowerInvariant(),
+                        priceAmount = x.PriceAmount,
+                        priceCurrencyCode = x.PriceCurrencyCode,
+                        participantsCanWrite = x.ParticipantsCanWrite,
+                        participantsCount = x.ParticipantsCount,
+                        company = new
+                        {
+                            id = x.CompanyId,
+                            name = x.CompanyName,
+                            verified = x.Verified
+                        },
+                        location = new
+                        {
+                            cityId = x.CityId,
+                            cityName = x.CityName,
+                            street = x.Street,
+                            houseNumber = x.House
+                        },
+                        tags = x.Tags
+                    }
+                }));
+        }
+
+        return Ok(new
+        {
+            type = "FeatureCollection",
+            features
+        });
+    }
+
+    private IQueryable<Vacancy> BuildVacancyQuery(MapQuery query)
+    {
+        var vacancies = dbContext.Vacancies
+            .AsNoTracking()
+            .Include(x => x.Company)
+            .Include(x => x.City)
+            .Include(x => x.Location)
+                .ThenInclude(x => x!.City)
+            .Include(x => x.VacancyTags)
+                .ThenInclude(x => x.Tag)
+            .Where(x => x.Status == OpportunityStatus.Active);
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim().ToLowerInvariant();
+            vacancies = vacancies.Where(x =>
+                x.Title.ToLower().Contains(search) ||
+                x.ShortDescription.ToLower().Contains(search) ||
+                x.Company.LegalName.ToLower().Contains(search) ||
+                (x.Company.BrandName != null && x.Company.BrandName.ToLower().Contains(search)));
+        }
+
+        if (query.CityId is not null)
+        {
+            vacancies = vacancies.Where(x => x.CityId == query.CityId || (x.Location != null && x.Location.CityId == query.CityId));
+        }
+
+        if (query.VacancyKinds is { Length: > 0 })
+        {
+            vacancies = vacancies.Where(x => query.VacancyKinds.Contains(x.Kind));
+        }
+
+        if (query.Formats is { Length: > 0 })
+        {
+            vacancies = vacancies.Where(x => query.Formats.Contains(x.Format));
+        }
+
+        if (query.TagIds is { Length: > 0 })
+        {
+            vacancies = vacancies.Where(x => x.VacancyTags.Any(t => query.TagIds.Contains(t.TagId)));
+        }
+
+        if (query.SalaryFrom is not null)
+        {
+            vacancies = vacancies.Where(x => x.SalaryTo == null || x.SalaryTo >= query.SalaryFrom);
+        }
+
+        if (query.SalaryTo is not null)
+        {
+            vacancies = vacancies.Where(x => x.SalaryFrom == null || x.SalaryFrom <= query.SalaryTo);
+        }
+
+        if (query.SalaryTaxModes is { Length: > 0 })
+        {
+            vacancies = vacancies.Where(x => query.SalaryTaxModes.Contains(x.SalaryTaxMode));
+        }
+
+        if (query.VerifiedOnly == true)
+        {
+            vacancies = vacancies.Where(x => x.Company.Status == CompanyStatus.Verified);
+        }
+
+        vacancies = ApplyBounds(vacancies, query);
+        return vacancies;
+    }
+
+    private IQueryable<Opportunity> BuildOpportunityQuery(MapQuery query)
     {
         var opportunities = dbContext.Opportunities
             .AsNoTracking()
@@ -33,7 +249,8 @@ public class MapController(AppDbContext dbContext) : ControllerBase
                 .ThenInclude(x => x!.City)
             .Include(x => x.OpportunityTags)
                 .ThenInclude(x => x.Tag)
-            .Where(x => x.Status == OpportunityStatus.Published);
+            .Include(x => x.Participants)
+            .Where(x => x.Status == OpportunityStatus.Active);
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
@@ -50,23 +267,9 @@ public class MapController(AppDbContext dbContext) : ControllerBase
             opportunities = opportunities.Where(x => x.CityId == query.CityId || (x.Location != null && x.Location.CityId == query.CityId));
         }
 
-        if (query.Types is { Length: > 0 })
+        if (query.OpportunityKinds is { Length: > 0 })
         {
-            opportunities = opportunities.Where(x => query.Types.Contains(x.OppType));
-        }
-
-        if (query.EventKinds is { Length: > 0 })
-        {
-            var eventKindSlugs = query.EventKinds
-                .Distinct()
-                .Select(x => x.ToTagSlug())
-                .ToArray();
-
-            opportunities = opportunities.Where(x =>
-                x.OppType == OpportunityType.CareerEvent &&
-                x.OpportunityTags.Any(t =>
-                    t.Tag.Group.Code == "event_kind" &&
-                    eventKindSlugs.Contains(t.Tag.Slug)));
+            opportunities = opportunities.Where(x => query.OpportunityKinds.Contains(x.Kind));
         }
 
         if (query.Formats is { Length: > 0 })
@@ -79,14 +282,19 @@ public class MapController(AppDbContext dbContext) : ControllerBase
             opportunities = opportunities.Where(x => x.OpportunityTags.Any(t => query.TagIds.Contains(t.TagId)));
         }
 
-        if (query.SalaryFrom is not null)
+        if (query.PriceTypes is { Length: > 0 })
         {
-            opportunities = opportunities.Where(x => x.SalaryTo == null || x.SalaryTo >= query.SalaryFrom);
+            opportunities = opportunities.Where(x => query.PriceTypes.Contains(x.PriceType));
         }
 
-        if (query.SalaryTo is not null)
+        if (query.PriceFrom is not null)
         {
-            opportunities = opportunities.Where(x => x.SalaryFrom == null || x.SalaryFrom <= query.SalaryTo);
+            opportunities = opportunities.Where(x => x.PriceAmount == null || x.PriceAmount >= query.PriceFrom);
+        }
+
+        if (query.PriceTo is not null)
+        {
+            opportunities = opportunities.Where(x => x.PriceAmount == null || x.PriceAmount <= query.PriceTo);
         }
 
         if (query.VerifiedOnly == true)
@@ -94,102 +302,75 @@ public class MapController(AppDbContext dbContext) : ControllerBase
             opportunities = opportunities.Where(x => x.Company.Status == CompanyStatus.Verified);
         }
 
-        if (query.MinLat is not null)
-        {
-            opportunities = opportunities.Where(x =>
-                (x.City != null && x.City.Latitude >= query.MinLat) ||
-                (x.Location != null && x.Location.City.Latitude >= query.MinLat));
-        }
+        opportunities = ApplyBounds(opportunities, query);
+        return opportunities;
+    }
 
-        if (query.MaxLat is not null)
+    private static IQueryable<T> ApplyBounds<T>(IQueryable<T> query, MapQuery bounds) where T : class
+    {
+        if (typeof(T) == typeof(Vacancy))
         {
-            opportunities = opportunities.Where(x =>
-                (x.City != null && x.City.Latitude <= query.MaxLat) ||
-                (x.Location != null && x.Location.City.Latitude <= query.MaxLat));
-        }
-
-        if (query.MinLng is not null)
-        {
-            opportunities = opportunities.Where(x =>
-                (x.City != null && x.City.Longitude >= query.MinLng) ||
-                (x.Location != null && x.Location.City.Longitude >= query.MinLng));
-        }
-
-        if (query.MaxLng is not null)
-        {
-            opportunities = opportunities.Where(x =>
-                (x.City != null && x.City.Longitude <= query.MaxLng) ||
-                (x.Location != null && x.Location.City.Longitude <= query.MaxLng));
-        }
-
-        var rows = await opportunities
-            .OrderByDescending(x => x.PublishAt)
-            .Select(x => new
+            var vacancies = (IQueryable<Vacancy>)query;
+            if (bounds.MinLat is not null)
             {
-                x.Id,
-                x.Title,
-                x.ShortDescription,
-                x.OppType,
-                x.Format,
-                x.SalaryFrom,
-                x.SalaryTo,
-                x.CurrencyCode,
-                x.PublishAt,
-                CompanyId = x.CompanyId,
-                CompanyName = x.Company.BrandName ?? x.Company.LegalName,
-                Verified = x.Company.Status == CompanyStatus.Verified,
-                CityId = x.City != null ? x.City.Id : (x.Location != null ? x.Location.City.Id : 0),
-                CityName = x.City != null ? x.City.CityName : (x.Location != null ? x.Location.City.CityName : "Unknown"),
-                Lat = x.City != null ? x.City.Latitude : (x.Location != null ? x.Location.City.Latitude : null),
-                Lng = x.City != null ? x.City.Longitude : (x.Location != null ? x.Location.City.Longitude : null),
-                Street = x.Location != null ? x.Location.StreetName : null,
-                House = x.Location != null ? x.Location.HouseNumber : null,
-                Tags = x.OpportunityTags.Select(t => t.Tag.Name).ToArray()
-            })
-            .ToListAsync(cancellationToken);
+                vacancies = vacancies.Where(x =>
+                    (x.City != null && x.City.Latitude >= bounds.MinLat) ||
+                    (x.Location != null && x.Location.City.Latitude >= bounds.MinLat));
+            }
 
-        var features = rows
-            .Where(x => x.Lat is not null && x.Lng is not null)
-            .Select(x => new
+            if (bounds.MaxLat is not null)
             {
-                type = "Feature",
-                geometry = new
-                {
-                    type = "Point",
-                    coordinates = new[] { x.Lng!.Value, x.Lat!.Value }
-                },
-                properties = new
-                {
-                    id = x.Id,
-                    title = x.Title,
-                    shortDescription = x.ShortDescription,
-                    type = x.OppType.ToString().ToLowerInvariant(),
-                    format = x.Format.ToString().ToLowerInvariant(),
-                    publishAt = x.PublishAt,
-                    salaryFrom = x.SalaryFrom,
-                    salaryTo = x.SalaryTo,
-                    currencyCode = x.CurrencyCode,
-                    company = new
-                    {
-                        id = x.CompanyId,
-                        name = x.CompanyName,
-                        verified = x.Verified
-                    },
-                    location = new
-                    {
-                        cityId = x.CityId,
-                        cityName = x.CityName,
-                        street = x.Street,
-                        houseNumber = x.House
-                    },
-                    tags = x.Tags
-                }
-            });
+                vacancies = vacancies.Where(x =>
+                    (x.City != null && x.City.Latitude <= bounds.MaxLat) ||
+                    (x.Location != null && x.Location.City.Latitude <= bounds.MaxLat));
+            }
 
-        return Ok(new
+            if (bounds.MinLng is not null)
+            {
+                vacancies = vacancies.Where(x =>
+                    (x.City != null && x.City.Longitude >= bounds.MinLng) ||
+                    (x.Location != null && x.Location.City.Longitude >= bounds.MinLng));
+            }
+
+            if (bounds.MaxLng is not null)
+            {
+                vacancies = vacancies.Where(x =>
+                    (x.City != null && x.City.Longitude <= bounds.MaxLng) ||
+                    (x.Location != null && x.Location.City.Longitude <= bounds.MaxLng));
+            }
+
+            return (IQueryable<T>)vacancies;
+        }
+
+        var opportunities = (IQueryable<Opportunity>)query;
+        if (bounds.MinLat is not null)
         {
-            type = "FeatureCollection",
-            features
-        });
+            opportunities = opportunities.Where(x =>
+                (x.City != null && x.City.Latitude >= bounds.MinLat) ||
+                (x.Location != null && x.Location.City.Latitude >= bounds.MinLat));
+        }
+
+        if (bounds.MaxLat is not null)
+        {
+            opportunities = opportunities.Where(x =>
+                (x.City != null && x.City.Latitude <= bounds.MaxLat) ||
+                (x.Location != null && x.Location.City.Latitude <= bounds.MaxLat));
+        }
+
+        if (bounds.MinLng is not null)
+        {
+            opportunities = opportunities.Where(x =>
+                (x.City != null && x.City.Longitude >= bounds.MinLng) ||
+                (x.Location != null && x.Location.City.Longitude >= bounds.MinLng));
+        }
+
+        if (bounds.MaxLng is not null)
+        {
+            opportunities = opportunities.Where(x =>
+                (x.City != null && x.City.Longitude <= bounds.MaxLng) ||
+                (x.Location != null && x.Location.City.Longitude <= bounds.MaxLng));
+        }
+
+        return (IQueryable<T>)opportunities;
     }
 }

@@ -12,51 +12,34 @@ using Monolith.Services.Common;
 
 namespace Monolith.Controllers;
 
-/// <summary>
-/// Операции с откликами (application).
-/// </summary>
 [ApiController]
 [Authorize]
 [Route("applications")]
 [Produces("application/json")]
 public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub> hubContext, IChatCacheService chatCache) : ControllerBase
 {
-    /// <summary>
-    /// Создает отклик и связанный application-чат.
-    /// </summary>
-    /// <remarks>
-    /// После создания:
-    /// 1) формируется запись application;
-    /// 2) создается чат типа application;
-    /// 3) в чат добавляются кандидат и owner/admin компании;
-    /// 4) при включенном авто-приветствии отправляется системное сообщение.
-    /// </remarks>
-    /// <param name="request">Параметры отклика: компания, кандидат, вакансия (опционально), роль инициатора.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Идентификаторы созданных application и чата.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<object>> Create(CreateApplicationRequest request, CancellationToken cancellationToken)
     {
         var currentUserId = User.GetUserId();
         if (request.InitiatorRole is not (PlatformRole.Seeker or PlatformRole.Employer))
         {
-            return this.ToBadRequestError("applications.initiator.invalid", "Инициатор отклика должен быть seeker или employer.");
+            return this.ToBadRequestError("applications.initiator.invalid", "Initiator must be seeker or employer.");
         }
 
         if (request.InitiatorRole == PlatformRole.Seeker && request.CandidateUserId != currentUserId)
         {
-            return this.ToBadRequestError("applications.candidate.invalid", "Для роли seeker кандидат должен совпадать с текущим пользователем.");
+            return this.ToBadRequestError("applications.candidate.invalid", "Candidate must match current user.");
         }
 
         var companyExists = await dbContext.Companies.AnyAsync(x => x.Id == request.CompanyId, cancellationToken);
         if (!companyExists)
         {
-            return this.ToNotFoundError("applications.company.not_found", "Компания не найдена.");
+            return this.ToNotFoundError("applications.company.not_found", "Company not found.");
         }
 
         if (request.InitiatorRole == PlatformRole.Employer)
@@ -68,28 +51,30 @@ public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub>
                 cancellationToken);
             if (!canCreateFromCompany)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse("applications.forbidden", "Недостаточно прав для отправки отклика от компании."));
+                return StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse("applications.forbidden", "Insufficient permissions for company."));
             }
         }
 
         if (!await dbContext.Users.AnyAsync(x => x.Id == request.CandidateUserId, cancellationToken))
         {
-            return this.ToNotFoundError("applications.candidate.not_found", "Кандидат не найден.");
+            return this.ToNotFoundError("applications.candidate.not_found", "Candidate not found.");
         }
 
-        if (request.OpportunityId is not null &&
-            !await dbContext.Opportunities.AnyAsync(x => x.Id == request.OpportunityId && x.CompanyId == request.CompanyId, cancellationToken))
+        var vacancy = await dbContext.Vacancies
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.VacancyId && x.CompanyId == request.CompanyId, cancellationToken);
+        if (vacancy is null)
         {
-            return this.ToNotFoundError("applications.opportunity.not_found", "Вакансия не найдена.");
+            return this.ToNotFoundError("applications.vacancy.not_found", "Vacancy not found.");
         }
 
         var app = new Application
         {
             CompanyId = request.CompanyId,
             CandidateUserId = request.CandidateUserId,
-            OpportunityId = request.OpportunityId,
+            VacancyId = request.VacancyId,
             InitiatorRole = request.InitiatorRole,
-            Status = ApplicationStatus.Open
+            Status = ApplicationStatus.New
         };
         dbContext.Applications.Add(app);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -118,6 +103,7 @@ public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub>
                 participants.Add(new ChatParticipant { ChatId = chat.Id, UserId = userId });
             }
         }
+
         dbContext.ChatParticipants.AddRange(participants);
 
         var settings = await dbContext.CompanyChatSettings.FirstOrDefaultAsync(x => x.CompanyId == request.CompanyId, cancellationToken);
@@ -141,14 +127,23 @@ public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub>
         {
             await chatCache.InvalidateUserListAsync(participantId, cancellationToken);
         }
+
         await chatCache.InvalidateChatHistoryAsync(chat.Id, cancellationToken);
 
         if (greeting is not null)
         {
+            var sender = await dbContext.Users
+                .AsNoTracking()
+                .Where(x => x.Id == greeting.SenderUserId)
+                .Select(x => new { x.DisplayName, x.AvatarUrl })
+                .FirstOrDefaultAsync(cancellationToken);
+
             await hubContext.Clients.Group(ChatHub.GroupName(chat.Id)).SendAsync("new", new ChatMessageDto(
                 greeting.Id,
                 greeting.ChatId,
                 greeting.SenderUserId,
+                sender?.DisplayName ?? "System",
+                sender?.AvatarUrl,
                 greeting.Text,
                 greeting.IsSystem,
                 greeting.CreatedAt), cancellationToken);

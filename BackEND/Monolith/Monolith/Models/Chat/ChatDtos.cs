@@ -2,60 +2,99 @@ using Monolith.Entities;
 
 namespace Monolith.Models.Chat;
 
-/// <summary>
-/// Карточка чата в списке.
-/// </summary>
-/// <param name="Id">Идентификатор чата.</param>
-/// <param name="Type">Тип чата (direct/application).</param>
-/// <param name="Title">Отображаемый заголовок чата: название компании или ФИО собеседника в формате "Иванов И.И.".</param>
-/// <param name="ParticipantIds">Идентификаторы участников чата.</param>
-/// <param name="CreatedAt">Дата создания чата.</param>
-/// <param name="LastMessage">Последнее сообщение (если есть).</param>
-public record ChatListItemDto(long Id, ChatType Type, string Title, long[] ParticipantIds, DateTimeOffset CreatedAt, ChatMessageDto? LastMessage);
+public record ChatListItemDto(
+    long Id,
+    ChatType Type,
+    string Title,
+    long[]? ParticipantIds,
+    int ParticipantsCount,
+    DateTimeOffset CreatedAt,
+    ChatMessageDto? LastMessage);
 
-/// <summary>
-/// Сообщение чата.
-/// </summary>
-/// <param name="Id">Идентификатор сообщения.</param>
-/// <param name="ChatId">Идентификатор чата.</param>
-/// <param name="SenderUserId">Идентификатор отправителя.</param>
-/// <param name="Text">Текст сообщения.</param>
-/// <param name="IsSystem">Признак системного сообщения.</param>
-/// <param name="CreatedAt">Дата отправки.</param>
-public record ChatMessageDto(long Id, long ChatId, long SenderUserId, string Text, bool IsSystem, DateTimeOffset CreatedAt);
+public record ChatMessageDto(
+    long Id,
+    long ChatId,
+    long SenderUserId,
+    string SenderDisplayName,
+    string? SenderAvatarUrl,
+    string Text,
+    bool IsSystem,
+    DateTimeOffset CreatedAt);
 
-/// <summary>
-/// Страница истории сообщений для пагинации "вверх".
-/// </summary>
-/// <param name="ChatId">Идентификатор чата.</param>
-/// <param name="Messages">Порция сообщений в хронологическом порядке (старые -> новые).</param>
-/// <param name="HasMore">Признак, что в истории есть более старые сообщения.</param>
-/// <param name="NextBeforeMessageId">Курсор для следующего запроса старых сообщений.</param>
-public record ChatHistoryPageDto(long ChatId, IReadOnlyCollection<ChatMessageDto> Messages, bool HasMore, long? NextBeforeMessageId);
+public record ChatHistoryPageDto(
+    long ChatId,
+    IReadOnlyCollection<ChatMessageDto> Messages,
+    bool HasMore,
+    long? NextBeforeMessageId);
 
-/// <summary>
-/// Запрос на создание direct-чата.
-/// </summary>
-/// <param name="UserId">Идентификатор второго участника.</param>
 public record CreateDirectChatRequest(long UserId);
 
-/// <summary>
-/// Запрос на создание отклика (application).
-/// </summary>
-/// <param name="CompanyId">Идентификатор компании.</param>
-/// <param name="CandidateUserId">Идентификатор кандидата.</param>
-/// <param name="OpportunityId">Идентификатор вакансии (опционально).</param>
-/// <param name="InitiatorRole">Роль инициатора отклика (seeker/employer).</param>
-public record CreateApplicationRequest(long CompanyId, long CandidateUserId, long? OpportunityId, PlatformRole InitiatorRole);
+public record CreateApplicationRequest(
+    long CompanyId,
+    long CandidateUserId,
+    long VacancyId,
+    PlatformRole InitiatorRole);
 
-/// <summary>
-/// Запрос на отправку сообщения в чат.
-/// </summary>
-/// <param name="Text">Текст сообщения.</param>
 public record SendChatMessageRequest(string Text);
 
-/// <summary>
-/// Запрос на отметку сообщения как прочитанного.
-/// </summary>
-/// <param name="MessageId">Идентификатор сообщения.</param>
 public record MarkChatReadRequest(long MessageId);
+
+public record ChatDetailDto(
+    long Id,
+    ChatType Type,
+    string Title,
+    int ParticipantsCount,
+    DateTimeOffset CreatedAt,
+    ChatLinkedCardDto? LinkedCard,
+    ChatHistoryPageDto History);
+
+public record ChatLinkedCardDto(
+    string Type,
+    OpportunityLinkedCardDto? Opportunity,
+    ApplicationEmployerLinkedCardDto? ApplicationEmployer,
+    ApplicationSeekerLinkedCardDto? ApplicationSeeker);
+
+public record OpportunityLinkedCardDto(
+    long OpportunityId,
+    string Title,
+    OpportunityKind Kind,
+    WorkFormat Format,
+    OpportunityStatus Status,
+    DateTimeOffset? EventDate,
+    PriceType PriceType,
+    decimal? PriceAmount,
+    string? PriceCurrencyCode);
+
+public record ApplicationEmployerLinkedCardDto(
+    long ApplicationId,
+    ApplicationStatus Status,
+    DateTimeOffset CreatedAt,
+    VacancyLinkedCardDto Vacancy,
+    CandidateLinkedCardDto Candidate);
+
+public record ApplicationSeekerLinkedCardDto(
+    long ApplicationId,
+    ApplicationStatus Status,
+    DateTimeOffset CreatedAt,
+    VacancyLinkedCardDto Vacancy);
+
+public record VacancyLinkedCardDto(
+    long VacancyId,
+    string Title,
+    VacancyKind Kind,
+    WorkFormat Format,
+    OpportunityStatus Status,
+    SalaryTaxMode SalaryTaxMode,
+    decimal? SalaryFrom,
+    decimal? SalaryTo,
+    string? CurrencyCode);
+
+public record CandidateLinkedCardDto(
+    long UserId,
+    string DisplayName,
+    string? AvatarUrl,
+    string? Headline,
+    string? DesiredPosition,
+    decimal? SalaryFrom,
+    decimal? SalaryTo,
+    string? CurrencyCode);

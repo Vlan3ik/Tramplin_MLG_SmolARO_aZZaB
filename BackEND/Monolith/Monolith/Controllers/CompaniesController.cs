@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Monolith.Contexts;
+using Monolith.Entities;
 using Monolith.Models.Common;
 using Monolith.Models.Companies;
 using Monolith.Models.Opportunities;
 using Monolith.Services.Common;
-using Monolith.Entities;
-using Monolith.Contexts;
 
 namespace Monolith.Controllers;
 
@@ -14,12 +14,6 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class CompaniesController(AppDbContext dbContext) : ControllerBase
 {
-    /// <summary>
-    /// Возвращает список компаний с фильтрацией и пагинацией.
-    /// </summary>
-    /// <param name="query">Параметры фильтрации и пагинации.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Пагинированный список компаний.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<CompanyListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<CompanyListItemDto>>> GetList([FromQuery] CompanyListQuery query, CancellationToken cancellationToken)
@@ -30,6 +24,7 @@ public class CompaniesController(AppDbContext dbContext) : ControllerBase
         var companies = dbContext.Companies
             .AsNoTracking()
             .Include(x => x.BaseCity)
+            .Include(x => x.Vacancies)
             .Include(x => x.Opportunities)
             .AsQueryable();
 
@@ -72,18 +67,12 @@ public class CompaniesController(AppDbContext dbContext) : ControllerBase
                 x.LogoUrl,
                 x.WebsiteUrl,
                 x.PublicEmail,
-                x.Opportunities.Count(o => o.Status == OpportunityStatus.Published)))
+                x.Vacancies.Count(v => v.Status == OpportunityStatus.Active) + x.Opportunities.Count(o => o.Status == OpportunityStatus.Active)))
             .ToListAsync(cancellationToken);
 
         return Ok(new PagedResponse<CompanyListItemDto>(rows, totalCount, page, pageSize));
     }
 
-    /// <summary>
-    /// Возвращает детальную карточку компании по идентификатору.
-    /// </summary>
-    /// <param name="id">Идентификатор компании.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Детальные данные компании и список активных возможностей.</returns>
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(CompanyDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -93,13 +82,34 @@ public class CompaniesController(AppDbContext dbContext) : ControllerBase
             .AsNoTracking()
             .Include(x => x.BaseCity)
             .Include(x => x.Links)
+            .Include(x => x.Vacancies)
             .Include(x => x.Opportunities)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (company is null)
         {
-            return this.ToNotFoundError("companies.not_found", "Компания не найдена.");
+            return this.ToNotFoundError("companies.not_found", "Company not found.");
         }
+
+        var activeVacancies = company.Vacancies
+            .Where(x => x.Status == OpportunityStatus.Active)
+            .Select(x => new CompanyOpportunityDto(
+                x.Id,
+                "vacancy",
+                x.Title,
+                x.Kind.ToString().ToLowerInvariant(),
+                x.Format.ToString().ToLowerInvariant(),
+                x.PublishAt));
+
+        var activeOpportunities = company.Opportunities
+            .Where(x => x.Status == OpportunityStatus.Active)
+            .Select(x => new CompanyOpportunityDto(
+                x.Id,
+                "opportunity",
+                x.Title,
+                x.Kind.ToString().ToLowerInvariant(),
+                x.Format.ToString().ToLowerInvariant(),
+                x.PublishAt));
 
         var dto = new CompanyDetailDto(
             company.Id,
@@ -114,18 +124,11 @@ public class CompaniesController(AppDbContext dbContext) : ControllerBase
             company.PublicEmail,
             company.PublicPhone,
             company.Links.Select(x => new CompanyLinkDto(x.LinkKind.ToString().ToLowerInvariant(), x.Url, x.Label)).ToArray(),
-            company.Opportunities
-                .Where(x => x.Status == OpportunityStatus.Published)
+            activeVacancies
+                .Concat(activeOpportunities)
                 .OrderByDescending(x => x.PublishAt)
                 .Take(30)
-                .Select(x => new CompanyOpportunityDto(
-                    x.Id,
-                    x.Title,
-                    x.OppType.ToString().ToLowerInvariant(),
-                    x.Format.ToString().ToLowerInvariant(),
-                    x.PublishAt))
-                .ToArray()
-        );
+                .ToArray());
 
         return Ok(dto);
     }

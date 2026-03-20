@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Monolith.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260319101727_AddUsernameResumeDetailsAndContacts")]
-    partial class AddUsernameResumeDetailsAndContacts
+    [Migration("20260320135947_InitialEmployerApi2")]
+    partial class InitialEmployerApi2
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -53,10 +53,6 @@ namespace Monolith.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("initiator_role");
 
-                    b.Property<long?>("OpportunityId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("opportunity_id");
-
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
@@ -65,13 +61,17 @@ namespace Monolith.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<long>("VacancyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("vacancy_id");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CandidateUserId");
 
                     b.HasIndex("CompanyId");
 
-                    b.HasIndex("OpportunityId");
+                    b.HasIndex("VacancyId");
 
                     b.ToTable("applications", (string)null);
                 });
@@ -403,6 +403,10 @@ namespace Monolith.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<long?>("OpportunityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("opportunity_id");
+
                     b.Property<int>("Type")
                         .HasColumnType("integer")
                         .HasColumnName("type");
@@ -410,7 +414,12 @@ namespace Monolith.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ApplicationId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("application_id IS NOT NULL");
+
+                    b.HasIndex("OpportunityId")
+                        .IsUnique()
+                        .HasFilter("opportunity_id IS NOT NULL");
 
                     b.ToTable("chats", (string)null);
                 });
@@ -907,10 +916,6 @@ namespace Monolith.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<DateTimeOffset?>("ApplicationDeadline")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("application_deadline");
-
                     b.Property<long?>("CityId")
                         .HasColumnType("bigint")
                         .HasColumnName("city_id");
@@ -927,10 +932,9 @@ namespace Monolith.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("created_by_user_id");
 
-                    b.Property<string>("CurrencyCode")
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)")
-                        .HasColumnName("currency_code");
+                    b.Property<DateTimeOffset?>("EventDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("event_date");
 
                     b.Property<int>("Format")
                         .HasColumnType("integer")
@@ -941,25 +945,34 @@ namespace Monolith.Migrations
                         .HasColumnType("text")
                         .HasColumnName("full_description");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
                     b.Property<long?>("LocationId")
                         .HasColumnType("bigint")
                         .HasColumnName("location_id");
 
-                    b.Property<int>("OppType")
+                    b.Property<bool>("ParticipantsCanWrite")
+                        .HasColumnType("boolean")
+                        .HasColumnName("participants_can_write");
+
+                    b.Property<decimal?>("PriceAmount")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("price_amount");
+
+                    b.Property<string>("PriceCurrencyCode")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("price_currency_code");
+
+                    b.Property<int>("PriceType")
                         .HasColumnType("integer")
-                        .HasColumnName("opp_type");
+                        .HasColumnName("price_type");
 
                     b.Property<DateTimeOffset>("PublishAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("publish_at");
-
-                    b.Property<decimal?>("SalaryFrom")
-                        .HasColumnType("numeric(12,2)")
-                        .HasColumnName("salary_from");
-
-                    b.Property<decimal?>("SalaryTo")
-                        .HasColumnType("numeric(12,2)")
-                        .HasColumnName("salary_to");
 
                     b.Property<string>("ShortDescription")
                         .IsRequired()
@@ -990,6 +1003,27 @@ namespace Monolith.Migrations
                     b.HasIndex("LocationId");
 
                     b.ToTable("opportunities", (string)null);
+                });
+
+            modelBuilder.Entity("Monolith.Entities.OpportunityParticipant", b =>
+                {
+                    b.Property<long>("OpportunityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("opportunity_id");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("JoinedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("joined_at");
+
+                    b.HasKey("OpportunityId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("opportunity_participants", (string)null);
                 });
 
             modelBuilder.Entity("Monolith.Entities.OpportunityTag", b =>
@@ -1268,6 +1302,121 @@ namespace Monolith.Migrations
                     b.ToTable("user_roles", (string)null);
                 });
 
+            modelBuilder.Entity("Monolith.Entities.Vacancy", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset?>("ApplicationDeadline")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("application_deadline");
+
+                    b.Property<long?>("CityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("city_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("CurrencyCode")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<int>("Format")
+                        .HasColumnType("integer")
+                        .HasColumnName("format");
+
+                    b.Property<string>("FullDescription")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("full_description");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<long?>("LocationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("location_id");
+
+                    b.Property<DateTimeOffset>("PublishAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("publish_at");
+
+                    b.Property<decimal?>("SalaryFrom")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("salary_from");
+
+                    b.Property<int>("SalaryTaxMode")
+                        .HasColumnType("integer")
+                        .HasColumnName("salary_tax_mode");
+
+                    b.Property<decimal?>("SalaryTo")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("salary_to");
+
+                    b.Property<string>("ShortDescription")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("short_description");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CityId");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("LocationId");
+
+                    b.ToTable("vacancies", (string)null);
+                });
+
+            modelBuilder.Entity("Monolith.Entities.VacancyTag", b =>
+                {
+                    b.Property<long>("VacancyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("vacancy_id");
+
+                    b.Property<long>("TagId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tag_id");
+
+                    b.HasKey("VacancyId", "TagId");
+
+                    b.HasIndex("TagId");
+
+                    b.ToTable("vacancy_tags", (string)null);
+                });
+
             modelBuilder.Entity("Monolith.Entities.Application", b =>
                 {
                     b.HasOne("Monolith.Entities.User", "CandidateUser")
@@ -1282,16 +1431,17 @@ namespace Monolith.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Monolith.Entities.Opportunity", "Opportunity")
+                    b.HasOne("Monolith.Entities.Vacancy", "Vacancy")
                         .WithMany("Applications")
-                        .HasForeignKey("OpportunityId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .HasForeignKey("VacancyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("CandidateUser");
 
                     b.Navigation("Company");
 
-                    b.Navigation("Opportunity");
+                    b.Navigation("Vacancy");
                 });
 
             modelBuilder.Entity("Monolith.Entities.CandidatePrivacySettings", b =>
@@ -1386,7 +1536,14 @@ namespace Monolith.Migrations
                         .HasForeignKey("Monolith.Entities.Chat", "ApplicationId")
                         .OnDelete(DeleteBehavior.Cascade);
 
+                    b.HasOne("Monolith.Entities.Opportunity", "Opportunity")
+                        .WithOne("Chat")
+                        .HasForeignKey("Monolith.Entities.Chat", "OpportunityId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.Navigation("Application");
+
+                    b.Navigation("Opportunity");
                 });
 
             modelBuilder.Entity("Monolith.Entities.ChatMessage", b =>
@@ -1570,6 +1727,25 @@ namespace Monolith.Migrations
                     b.Navigation("Location");
                 });
 
+            modelBuilder.Entity("Monolith.Entities.OpportunityParticipant", b =>
+                {
+                    b.HasOne("Monolith.Entities.Opportunity", "Opportunity")
+                        .WithMany("Participants")
+                        .HasForeignKey("OpportunityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Monolith.Entities.User", "User")
+                        .WithMany("OpportunityParticipations")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Opportunity");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Monolith.Entities.OpportunityTag", b =>
                 {
                     b.HasOne("Monolith.Entities.Opportunity", "Opportunity")
@@ -1641,6 +1817,48 @@ namespace Monolith.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Monolith.Entities.Vacancy", b =>
+                {
+                    b.HasOne("Monolith.Entities.City", "City")
+                        .WithMany()
+                        .HasForeignKey("CityId");
+
+                    b.HasOne("Monolith.Entities.Company", "Company")
+                        .WithMany("Vacancies")
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Monolith.Entities.Location", "Location")
+                        .WithMany()
+                        .HasForeignKey("LocationId");
+
+                    b.Navigation("City");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("Location");
+                });
+
+            modelBuilder.Entity("Monolith.Entities.VacancyTag", b =>
+                {
+                    b.HasOne("Monolith.Entities.Tag", "Tag")
+                        .WithMany("VacancyTags")
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Monolith.Entities.Vacancy", "Vacancy")
+                        .WithMany("VacancyTags")
+                        .HasForeignKey("VacancyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tag");
+
+                    b.Navigation("Vacancy");
+                });
+
             modelBuilder.Entity("Monolith.Entities.Application", b =>
                 {
                     b.Navigation("Chat");
@@ -1696,18 +1914,24 @@ namespace Monolith.Migrations
                     b.Navigation("Members");
 
                     b.Navigation("Opportunities");
+
+                    b.Navigation("Vacancies");
                 });
 
             modelBuilder.Entity("Monolith.Entities.Opportunity", b =>
                 {
-                    b.Navigation("Applications");
+                    b.Navigation("Chat");
 
                     b.Navigation("OpportunityTags");
+
+                    b.Navigation("Participants");
                 });
 
             modelBuilder.Entity("Monolith.Entities.Tag", b =>
                 {
                     b.Navigation("OpportunityTags");
+
+                    b.Navigation("VacancyTags");
                 });
 
             modelBuilder.Entity("Monolith.Entities.TagGroup", b =>
@@ -1735,6 +1959,8 @@ namespace Monolith.Migrations
 
                     b.Navigation("IncomingContactRequests");
 
+                    b.Navigation("OpportunityParticipations");
+
                     b.Navigation("OutgoingContactRequests");
 
                     b.Navigation("RefreshTokens");
@@ -1742,6 +1968,13 @@ namespace Monolith.Migrations
                     b.Navigation("Roles");
 
                     b.Navigation("SentCompanyInvites");
+                });
+
+            modelBuilder.Entity("Monolith.Entities.Vacancy", b =>
+                {
+                    b.Navigation("Applications");
+
+                    b.Navigation("VacancyTags");
                 });
 #pragma warning restore 612, 618
         }

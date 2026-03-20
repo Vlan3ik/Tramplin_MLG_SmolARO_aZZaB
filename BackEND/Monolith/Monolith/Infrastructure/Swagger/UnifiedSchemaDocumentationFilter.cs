@@ -10,122 +10,75 @@ public class UnifiedSchemaDocumentationFilter : ISchemaFilter
 {
     private static readonly IReadOnlyDictionary<string, string> IdHints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
-        ["userId"] = "Идентификатор пользователя. Получить можно через профили пользователей или административные API пользователей.",
-        ["candidateUserId"] = "Идентификатор пользователя-соискателя. Получить можно через профили пользователей или список откликов.",
-        ["createdByUserId"] = "Идентификатор пользователя, создавшего сущность. Для работодателей обычно это текущий авторизованный пользователь.",
-        ["companyId"] = "Идентификатор компании. Получить можно через GET /companies (публичный каталог) или API работодателя/администратора.",
-        ["baseCityId"] = "Идентификатор города. Получить можно через GET /catalog/cities.",
-        ["cityId"] = "Идентификатор города. Получить можно через GET /catalog/cities.",
-        ["locationId"] = "Идентификатор локации. Получить можно через GET /catalog/locations.",
-        ["tagId"] = "Идентификатор тега. Получить можно через GET /catalog/tags.",
-        ["tagIds"] = "Массив идентификаторов тегов. Получить можно через GET /catalog/tags.",
-        ["groupId"] = "Идентификатор группы тегов. Получить можно через GET /catalog/tag-groups.",
-        ["opportunityId"] = "Идентификатор возможности. Получить можно через GET /opportunities.",
-        ["chatId"] = "Идентификатор чата. Получить можно через GET /chats.",
-        ["messageId"] = "Идентификатор сообщения чата. Получить можно через GET /chats/{chatId}/messages."
+        ["userId"] = "User id.",
+        ["candidateUserId"] = "Candidate user id.",
+        ["createdByUserId"] = "Creator user id.",
+        ["newOwnerUserId"] = "Target user id for ownership transfer.",
+        ["companyId"] = "Company id.",
+        ["baseCityId"] = "City id from GET /catalog/cities.",
+        ["cityId"] = "City id from GET /catalog/cities.",
+        ["locationId"] = "Location id from GET /catalog/locations.",
+        ["groupId"] = "Tag group id from GET /catalog/tag-groups.",
+        ["tagId"] = "Tag id from GET /catalog/tags.",
+        ["tagIds"] = "Tag ids from GET /catalog/tags.",
+        ["opportunityId"] = "Opportunity id from GET /opportunities.",
+        ["vacancyId"] = "Vacancy id from GET /vacancies.",
+        ["vacancyIds"] = "Vacancy ids from GET /vacancies.",
+        ["chatId"] = "Chat id from GET /chats.",
+        ["messageId"] = "Message id from GET /chats/{chatId}/messages."
     };
 
     private static readonly IReadOnlyDictionary<Type, IReadOnlyDictionary<string, string>> EnumLabels =
         new Dictionary<Type, IReadOnlyDictionary<string, string>>
         {
-            [typeof(AccountStatus)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            [typeof(VacancyKind)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Active"] = "Активен",
-                ["Blocked"] = "Заблокирован",
-                ["Deleted"] = "Удален"
+                ["Internship"] = "Internship",
+                ["Job"] = "Job"
             },
-            [typeof(ApplicationStatus)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            [typeof(SalaryTaxMode)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Open"] = "Открыт",
-                ["Closed"] = "Закрыт",
-                ["Rejected"] = "Отклонен"
-            },
-            [typeof(CatalogStatus)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Active"] = "Активен",
-                ["Pending"] = "На проверке",
-                ["Archived"] = "Архив"
-            },
-            [typeof(ChatType)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Direct"] = "Личный чат",
-                ["Application"] = "Чат отклика"
-            },
-            [typeof(CompanyLegalType)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["LegalEntity"] = "Юридическое лицо",
-                ["IndividualEntrepreneur"] = "ИП"
-            },
-            [typeof(CompanyMemberRole)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Owner"] = "Владелец",
-                ["Admin"] = "Администратор",
-                ["Staff"] = "Сотрудник"
-            },
-            [typeof(CompanyStatus)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Draft"] = "Черновик",
-                ["PendingVerification"] = "Ожидает верификации",
-                ["Verified"] = "Подтверждена",
-                ["Rejected"] = "Отклонена",
-                ["Blocked"] = "Заблокирована"
-            },
-            [typeof(ContactRequestStatus)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Pending"] = "Ожидает",
-                ["Accepted"] = "Принята",
-                ["Rejected"] = "Отклонена"
-            },
-            [typeof(LinkType)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Website"] = "Сайт",
-                ["Telegram"] = "Telegram",
-                ["Vk"] = "VK",
-                ["Github"] = "GitHub",
-                ["Linkedin"] = "LinkedIn",
-                ["Hh"] = "hh.ru",
-                ["Other"] = "Другое"
+                ["BeforeTax"] = "Before tax",
+                ["AfterTax"] = "After tax",
+                ["Unknown"] = "Unknown"
             },
             [typeof(OpportunityStatus)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Draft"] = "Черновик",
-                ["PendingModeration"] = "Ожидает модерации",
-                ["Planned"] = "Запланирована",
-                ["Published"] = "Опубликована",
-                ["Closed"] = "Закрыта",
-                ["Rejected"] = "Отклонена",
-                ["Archived"] = "Архив"
+                ["Draft"] = "Draft",
+                ["PendingModeration"] = "Pending moderation",
+                ["Active"] = "Active",
+                ["Finished"] = "Finished",
+                ["Canceled"] = "Canceled",
+                ["Rejected"] = "Rejected",
+                ["Archived"] = "Archived"
             },
-            [typeof(OpportunityType)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            [typeof(ApplicationStatus)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Internship"] = "Стажировка",
-                ["Vacancy"] = "Вакансия",
-                ["MentorshipProgram"] = "Менторская программа",
-                ["CareerEvent"] = "Карьерное мероприятие"
+                ["New"] = "New",
+                ["InReview"] = "In review",
+                ["Interview"] = "Interview",
+                ["Offer"] = "Offer",
+                ["Hired"] = "Hired",
+                ["Rejected"] = "Rejected",
+                ["Canceled"] = "Canceled"
             },
-            [typeof(PlatformRole)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            [typeof(OpportunityKind)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Seeker"] = "Соискатель",
-                ["Employer"] = "Работодатель",
-                ["Curator"] = "Куратор"
+                ["Hackathon"] = "Hackathon",
+                ["OpenDay"] = "Open day",
+                ["Lecture"] = "Lecture",
+                ["Other"] = "Other"
             },
-            [typeof(PrivacyScope)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            [typeof(PriceType)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Private"] = "Личное",
-                ["ContactsOnly"] = "Только контакты",
-                ["AuthorizedUsers"] = "Все авторизованные"
+                ["Free"] = "Free",
+                ["Paid"] = "Paid",
+                ["Prize"] = "Prize"
             },
-            [typeof(WorkFormat)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            [typeof(MapEntityType)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Onsite"] = "Офис/очно",
-                ["Hybrid"] = "Гибрид",
-                ["Remote"] = "Удаленно"
-            },
-            [typeof(CareerEventKind)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Hackathon"] = "Хакатон",
-                ["OpenDay"] = "День открытых дверей",
-                ["Lecture"] = "Лекция"
+                ["Vacancy"] = "Vacancy",
+                ["Opportunity"] = "Opportunity"
             }
         };
 
@@ -164,21 +117,19 @@ public class UnifiedSchemaDocumentationFilter : ISchemaFilter
             return;
         }
 
-        var lines = values
-            .Select(value =>
+        var lines = values.Select(value =>
+        {
+            var numeric = Convert.ToInt64(value, CultureInfo.InvariantCulture);
+            var name = Enum.GetName(enumType, value) ?? value.ToString() ?? numeric.ToString(CultureInfo.InvariantCulture);
+            if (EnumLabels.TryGetValue(enumType, out var labels) && labels.TryGetValue(name, out var label))
             {
-                var numeric = Convert.ToInt64(value, CultureInfo.InvariantCulture);
-                var name = Enum.GetName(enumType, value) ?? value.ToString() ?? numeric.ToString(CultureInfo.InvariantCulture);
-                if (EnumLabels.TryGetValue(enumType, out var labels) && labels.TryGetValue(name, out var label))
-                {
-                    return $"{numeric} = {name} ({label})";
-                }
+                return $"{numeric} = {name} ({label})";
+            }
 
-                return $"{numeric} = {name}";
-            })
-            .ToArray();
+            return $"{numeric} = {name}";
+        });
 
-        var enumDescription = $"Коды значений: {string.Join("; ", lines)}.";
+        var enumDescription = $"Codes: {string.Join("; ", lines)}.";
         schema.Description = string.IsNullOrWhiteSpace(schema.Description)
             ? enumDescription
             : $"{schema.Description} {enumDescription}";
@@ -199,13 +150,13 @@ public class UnifiedSchemaDocumentationFilter : ISchemaFilter
 
         if (propertyName.EndsWith("Ids", StringComparison.OrdinalIgnoreCase))
         {
-            description = "Массив числовых идентификаторов. Источник значений указан в описании конкретного API-метода.";
+            description = "Array of numeric ids.";
             return true;
         }
 
         if (propertyName.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
         {
-            description = "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.";
+            description = "Numeric id.";
             return true;
         }
 
