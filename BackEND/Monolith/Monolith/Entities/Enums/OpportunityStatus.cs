@@ -1,5 +1,8 @@
 namespace Monolith.Entities;
 
+/// <summary>
+/// Статус модерации и публикации карточки возможности.
+/// </summary>
 public enum OpportunityStatus
 {
     Draft = 1,

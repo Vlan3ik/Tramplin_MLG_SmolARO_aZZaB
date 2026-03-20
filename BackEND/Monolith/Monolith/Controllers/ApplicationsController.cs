@@ -7,6 +7,7 @@ using Monolith.Entities;
 using Monolith.Hubs;
 using Monolith.Models.Chat;
 using Monolith.Models.Common;
+using Monolith.Services.Chats;
 using Monolith.Services.Common;
 
 namespace Monolith.Controllers;
@@ -18,7 +19,7 @@ namespace Monolith.Controllers;
 [Authorize]
 [Route("applications")]
 [Produces("application/json")]
-public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub> hubContext) : ControllerBase
+public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub> hubContext, IChatCacheService chatCache) : ControllerBase
 {
     /// <summary>
     /// Создает отклик и связанный application-чат.
@@ -135,6 +136,12 @@ public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub>
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        foreach (var participantId in participants.Select(x => x.UserId).Distinct())
+        {
+            await chatCache.InvalidateUserListAsync(participantId, cancellationToken);
+        }
+        await chatCache.InvalidateChatHistoryAsync(chat.Id, cancellationToken);
 
         if (greeting is not null)
         {

@@ -7,10 +7,11 @@ namespace Monolith.Models.Chat;
 /// </summary>
 /// <param name="Id">Идентификатор чата.</param>
 /// <param name="Type">Тип чата (direct/application).</param>
+/// <param name="Title">Отображаемый заголовок чата: название компании или ФИО собеседника в формате "Иванов И.И.".</param>
 /// <param name="ParticipantIds">Идентификаторы участников чата.</param>
 /// <param name="CreatedAt">Дата создания чата.</param>
 /// <param name="LastMessage">Последнее сообщение (если есть).</param>
-public record ChatListItemDto(long Id, ChatType Type, long[] ParticipantIds, DateTimeOffset CreatedAt, ChatMessageDto? LastMessage);
+public record ChatListItemDto(long Id, ChatType Type, string Title, long[] ParticipantIds, DateTimeOffset CreatedAt, ChatMessageDto? LastMessage);
 
 /// <summary>
 /// Сообщение чата.
@@ -22,6 +23,15 @@ public record ChatListItemDto(long Id, ChatType Type, long[] ParticipantIds, Dat
 /// <param name="IsSystem">Признак системного сообщения.</param>
 /// <param name="CreatedAt">Дата отправки.</param>
 public record ChatMessageDto(long Id, long ChatId, long SenderUserId, string Text, bool IsSystem, DateTimeOffset CreatedAt);
+
+/// <summary>
+/// Страница истории сообщений для пагинации "вверх".
+/// </summary>
+/// <param name="ChatId">Идентификатор чата.</param>
+/// <param name="Messages">Порция сообщений в хронологическом порядке (старые -> новые).</param>
+/// <param name="HasMore">Признак, что в истории есть более старые сообщения.</param>
+/// <param name="NextBeforeMessageId">Курсор для следующего запроса старых сообщений.</param>
+public record ChatHistoryPageDto(long ChatId, IReadOnlyCollection<ChatMessageDto> Messages, bool HasMore, long? NextBeforeMessageId);
 
 /// <summary>
 /// Запрос на создание direct-чата.

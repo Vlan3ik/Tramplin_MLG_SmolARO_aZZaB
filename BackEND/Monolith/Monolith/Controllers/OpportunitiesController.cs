@@ -161,6 +161,20 @@ public class OpportunitiesController(AppDbContext dbContext) : ControllerBase
             opportunities = opportunities.Where(x => query.Types.Contains(x.OppType));
         }
 
+        if (query.EventKinds is { Length: > 0 })
+        {
+            var eventKindSlugs = query.EventKinds
+                .Distinct()
+                .Select(x => x.ToTagSlug())
+                .ToArray();
+
+            opportunities = opportunities.Where(x =>
+                x.OppType == OpportunityType.CareerEvent &&
+                x.OpportunityTags.Any(t =>
+                    t.Tag.Group.Code == "event_kind" &&
+                    eventKindSlugs.Contains(t.Tag.Slug)));
+        }
+
         if (query.Formats is { Length: > 0 })
         {
             opportunities = opportunities.Where(x => query.Formats.Contains(x.Format));
