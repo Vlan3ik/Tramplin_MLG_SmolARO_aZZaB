@@ -1,9 +1,9 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
-import type { StyleSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Link } from 'react-router-dom'
 import type { Opportunity } from '../../types/opportunity'
+import { cartoStyle } from './mapStyle'
 
 type MarkerKind = 'single' | 'verified' | 'cluster'
 
@@ -21,29 +21,6 @@ type MapBoardProps = {
   isLoading: boolean
   errorMessage: string
   onRetry: () => void
-}
-
-const satelliteStyle: StyleSpecification = {
-  version: 8,
-  sources: {
-    esriSatellite: {
-      type: 'raster',
-      tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-      tileSize: 256,
-      attribution: 'Tiles © Esri',
-      maxzoom: 19,
-    },
-    esriLabels: {
-      type: 'raster',
-      tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'],
-      tileSize: 256,
-      maxzoom: 19,
-    },
-  },
-  layers: [
-    { id: 'satellite-base', type: 'raster', source: 'esriSatellite' },
-    { id: 'satellite-labels', type: 'raster', source: 'esriLabels' },
-  ],
 }
 
 function createOpportunityTags(tags: string[]) {
@@ -207,11 +184,11 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: satelliteStyle,
+      style: cartoStyle,
       center: [37.6176, 55.7558],
       zoom: 4.5,
-      pitch: 52,
-      bearing: -20,
+      pitch: 0,
+      bearing: 0,
       maxZoom: 18,
       canvasContextAttributes: { antialias: true },
       attributionControl: false,

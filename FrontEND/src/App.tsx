@@ -6,6 +6,7 @@ import { ChatWidget } from './components/chat/ChatWidget'
 import { PublicLayout } from './components/layout/PublicLayout'
 import { AboutPlatformPage } from './pages/AboutPlatformPage'
 import { CompanyPage } from './pages/CompanyPage'
+import { CompaniesListPage } from './pages/CompaniesListPage'
 import { EmployerVerificationPage } from './pages/EmployerVerificationPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
@@ -25,7 +26,8 @@ function App() {
           <Route index element={<HomePage />} />
           <Route path="about" element={<AboutPlatformPage />} />
           <Route path="opportunity/:id" element={<OpportunityDetailsPage />} />
-          <Route path="company/:slug" element={<CompanyPage />} />
+          <Route path="companies" element={<CompaniesListPage />} />
+          <Route path="company/:id" element={<CompanyPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
 

@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 
 const menuItems = [
   { label: 'Возможности', to: '/', isActive: (pathname: string) => pathname === '/' },
-  { label: 'Компании', to: '/company/cloudline', isActive: (pathname: string) => pathname.startsWith('/company/') },
+  { label: 'Компании', to: '/companies', isActive: (pathname: string) => pathname === '/companies' || pathname.startsWith('/companies/') },
   { label: 'Мероприятия', to: '/opportunity/1', isActive: (pathname: string) => pathname.startsWith('/opportunity/') },
   { label: 'О платформе', to: '/about', isActive: (pathname: string) => pathname === '/about' },
 ]

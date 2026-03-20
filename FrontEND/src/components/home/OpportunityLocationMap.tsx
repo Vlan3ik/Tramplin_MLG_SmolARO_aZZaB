@@ -1,35 +1,12 @@
 import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
-import type { StyleSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { cartoStyle } from './mapStyle'
 
 type OpportunityLocationMapProps = {
   latitude: number | null | undefined
   longitude: number | null | undefined
   title: string
-}
-
-const satelliteStyle: StyleSpecification = {
-  version: 8,
-  sources: {
-    esriSatellite: {
-      type: 'raster',
-      tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-      tileSize: 256,
-      attribution: 'Tiles © Esri',
-      maxzoom: 19,
-    },
-    esriLabels: {
-      type: 'raster',
-      tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'],
-      tileSize: 256,
-      maxzoom: 19,
-    },
-  },
-  layers: [
-    { id: 'satellite-base', type: 'raster', source: 'esriSatellite' },
-    { id: 'satellite-labels', type: 'raster', source: 'esriLabels' },
-  ],
 }
 
 export function OpportunityLocationMap({ latitude, longitude, title }: OpportunityLocationMapProps) {
@@ -44,11 +21,11 @@ export function OpportunityLocationMap({ latitude, longitude, title }: Opportuni
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: satelliteStyle,
+      style: cartoStyle,
       center: [longitude, latitude],
       zoom: 13,
-      pitch: 42,
-      bearing: -12,
+      pitch: 0,
+      bearing: 0,
       attributionControl: false,
     })
 
@@ -57,7 +34,7 @@ export function OpportunityLocationMap({ latitude, longitude, title }: Opportuni
 
     const markerNode = document.createElement('div')
     markerNode.className = 'opportunity-location-marker'
-    markerNode.innerHTML = '<span>●</span>'
+    markerNode.innerHTML = '<span>•</span>'
 
     const marker = new maplibregl.Marker({ element: markerNode, anchor: 'bottom' })
       .setLngLat([longitude, latitude])

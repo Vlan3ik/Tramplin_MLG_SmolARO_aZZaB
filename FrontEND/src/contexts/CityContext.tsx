@@ -292,6 +292,7 @@ export function CityProvider({ children }: CityProviderProps) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCity() {
   const context = useContext(CityContext)
 
