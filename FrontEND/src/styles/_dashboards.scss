@@ -427,12 +427,21 @@
 }
 
 .favorite-card {
-  border: 1px solid var(--line);
+  border: 1px solid rgba(127, 154, 198, 0.24);
   border-radius: 14px;
-  background: #fff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 255, 0.95));
   padding: 0.85rem;
   display: grid;
   gap: 0.55rem;
+  box-shadow: 0 12px 24px rgba(15, 42, 90, 0.08);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: rgba(0, 91, 255, 0.3);
+    box-shadow: 0 14px 28px rgba(15, 42, 90, 0.12);
+  }
 }
 
 .favorite-card__head {
@@ -465,6 +474,10 @@
   display: inline-flex;
   gap: 0.55rem;
   flex-wrap: wrap;
+
+  .btn {
+    min-height: 38px;
+  }
 }
 
 .resume-stepper {

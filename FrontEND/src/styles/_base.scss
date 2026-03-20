@@ -151,6 +151,12 @@ textarea:focus {
   padding: 0 0.7rem;
 }
 
+.btn--icon-active {
+  color: var(--accent);
+  border-color: rgba(0, 91, 255, 0.35);
+  background: var(--accent-soft);
+}
+
 .btn--danger {
   background: rgba(229, 72, 77, 0.1);
   color: var(--danger);

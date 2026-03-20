@@ -1,0 +1,6021 @@
+﻿{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Tramplin API",
+    "version": "v1"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Direct API (debug/local)"
+    },
+    {
+      "url": "/api",
+      "description": "Nginx API prefix"
+    }
+  ],
+  "paths": {
+    "/admin/companies": {
+      "get": {
+        "tags": [
+          "AdminCompanies"
+        ],
+        "summary": "Возвращает список компаний с пагинацией и поиском.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Номер страницы (начиная с 1).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Размер страницы (максимум 100).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Поисковая строка по legalName/brandName/industry.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCompanyListItemDtoPagedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AdminCompanies"
+        ],
+        "summary": "Создает компанию в административном контуре.",
+        "requestBody": {
+          "description": "Полный набор полей компании.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCompanyUpsertRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCompanyUpsertRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCompanyUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCompanyListItemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/companies/{id}": {
+      "put": {
+        "tags": [
+          "AdminCompanies"
+        ],
+        "summary": "Обновляет данные компании.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Идентификатор компании.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Новые значения полей компании.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCompanyUpsertRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCompanyUpsertRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCompanyUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCompanyListItemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "AdminCompanies"
+        ],
+        "summary": "Удаляет компанию.",
+        "description": "Удаление физическое (hard delete), включая зависимые записи по каскадным FK.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Идентификатор компании.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/companies/{id}/verify": {
+      "post": {
+        "tags": [
+          "AdminCompanies"
+        ],
+        "summary": "Подтверждает верификацию компании.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Идентификатор компании.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/companies/{id}/reject": {
+      "post": {
+        "tags": [
+          "AdminCompanies"
+        ],
+        "summary": "Отклоняет верификацию компании.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Идентификатор компании.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/opportunities": {
+      "get": {
+        "tags": [
+          "AdminOpportunities"
+        ],
+        "summary": "Возвращает список вакансий с пагинацией и поиском.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Номер страницы (начиная с 1).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Размер страницы (максимум 100).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Поиск по title и shortDescription.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOpportunityListItemDtoPagedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AdminOpportunities"
+        ],
+        "summary": "Создает вакансию в административном контуре.",
+        "requestBody": {
+          "description": "Полный набор полей вакансии.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminOpportunityUpsertRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminOpportunityUpsertRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminOpportunityUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOpportunityListItemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/opportunities/{id}": {
+      "put": {
+        "tags": [
+          "AdminOpportunities"
+        ],
+        "summary": "Обновляет вакансию.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Идентификатор вакансии.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Новые значения полей вакансии.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminOpportunityUpsertRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminOpportunityUpsertRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminOpportunityUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOpportunityListItemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "AdminOpportunities"
+        ],
+        "summary": "Удаляет вакансию.",
+        "description": "Удаление физическое (hard delete), включая зависимые записи по каскадным FK.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Идентификатор вакансии.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": [
+          "AdminUsers"
+        ],
+        "summary": "Возвращает список пользователей с пагинацией и поиском по email/имени.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Номер страницы (начиная с 1).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Размер страницы (максимум 100).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Поисковая строка по email или username.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserListItemDtoPagedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AdminUsers"
+        ],
+        "summary": "Создает пользователя и назначает ему набор платформенных ролей.",
+        "description": "Пароль генерируется системой автоматически (служебный аккаунт).\r\nДубликаты ролей в запросе игнорируются.",
+        "requestBody": {
+          "description": "Данные создаваемого пользователя и список ролей.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUserUpsertRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUserUpsertRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUserUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserListItemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{id}": {
+      "put": {
+        "tags": [
+          "AdminUsers"
+        ],
+        "summary": "Обновляет данные пользователя и полностью заменяет набор его ролей.",
+        "description": "Текущие роли пользователя удаляются и создаются заново из запроса.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Идентификатор пользователя.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Новые значения полей пользователя и ролей.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUserUpsertRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUserUpsertRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUserUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserListItemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "AdminUsers"
+        ],
+        "summary": "Удаляет пользователя.",
+        "description": "Удаление физическое (hard delete). Связанные данные удаляются каскадно в соответствии с FK.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Идентификатор пользователя.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/applications": {
+      "post": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Создает отклик и связанный application-чат.",
+        "description": "После создания:\r\n1) формируется запись application;\r\n2) создается чат типа application;\r\n3) в чат добавляются кандидат и owner/admin компании;\r\n4) при включенном авто-приветствии отправляется системное сообщение.",
+        "requestBody": {
+          "description": "Параметры отклика: компания, кандидат, вакансия (опционально), роль инициатора.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApplicationRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApplicationRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApplicationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Регистрирует нового пользователя платформы.",
+        "description": "Доступные публичные роли: seeker (1) и employer (2).\r\nРоль curator для публичной регистрации запрещена.",
+        "requestBody": {
+          "description": "Данные регистрации: email, пароль, отображаемое имя, роль.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/roles": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Возвращает справочник платформенных ролей с их id.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleDictionaryItemDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Выполняет вход пользователя по email и паролю.",
+        "requestBody": {
+          "description": "Учетные данные пользователя.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Обновляет пару access/refresh токенов по действующему refresh токену.",
+        "requestBody": {
+          "description": "Refresh токен пользователя.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Инвалидирует refresh токен текущей сессии.",
+        "requestBody": {
+          "description": "Refresh токен для отзыва.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/change-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Изменяет пароль текущего авторизованного пользователя.",
+        "requestBody": {
+          "description": "Текущий пароль и новый пароль.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catalog/cities": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Возвращает справочник городов с пагинацией и поиском.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Номер страницы (начиная с 1).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Размер страницы (максимум 100).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Поиск по названию города и региона.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CityListItemDtoPagedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catalog/locations": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Возвращает справочник локаций с пагинацией и фильтрацией.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Номер страницы (начиная с 1).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Размер страницы (максимум 100).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          },
+          {
+            "name": "cityId",
+            "in": "query",
+            "description": "Фильтр по идентификатору города.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Поиск по городу, улице или номеру дома.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationListItemDtoPagedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catalog/tag-groups": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Возвращает группы тегов.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TagGroupListItemDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catalog/tags": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Возвращает теги.",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "query",
+            "description": "Опциональный фильтр по группе тегов.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TagListItemDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats": {
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "summary": "Возвращает список чатов текущего пользователя.",
+        "description": "Поле `title` содержит:\r\n1) для application-чата: название компании (для соискателя) или ФИО кандидата в формате \"Иванов И.И.\" (для работодателя);\r\n2) для direct-чата: ФИО второго участника в формате \"Иванов И.И.\" (если доступен профиль кандидата), иначе displayName.\r\nДля снижения нагрузки используется Redis-кэш списка чатов пользователя.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChatListItemDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/direct": {
+      "post": {
+        "tags": [
+          "Chats"
+        ],
+        "summary": "Создает direct-чат между текущим пользователем и указанным пользователем.",
+        "description": "Создание разрешено только при наличии общего контекста (совместная компания или связь через application).\r\nПри наличии существующего direct-чата возвращается его идентификатор.",
+        "requestBody": {
+          "description": "Идентификатор второго участника чата.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDirectChatRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDirectChatRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDirectChatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/{chatId}/history": {
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "summary": "Возвращает страницу истории сообщений чата для подгрузки вверх.",
+        "description": "Сценарий infinite-scroll:\r\n1) первый вызов без `beforeMessageId` вернет последние `limit` сообщений;\r\n2) для подгрузки старых сообщений передайте `beforeMessageId = nextBeforeMessageId` из предыдущего ответа;\r\n3) если `hasMore = false`, история загружена полностью.\r\nДля снижения нагрузки используется Redis-кэш страниц истории.",
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "description": "Идентификатор чата.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "beforeMessageId",
+            "in": "query",
+            "description": "Курсор: вернуть сообщения с id меньше указанного.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Размер страницы (1..200, по умолчанию 50).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatHistoryPageDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/{chatId}/messages": {
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "summary": "Возвращает сообщения чата с курсорной пагинацией \"вперед\".",
+        "description": "Legacy endpoint для выборки новых сообщений (id > cursor). Для подгрузки истории \"вверх\" используйте `GET /chats/{chatId}/history`.",
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "description": "Идентификатор чата.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Опциональный курсор: вернуть сообщения с id больше указанного.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChatMessageDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Chats"
+        ],
+        "summary": "Отправляет сообщение в чат.",
+        "description": "После сохранения сообщения публикуется realtime-событие `new` в группу чата.",
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "description": "Идентификатор чата.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Текст сообщения.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendChatMessageRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendChatMessageRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendChatMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessageDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/{chatId}/read": {
+      "post": {
+        "tags": [
+          "Chats"
+        ],
+        "summary": "Помечает сообщение как прочитанное текущим пользователем.",
+        "description": "Если запись о прочтении уже существует, операция является идемпотентной.\r\nПосле фиксации отправляется realtime-событие `read`.",
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "description": "Идентификатор чата.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Идентификатор сообщения для отметки прочтения.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkChatReadRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkChatReadRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkChatReadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies": {
+      "get": {
+        "tags": [
+          "Companies"
+        ],
+        "summary": "Возвращает список компаний с фильтрацией и пагинацией.",
+        "parameters": [
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "CityId",
+            "in": "query",
+            "description": "ID города из GET /catalog/cities.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "Industry",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "VerifiedOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyListItemDtoPagedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{id}": {
+      "get": {
+        "tags": [
+          "Companies"
+        ],
+        "summary": "Возвращает детальную карточку компании по идентификатору.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Идентификатор компании.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyDetailDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{companyId}/invites": {
+      "post": {
+        "tags": [
+          "CompanyInvites"
+        ],
+        "summary": "Создает приглашение в компанию.",
+        "description": "Доступно только участникам компании с ролью owner/admin.\r\nВозвращает токен и относительную ссылку приглашения.",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "Идентификатор компании.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Роль приглашенного участника и срок действия ссылки.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCompanyInviteRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCompanyInviteRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCompanyInviteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyInviteCreatedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/company-invites/{token}/accept": {
+      "post": {
+        "tags": [
+          "CompanyInvites"
+        ],
+        "summary": "Принимает приглашение в компанию по токену.",
+        "description": "Проверяет существование, срок действия и одноразовость приглашения.\r\nПользователь может состоять только в одной компании.",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Токен приглашения.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts": {
+      "get": {
+        "tags": [
+          "Contacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContactUserDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/requests/{targetUserId}": {
+      "post": {
+        "tags": [
+          "Contacts"
+        ],
+        "parameters": [
+          {
+            "name": "targetUserId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/requests/incoming": {
+      "get": {
+        "tags": [
+          "Contacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContactRequestDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/requests/outgoing": {
+      "get": {
+        "tags": [
+          "Contacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContactRequestDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/requests/{requestId}/accept": {
+      "post": {
+        "tags": [
+          "Contacts"
+        ],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/requests/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "Contacts"
+        ],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/{contactUserId}": {
+      "delete": {
+        "tags": [
+          "Contacts"
+        ],
+        "parameters": [
+          {
+            "name": "contactUserId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/employer/company": {
+      "post": {
+        "tags": [
+          "EmployerCompanies"
+        ],
+        "summary": "Создает черновик компании для текущего работодателя.",
+        "description": "Пользователь может состоять только в одной компании.\r\nПри создании добавляется owner membership и базовые настройки чата.",
+        "requestBody": {
+          "description": "Минимальные данные компании на этапе черновика.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmployerCompanyRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmployerCompanyRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmployerCompanyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "EmployerCompanies"
+        ],
+        "summary": "Возвращает компанию текущего работодателя.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/employer/company/verification": {
+      "patch": {
+        "tags": [
+          "EmployerCompanies"
+        ],
+        "summary": "Обновляет данные компании для прохождения верификации.",
+        "description": "Доступно ролям company owner/admin.",
+        "requestBody": {
+          "description": "Юридические и публичные данные компании.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyVerificationRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyVerificationRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyVerificationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/employer/company/submit-verification": {
+      "post": {
+        "tags": [
+          "EmployerCompanies"
+        ],
+        "summary": "Отправляет компанию на верификацию.",
+        "description": "Проверяет обязательные поля: legalName, legalType, taxId, registrationNumber, industry, description,\r\nbaseCityId и хотя бы один публичный контакт (email или phone).",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/employer/company/chat-settings": {
+      "patch": {
+        "tags": [
+          "EmployerCompanies"
+        ],
+        "summary": "Обновляет настройки чата компании (авто-приветствие и рабочие часы).",
+        "requestBody": {
+          "description": "Новые значения настроек чата.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyChatSettingsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyChatSettingsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyChatSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/map/opportunities": {
+      "get": {
+        "tags": [
+          "Map"
+        ],
+        "summary": "Возвращает набор гео-объектов возможностей в формате GeoJSON.",
+        "description": "В ответе формируется FeatureCollection c координатами и краткими свойствами карточек.\r\nПоддерживаются фильтры по территории, типу, формату, тегам, зарплате и верификации компании.",
+        "parameters": [
+          {
+            "name": "MinLat",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "MaxLat",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "MinLng",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "MaxLng",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "CityId",
+            "in": "query",
+            "description": "ID города из GET /catalog/cities.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "Types",
+            "in": "query",
+            "description": "Фильтр по типам возможностей.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/OpportunityType"
+              }
+            }
+          },
+          {
+            "name": "EventKinds",
+            "in": "query",
+            "description": "Фильтр по подтипам карьерных мероприятий (применяется только к CareerEvent).",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CareerEventKind"
+              }
+            }
+          },
+          {
+            "name": "Formats",
+            "in": "query",
+            "description": "Фильтр по формату работы.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/WorkFormat"
+              }
+            }
+          },
+          {
+            "name": "TagIds",
+            "in": "query",
+            "description": "ID тегов из GET /catalog/tags.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          {
+            "name": "SalaryFrom",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "SalaryTo",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "VerifiedOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "Search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Возвращает краткие данные текущего пользователя и его роли.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/profile": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Возвращает профиль соискателя текущего пользователя.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Обновляет профиль соискателя текущего пользователя.",
+        "requestBody": {
+          "description": "Данные профиля для обновления.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/username": {
+      "patch": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Изменяет username текущего пользователя.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUsernameRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUsernameRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUsernameRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsernameResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/settings": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Возвращает настройки приватности и доступности пользователя.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Обновляет настройки приватности и доступности пользователя.",
+        "requestBody": {
+          "description": "Новые настройки пользователя.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/resume": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Возвращает резюме текущего пользователя.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Обновляет резюме текущего пользователя.",
+        "requestBody": {
+          "description": "Данные резюме для обновления.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResumeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResumeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResumeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/resume/details": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Возвращает подробные секции резюме текущего пользователя.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeDetailsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Обновляет подробные секции резюме текущего пользователя.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResumeDetailsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResumeDetailsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResumeDetailsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeDetailsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/media/me/avatar": {
+      "post": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Загружает аватар текущего пользователя в S3-совместимое хранилище.",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadMediaResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/media/companies/{companyId}/logo": {
+      "post": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Загружает логотип компании в S3-совместимое хранилище.",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "description": "Идентификатор компании.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadMediaResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/media/{objectKey}": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Возвращает изображение из S3-совместимого хранилища через API.",
+        "parameters": [
+          {
+            "name": "objectKey",
+            "in": "path",
+            "description": "Ключ объекта в хранилище.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/opportunities": {
+      "get": {
+        "tags": [
+          "Opportunities"
+        ],
+        "summary": "Возвращает список возможностей с фильтрацией и пагинацией.",
+        "parameters": [
+          {
+            "name": "Page",
+            "in": "query",
+            "description": "Номер страницы, начиная с 1.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "description": "Размер страницы.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Search",
+            "in": "query",
+            "description": "Полнотекстовый поиск по названию/описанию/компании.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "CityId",
+            "in": "query",
+            "description": "ID города из GET /catalog/cities.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "CompanyId",
+            "in": "query",
+            "description": "ID компании из GET /companies.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "Types",
+            "in": "query",
+            "description": "Фильтр по типам возможностей.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/OpportunityType"
+              }
+            }
+          },
+          {
+            "name": "EventKinds",
+            "in": "query",
+            "description": "Фильтр по подтипам карьерных мероприятий (применяется только к CareerEvent).",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CareerEventKind"
+              }
+            }
+          },
+          {
+            "name": "Formats",
+            "in": "query",
+            "description": "Фильтр по формату работы.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/WorkFormat"
+              }
+            }
+          },
+          {
+            "name": "TagIds",
+            "in": "query",
+            "description": "ID тегов из GET /catalog/tags.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          {
+            "name": "SalaryFrom",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "SalaryTo",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "VerifiedOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityListItemDtoPagedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/opportunities/{id}": {
+      "get": {
+        "tags": [
+          "Opportunities"
+        ],
+        "summary": "Возвращает детальную информацию о возможности.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Идентификатор возможности.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityDetailDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profiles/{username}": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicProfileResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountStatus": {
+        "enum": [
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "description": "Коды значений: 1 = Active (Активен); 2 = Blocked (Заблокирован); 3 = Deleted (Удален).",
+        "format": "int32",
+        "example": 1
+      },
+      "AdminCompanyListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Идентификатор компании.",
+            "format": "int64"
+          },
+          "legalName": {
+            "type": "string",
+            "description": "Юридическое наименование.",
+            "nullable": true
+          },
+          "brandName": {
+            "type": "string",
+            "description": "Брендовое наименование.",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/CompanyStatus"
+          },
+          "baseCityId": {
+            "type": "integer",
+            "description": "Идентификатор базового города.",
+            "format": "int64"
+          },
+          "industry": {
+            "type": "string",
+            "description": "Отрасль компании.",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Дата создания компании.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Краткая карточка компании для административного списка."
+      },
+      "AdminCompanyListItemDtoPagedResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminCompanyListItemDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdminCompanyUpsertRequest": {
+        "type": "object",
+        "properties": {
+          "legalName": {
+            "type": "string",
+            "description": "Юридическое наименование.",
+            "nullable": true
+          },
+          "brandName": {
+            "type": "string",
+            "description": "Брендовое наименование.",
+            "nullable": true
+          },
+          "legalType": {
+            "$ref": "#/components/schemas/CompanyLegalType"
+          },
+          "taxId": {
+            "type": "string",
+            "description": "ИНН.",
+            "nullable": true
+          },
+          "registrationNumber": {
+            "type": "string",
+            "description": "ОГРН/регистрационный номер.",
+            "nullable": true
+          },
+          "industry": {
+            "type": "string",
+            "description": "Отрасль.",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Описание компании.",
+            "nullable": true
+          },
+          "baseCityId": {
+            "type": "integer",
+            "description": "Идентификатор базового города.",
+            "format": "int64"
+          },
+          "websiteUrl": {
+            "type": "string",
+            "description": "URL сайта компании.",
+            "nullable": true
+          },
+          "publicEmail": {
+            "type": "string",
+            "description": "Публичный email.",
+            "nullable": true
+          },
+          "publicPhone": {
+            "type": "string",
+            "description": "Публичный телефон.",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/CompanyStatus"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Данные для создания/обновления компании в админ-контуре."
+      },
+      "AdminOpportunityListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Идентификатор вакансии.",
+            "format": "int64"
+          },
+          "companyId": {
+            "type": "integer",
+            "description": "Идентификатор компании-владельца.",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "description": "Заголовок вакансии.",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/OpportunityStatus"
+          },
+          "type": {
+            "$ref": "#/components/schemas/OpportunityType"
+          },
+          "format": {
+            "$ref": "#/components/schemas/WorkFormat"
+          },
+          "publishAt": {
+            "type": "string",
+            "description": "Дата/время публикации.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Краткая карточка вакансии для административного списка."
+      },
+      "AdminOpportunityListItemDtoPagedResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminOpportunityListItemDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdminOpportunityUpsertRequest": {
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "type": "integer",
+            "description": "Идентификатор компании-владельца.",
+            "format": "int64"
+          },
+          "createdByUserId": {
+            "type": "integer",
+            "description": "Идентификатор пользователя-создателя.",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "description": "Заголовок вакансии.",
+            "nullable": true
+          },
+          "shortDescription": {
+            "type": "string",
+            "description": "Краткое описание.",
+            "nullable": true
+          },
+          "fullDescription": {
+            "type": "string",
+            "description": "Полное описание.",
+            "nullable": true
+          },
+          "oppType": {
+            "$ref": "#/components/schemas/OpportunityType"
+          },
+          "format": {
+            "$ref": "#/components/schemas/WorkFormat"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OpportunityStatus"
+          },
+          "cityId": {
+            "type": "integer",
+            "description": "Идентификатор города (опционально).",
+            "format": "int64",
+            "nullable": true
+          },
+          "locationId": {
+            "type": "integer",
+            "description": "Идентификатор локации (опционально).",
+            "format": "int64",
+            "nullable": true
+          },
+          "salaryFrom": {
+            "type": "number",
+            "description": "Нижняя граница зарплаты.",
+            "format": "double",
+            "nullable": true
+          },
+          "salaryTo": {
+            "type": "number",
+            "description": "Верхняя граница зарплаты.",
+            "format": "double",
+            "nullable": true
+          },
+          "currencyCode": {
+            "type": "string",
+            "description": "Код валюты.",
+            "nullable": true
+          },
+          "publishAt": {
+            "type": "string",
+            "description": "Дата/время публикации.",
+            "format": "date-time"
+          },
+          "applicationDeadline": {
+            "type": "string",
+            "description": "Крайний срок отклика.",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Данные для создания/обновления вакансии в админ-контуре."
+      },
+      "AdminUserListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Идентификатор пользователя.",
+            "format": "int64"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email пользователя (уникальный).",
+            "nullable": true
+          },
+          "username": {
+            "type": "string",
+            "description": "Username пользователя.",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/AccountStatus"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Набор платформенных ролей (string-коды).",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Дата создания учетной записи.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Краткая карточка пользователя для административного списка."
+      },
+      "AdminUserListItemDtoPagedResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUserListItemDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdminUserUpsertRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email пользователя.",
+            "nullable": true
+          },
+          "firstName": {
+            "type": "string",
+            "description": "Имя пользователя.",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Фамилия пользователя.",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/AccountStatus"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformRole"
+            },
+            "description": "Набор платформенных ролей.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Данные для создания/обновления пользователя в админ-контуре."
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "accessTokenExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "refreshTokenExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUserDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuthUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.",
+            "format": "int64"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CareerEventKind": {
+        "enum": [
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "description": "Подтип карьерного мероприятия, представленный системными тегами группы `event_kind`. Коды значений: 1 = Hackathon (Хакатон); 2 = OpenDay (День открытых дверей); 3 = Lecture (Лекция).",
+        "format": "int32",
+        "example": 1
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "nullable": true
+          },
+          "newPassword": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChatHistoryPageDto": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "integer",
+            "description": "Идентификатор чата.",
+            "format": "int64"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessageDto"
+            },
+            "description": "Порция сообщений в хронологическом порядке (старые -> новые).",
+            "nullable": true
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Признак, что в истории есть более старые сообщения."
+          },
+          "nextBeforeMessageId": {
+            "type": "integer",
+            "description": "Курсор для следующего запроса старых сообщений.",
+            "format": "int64",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Страница истории сообщений для пагинации \"вверх\"."
+      },
+      "ChatListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Идентификатор чата.",
+            "format": "int64"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ChatType"
+          },
+          "title": {
+            "type": "string",
+            "description": "Отображаемый заголовок чата: название компании или ФИО собеседника в формате \"Иванов И.И.\".",
+            "nullable": true
+          },
+          "participantIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Идентификаторы участников чата.",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Дата создания чата.",
+            "format": "date-time"
+          },
+          "lastMessage": {
+            "$ref": "#/components/schemas/ChatMessageDto"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Карточка чата в списке."
+      },
+      "ChatMessageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Идентификатор сообщения.",
+            "format": "int64"
+          },
+          "chatId": {
+            "type": "integer",
+            "description": "Идентификатор чата.",
+            "format": "int64"
+          },
+          "senderUserId": {
+            "type": "integer",
+            "description": "Идентификатор отправителя.",
+            "format": "int64"
+          },
+          "text": {
+            "type": "string",
+            "description": "Текст сообщения.",
+            "nullable": true
+          },
+          "isSystem": {
+            "type": "boolean",
+            "description": "Признак системного сообщения."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Дата отправки.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Сообщение чата."
+      },
+      "ChatType": {
+        "enum": [
+          1,
+          2
+        ],
+        "type": "integer",
+        "description": "Коды значений: 1 = Direct (Личный чат); 2 = Application (Чат отклика).",
+        "format": "int32",
+        "example": 1
+      },
+      "CityListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Идентификатор города.",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "description": "Название города.",
+            "nullable": true
+          },
+          "region": {
+            "type": "string",
+            "description": "Название региона.",
+            "nullable": true
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "Код страны ISO-3166-1 alpha-2.",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "description": "Широта города.",
+            "format": "double",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "description": "Долгота города.",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Элемент списка городов."
+      },
+      "CityListItemDtoPagedResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CityListItemDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompanyDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.",
+            "format": "int64"
+          },
+          "legalName": {
+            "type": "string",
+            "nullable": true
+          },
+          "brandName": {
+            "type": "string",
+            "nullable": true
+          },
+          "industry": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "cityName": {
+            "type": "string",
+            "nullable": true
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "websiteUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "publicEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "publicPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyLinkDto"
+            },
+            "nullable": true
+          },
+          "activeOpportunities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyOpportunityDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompanyInviteCreatedResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Уникальный токен инвайта.",
+            "nullable": true
+          },
+          "inviteLink": {
+            "type": "string",
+            "description": "Относительная ссылка для принятия инвайта.",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Дата и время истечения срока действия.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Ответ с данными созданного инвайта."
+      },
+      "CompanyLegalType": {
+        "enum": [
+          1,
+          2
+        ],
+        "type": "integer",
+        "description": "Коды значений: 1 = LegalEntity (Юридическое лицо); 2 = IndividualEntrepreneur (ИП).",
+        "format": "int32",
+        "example": 1
+      },
+      "CompanyLinkDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompanyListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "industry": {
+            "type": "string",
+            "nullable": true
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "cityName": {
+            "type": "string",
+            "nullable": true
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "websiteUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "publicEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "activeOpportunitiesCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompanyListItemDtoPagedResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyListItemDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompanyMemberRole": {
+        "enum": [
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "description": "Коды значений: 1 = Owner (Владелец); 2 = Admin (Администратор); 3 = Staff (Сотрудник).",
+        "format": "int32",
+        "example": 1
+      },
+      "CompanyOpportunityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "format": {
+            "type": "string",
+            "nullable": true
+          },
+          "publishAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompanyShortDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "websiteUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "publicEmail": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompanyStatus": {
+        "enum": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "type": "integer",
+        "description": "Коды значений: 1 = Draft (Черновик); 2 = PendingVerification (Ожидает верификации); 3 = Verified (Подтверждена); 4 = Rejected (Отклонена); 5 = Blocked (Заблокирована).",
+        "format": "int32",
+        "example": 1
+      },
+      "ContactRequestDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.",
+            "format": "int64"
+          },
+          "fromUser": {
+            "$ref": "#/components/schemas/ContactUserDto"
+          },
+          "toUser": {
+            "$ref": "#/components/schemas/ContactUserDto"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ContactRequestStatus"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ContactRequestStatus": {
+        "enum": [
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "description": "Коды значений: 1 = Pending (Ожидает); 2 = Accepted (Принята); 3 = Rejected (Отклонена).",
+        "format": "int32",
+        "example": 1
+      },
+      "ContactUserDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "description": "Идентификатор пользователя. Получить можно через профили пользователей или административные API пользователей.",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateApplicationRequest": {
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "type": "integer",
+            "description": "Идентификатор компании.",
+            "format": "int64"
+          },
+          "candidateUserId": {
+            "type": "integer",
+            "description": "Идентификатор кандидата.",
+            "format": "int64"
+          },
+          "opportunityId": {
+            "type": "integer",
+            "description": "Идентификатор вакансии (опционально).",
+            "format": "int64",
+            "nullable": true
+          },
+          "initiatorRole": {
+            "$ref": "#/components/schemas/PlatformRole"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Запрос на создание отклика (application)."
+      },
+      "CreateCompanyInviteRequest": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/CompanyMemberRole"
+          },
+          "expiresInDays": {
+            "type": "integer",
+            "description": "Срок жизни инвайта в днях.",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Запрос на создание инвайта в компанию."
+      },
+      "CreateDirectChatRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "description": "Идентификатор второго участника.",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Запрос на создание direct-чата."
+      },
+      "CreateEmployerCompanyRequest": {
+        "type": "object",
+        "properties": {
+          "legalName": {
+            "type": "string",
+            "description": "Юридическое наименование компании.",
+            "nullable": true
+          },
+          "brandName": {
+            "type": "string",
+            "description": "Брендовое наименование компании.",
+            "nullable": true
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "URL логотипа компании.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Запрос на создание черновика компании работодателя."
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "details": {
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LocationDto": {
+        "type": "object",
+        "properties": {
+          "cityId": {
+            "type": "integer",
+            "description": "Идентификатор города. Получить можно через GET /catalog/cities.",
+            "format": "int64",
+            "nullable": true
+          },
+          "cityName": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "streetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "houseNumber": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LocationListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Идентификатор локации.",
+            "format": "int64"
+          },
+          "cityId": {
+            "type": "integer",
+            "description": "Идентификатор города.",
+            "format": "int64"
+          },
+          "cityName": {
+            "type": "string",
+            "description": "Название города.",
+            "nullable": true
+          },
+          "streetName": {
+            "type": "string",
+            "description": "Название улицы.",
+            "nullable": true
+          },
+          "houseNumber": {
+            "type": "string",
+            "description": "Номер дома.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Элемент списка локаций."
+      },
+      "LocationListItemDtoPagedResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocationListItemDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "password": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LogoutRequest": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "MarkChatReadRequest": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "integer",
+            "description": "Идентификатор сообщения.",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Запрос на отметку сообщения как прочитанного."
+      },
+      "MeResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.",
+            "format": "int64"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OpportunityDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "shortDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "fullDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/OpportunityType"
+          },
+          "format": {
+            "$ref": "#/components/schemas/WorkFormat"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OpportunityStatus"
+          },
+          "publishAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "applicationDeadline": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "salaryFrom": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "salaryTo": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "currencyCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "company": {
+            "$ref": "#/components/schemas/CompanyShortDto"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationDto"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OpportunityListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/OpportunityType"
+          },
+          "format": {
+            "$ref": "#/components/schemas/WorkFormat"
+          },
+          "companyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "locationName": {
+            "type": "string",
+            "nullable": true
+          },
+          "salaryFrom": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "salaryTo": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "currencyCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "publishAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "verifiedCompany": {
+            "type": "boolean"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OpportunityListItemDtoPagedResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpportunityListItemDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OpportunityStatus": {
+        "enum": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "type": "integer",
+        "description": "Статус модерации и публикации карточки возможности. Коды значений: 1 = Draft (Черновик); 2 = PendingModeration (Ожидает модерации); 3 = Planned (Запланирована); 4 = Published (Опубликована); 5 = Closed (Закрыта); 6 = Rejected (Отклонена); 7 = Archived (Архив).",
+        "format": "int32",
+        "example": 1
+      },
+      "OpportunityType": {
+        "enum": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "type": "integer",
+        "description": "Тип возможности для каталога, карты и фильтрации. Коды значений: 1 = Internship (Стажировка); 2 = Vacancy (Вакансия); 3 = MentorshipProgram (Менторская программа); 4 = CareerEvent (Карьерное мероприятие).",
+        "format": "int32",
+        "example": 1
+      },
+      "PlatformRole": {
+        "enum": [
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "description": "Платформенные роли пользователя. Коды значений: 1 = Seeker (Соискатель); 2 = Employer (Работодатель); 3 = Curator (Куратор).",
+        "format": "int32",
+        "example": 1
+      },
+      "PrivacyScope": {
+        "enum": [
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "description": "Область видимости профиля и резюме соискателя. Коды значений: 1 = Private (Личное); 2 = ContactsOnly (Только контакты); 3 = AuthorizedUsers (Все авторизованные).",
+        "format": "int32",
+        "example": 1
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": { }
+      },
+      "ProfileResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "description": "Идентификатор пользователя. Получить можно через профили пользователей или административные API пользователей.",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "middleName": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "about": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProfileStatsResponse": {
+        "type": "object",
+        "properties": {
+          "applicationsTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "applicationsOpen": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "applicationsClosed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "applicationsRejected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "internshipsCompleted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "eventsAttended": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "mentorshipParticipations": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PublicProfileResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "description": "Идентификатор пользователя. Получить можно через профили пользователей или административные API пользователей.",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "middleName": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "about": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "resume": {
+            "$ref": "#/components/schemas/ResumeDetailsResponse"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/ProfileStatsResponse"
+          },
+          "visibilityMode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "password": {
+            "type": "string",
+            "nullable": true
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/PlatformRole"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResumeDetailsResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "description": "Идентификатор пользователя. Получить можно через профили пользователей или административные API пользователей.",
+            "format": "int64"
+          },
+          "headline": {
+            "type": "string",
+            "nullable": true
+          },
+          "desiredPosition": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "salaryFrom": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "salaryTo": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "currencyCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResumeSkillItemDto"
+            },
+            "nullable": true
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResumeProjectItemDto"
+            },
+            "nullable": true
+          },
+          "education": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResumeEducationItemDto"
+            },
+            "nullable": true
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResumeLinkItemDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResumeEducationItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.",
+            "format": "int64"
+          },
+          "university": {
+            "type": "string",
+            "nullable": true
+          },
+          "faculty": {
+            "type": "string",
+            "nullable": true
+          },
+          "specialty": {
+            "type": "string",
+            "nullable": true
+          },
+          "course": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "graduationYear": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResumeEducationUpsertDto": {
+        "type": "object",
+        "properties": {
+          "university": {
+            "type": "string",
+            "nullable": true
+          },
+          "faculty": {
+            "type": "string",
+            "nullable": true
+          },
+          "specialty": {
+            "type": "string",
+            "nullable": true
+          },
+          "course": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "graduationYear": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResumeLinkItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResumeLinkUpsertDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResumeProjectItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор сущности. Источник значения указан в описании конкретного API-метода.",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "repoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "demoUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResumeProjectUpsertDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "repoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "demoUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResumeResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "description": "Идентификатор пользователя. Получить можно через профили пользователей или административные API пользователей.",
+            "format": "int64"
+          },
+          "headline": {
+            "type": "string",
+            "nullable": true
+          },
+          "desiredPosition": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "salaryFrom": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "salaryTo": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "currencyCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResumeSkillItemDto": {
+        "type": "object",
+        "properties": {
+          "tagId": {
+            "type": "integer",
+            "description": "ID тега навыка из GET /catalog/tags.",
+            "format": "int64"
+          },
+          "tagName": {
+            "type": "string",
+            "description": "Название тега навыка.",
+            "nullable": true
+          },
+          "level": {
+            "type": "integer",
+            "description": "Уровень навыка от 1 до 5.",
+            "format": "int32",
+            "nullable": true
+          },
+          "yearsExperience": {
+            "type": "number",
+            "description": "Опыт в годах.",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Элемент навыка в резюме."
+      },
+      "ResumeSkillUpsertDto": {
+        "type": "object",
+        "properties": {
+          "tagId": {
+            "type": "integer",
+            "description": "ID тега навыка из GET /catalog/tags.",
+            "format": "int64"
+          },
+          "level": {
+            "type": "integer",
+            "description": "Уровень навыка от 1 до 5.",
+            "format": "int32",
+            "nullable": true
+          },
+          "yearsExperience": {
+            "type": "number",
+            "description": "Опыт в годах.",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Навык для сохранения в резюме."
+      },
+      "RoleDictionaryItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Числовой идентификатор роли (role_id claim).",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string",
+            "description": "Строковый код роли в JWT claim role.",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "description": "Человекочитаемое название роли.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Элемент справочника ролей платформы."
+      },
+      "SendChatMessageRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Текст сообщения.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Запрос на отправку сообщения в чат."
+      },
+      "SettingsResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "description": "ID пользователя, для которого возвращены настройки.",
+            "format": "int64"
+          },
+          "profileVisibility": {
+            "$ref": "#/components/schemas/PrivacyScope"
+          },
+          "resumeVisibility": {
+            "$ref": "#/components/schemas/PrivacyScope"
+          },
+          "openToWork": {
+            "type": "boolean",
+            "description": "Флаг готовности к предложениям."
+          },
+          "showContactsInResume": {
+            "type": "boolean",
+            "description": "Показывать ли контакты в резюме."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Текущие настройки приватности профиля соискателя."
+      },
+      "TagGroupListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Идентификатор группы.",
+            "format": "int64"
+          },
+          "code": {
+            "type": "string",
+            "description": "Системный код группы.",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "Название группы.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Элемент списка групп тегов."
+      },
+      "TagListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Идентификатор тега.",
+            "format": "int64"
+          },
+          "groupId": {
+            "type": "integer",
+            "description": "Идентификатор группы тега.",
+            "format": "int64"
+          },
+          "groupCode": {
+            "type": "string",
+            "description": "Системный код группы тега.",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "Название тега.",
+            "nullable": true
+          },
+          "slug": {
+            "type": "string",
+            "description": "Уникальный slug тега.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Элемент списка тегов."
+      },
+      "UpdateCompanyChatSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "autoGreetingEnabled": {
+            "type": "boolean",
+            "description": "Флаг включения авто-приветствия."
+          },
+          "autoGreetingText": {
+            "type": "string",
+            "description": "Текст авто-приветствия.",
+            "nullable": true
+          },
+          "outsideHoursEnabled": {
+            "type": "boolean",
+            "description": "Флаг включения ответа вне рабочих часов."
+          },
+          "outsideHoursText": {
+            "type": "string",
+            "description": "Текст сообщения вне рабочих часов.",
+            "nullable": true
+          },
+          "workingHoursTimezone": {
+            "type": "string",
+            "description": "Таймзона рабочих часов.",
+            "nullable": true
+          },
+          "workingHoursFrom": {
+            "type": "string",
+            "description": "Начало рабочего интервала.",
+            "format": "date-span",
+            "nullable": true
+          },
+          "workingHoursTo": {
+            "type": "string",
+            "description": "Окончание рабочего интервала.",
+            "format": "date-span",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Запрос на обновление чат-настроек компании."
+      },
+      "UpdateCompanyVerificationRequest": {
+        "type": "object",
+        "properties": {
+          "legalName": {
+            "type": "string",
+            "description": "Юридическое наименование.",
+            "nullable": true
+          },
+          "brandName": {
+            "type": "string",
+            "description": "Брендовое наименование.",
+            "nullable": true
+          },
+          "legalType": {
+            "$ref": "#/components/schemas/CompanyLegalType"
+          },
+          "taxId": {
+            "type": "string",
+            "description": "ИНН.",
+            "nullable": true
+          },
+          "registrationNumber": {
+            "type": "string",
+            "description": "Регистрационный номер.",
+            "nullable": true
+          },
+          "industry": {
+            "type": "string",
+            "description": "Отрасль компании.",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Описание компании.",
+            "nullable": true
+          },
+          "baseCityId": {
+            "type": "integer",
+            "description": "Идентификатор базового города.",
+            "format": "int64"
+          },
+          "websiteUrl": {
+            "type": "string",
+            "description": "URL сайта компании.",
+            "nullable": true
+          },
+          "publicEmail": {
+            "type": "string",
+            "description": "Публичный email.",
+            "nullable": true
+          },
+          "publicPhone": {
+            "type": "string",
+            "description": "Публичный телефон.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Запрос на обновление данных компании для верификации."
+      },
+      "UpdateProfileRequest": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "middleName": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "about": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateResumeDetailsRequest": {
+        "type": "object",
+        "properties": {
+          "headline": {
+            "type": "string",
+            "nullable": true
+          },
+          "desiredPosition": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "salaryFrom": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "salaryTo": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "currencyCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResumeSkillUpsertDto"
+            },
+            "nullable": true
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResumeProjectUpsertDto"
+            },
+            "nullable": true
+          },
+          "education": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResumeEducationUpsertDto"
+            },
+            "nullable": true
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResumeLinkUpsertDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateResumeRequest": {
+        "type": "object",
+        "properties": {
+          "headline": {
+            "type": "string",
+            "nullable": true
+          },
+          "desiredPosition": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "salaryFrom": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "salaryTo": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "currencyCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "profileVisibility": {
+            "$ref": "#/components/schemas/PrivacyScope"
+          },
+          "resumeVisibility": {
+            "$ref": "#/components/schemas/PrivacyScope"
+          },
+          "openToWork": {
+            "type": "boolean",
+            "description": "Флаг готовности к предложениям."
+          },
+          "showContactsInResume": {
+            "type": "boolean",
+            "description": "Показывать ли контакты в резюме."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Обновление настроек приватности профиля соискателя."
+      },
+      "UpdateUsernameRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UploadMediaResponse": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UsernameResponse": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkFormat": {
+        "enum": [
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "description": "Формат работы/участия в возможности. Коды значений: 1 = Onsite (Офис/очно); 2 = Hybrid (Гибрид); 3 = Remote (Удаленно).",
+        "format": "int32",
+        "example": 1
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "Input a valid JWT access token.",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "Bearer": [ ]
+    }
+  ],
+  "tags": [
+    {
+      "name": "AdminCompanies",
+      "description": "Административные операции над компаниями.\r\nДоступ только для роли curator."
+    },
+    {
+      "name": "AdminOpportunities",
+      "description": "Административные операции над вакансиями/возможностями.\r\nДоступ только для роли curator."
+    },
+    {
+      "name": "AdminUsers",
+      "description": "Административные операции над пользователями платформы.\r\nДоступ только для роли curator."
+    },
+    {
+      "name": "Applications",
+      "description": "Операции с откликами (application)."
+    },
+    {
+      "name": "Catalog",
+      "description": "Публичные справочники платформы (города, локации, теги)."
+    },
+    {
+      "name": "Chats",
+      "description": "REST-операции модуля чатов.\r\nRealtime-события передаются через SignalR hub /hubs/chat."
+    },
+    {
+      "name": "CompanyInvites",
+      "description": "Операции с приглашениями в компанию по токен-ссылке."
+    },
+    {
+      "name": "EmployerCompanies",
+      "description": "Операции работодателя со своей компанией."
+    }
+  ]
+}

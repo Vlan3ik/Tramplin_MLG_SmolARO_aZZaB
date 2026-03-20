@@ -2,16 +2,18 @@
 import { CalendarClock, MapPin, Phone, Settings2, UploadCloud, X } from 'lucide-react'
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { createApplication } from '../../api/applications'
 import { fetchTags } from '../../api/catalog'
-import { fetchSeekerProfile, fetchSeekerProfileStats, fetchSeekerResume, updateSeekerProfile, updateSeekerResume } from '../../api/me'
+import { fetchSeekerProfile, fetchSeekerResume, updateSeekerProfile, updateSeekerResume } from '../../api/me'
 import { uploadMyAvatar } from '../../api/media'
-import { fetchOpportunityById } from '../../api/opportunities'
+import { fetchOpportunityById, fetchOpportunityDetailById } from '../../api/opportunities'
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
+import { useApplications } from '../../hooks/useApplications'
 import { useAuth } from '../../hooks/useAuth'
 import type { TagListItem } from '../../types/catalog'
-import type { SeekerProfile, SeekerProfileStats } from '../../types/me'
+import type { SeekerProfile } from '../../types/me'
 import type { Opportunity } from '../../types/opportunity'
 import type { SeekerResume } from '../../types/resume'
 import { getFavoriteOpportunityIds, subscribeToFavoriteOpportunities } from '../../utils/favorites'
@@ -138,24 +140,17 @@ function loadResumeLocal(userId: number) {
   }
 }
 
-type ResponseStatusCard = {
-  id: string
-  label: string
-  count: number
-  tone: 'success' | 'warning' | 'danger'
-  description: string
-}
-
 export function SeekerDashboardPage() {
   const { session, signIn } = useAuth()
+  const { applications, hasApplied, addApplication } = useApplications()
   const [tab, setTab] = useState<TabId>('responses')
   const [step, setStep] = useState(0)
   const [profile, setProfile] = useState<SeekerProfile | null>(null)
   const [resume, setResume] = useState<SeekerResume>(initialResume())
   const [tags, setTags] = useState<TagListItem[]>([])
-  const [profileStats, setProfileStats] = useState<SeekerProfileStats | null>(null)
   const [favoriteOpportunities, setFavoriteOpportunities] = useState<Opportunity[]>([])
   const [favoriteIds, setFavoriteIds] = useState<number[]>(() => getFavoriteOpportunityIds())
+  const [applyingIds, setApplyingIds] = useState<Record<number, boolean>>({})
 
   const [profileForm, setProfileForm] = useState({ firstName: '', lastName: '', middleName: '', phone: '', avatarUrl: '' })
   const [projectForm, setProjectForm] = useState(initialProject)
@@ -215,16 +210,6 @@ export function SeekerDashboardPage() {
           avatarUrl: p.avatarUrl ?? '',
         })
 
-        try {
-          const stats = await fetchSeekerProfileStats(p.username ?? session?.user?.username ?? '', controller.signal)
-          if (!controller.signal.aborted) {
-            setProfileStats(stats)
-          }
-        } catch {
-          if (!controller.signal.aborted) {
-            setProfileStats(null)
-          }
-        }
       } else if (!isAbortError(profileResult.reason)) {
         setProfileError(profileResult.reason instanceof Error ? profileResult.reason.message : 'Ошибка загрузки профиля.')
       }
@@ -340,47 +325,64 @@ export function SeekerDashboardPage() {
     return { done, total: checks.length, percent: Math.round((done / checks.length) * 100) }
   }, [profile, resume])
 
-  const responseStatusCards = useMemo<ResponseStatusCard[]>(() => {
-    if (!profileStats) {
-      return [
-        { id: 'total', label: 'Всего откликов', count: 0, tone: 'warning', description: 'Данные пока недоступны' },
-        { id: 'open', label: 'Открытые', count: 0, tone: 'success', description: 'В процессе рассмотрения' },
-        { id: 'closed', label: 'Закрытые', count: 0, tone: 'warning', description: 'Завершенные отклики' },
-        { id: 'rejected', label: 'Отклоненные', count: 0, tone: 'danger', description: 'Нужны новые отклики' },
-      ]
+  const responsesStats = useMemo(
+    () => ({
+      total: applications.length,
+      success: applications.filter((item) => item.tone === 'success').length,
+      warning: applications.filter((item) => item.tone === 'warning').length,
+      danger: applications.filter((item) => item.tone === 'danger').length,
+    }),
+    [applications],
+  )
+
+  async function onApplyFromFavorites(opportunityId: number) {
+    if (!session?.accessToken || !session.user?.id) {
+      setProfileError('Для отклика нужно войти как соискатель.')
+      return
     }
 
-    return [
-      {
-        id: 'total',
-        label: 'Всего откликов',
-        count: profileStats.applicationsTotal,
-        tone: profileStats.applicationsTotal > 0 ? 'success' : 'warning',
-        description: 'Общее число откликов по профилю',
-      },
-      {
-        id: 'open',
-        label: 'Открытые',
-        count: profileStats.applicationsOpen,
-        tone: profileStats.applicationsOpen > 0 ? 'success' : 'warning',
-        description: 'Отклики в работе',
-      },
-      {
-        id: 'closed',
-        label: 'Закрытые',
-        count: profileStats.applicationsClosed,
-        tone: profileStats.applicationsClosed > 0 ? 'success' : 'warning',
-        description: 'Отклики с завершенным процессом',
-      },
-      {
-        id: 'rejected',
-        label: 'Отклоненные',
-        count: profileStats.applicationsRejected,
-        tone: profileStats.applicationsRejected > 0 ? 'danger' : 'success',
-        description: 'Отклики с отказом',
-      },
-    ]
-  }, [profileStats])
+    if (hasApplied(opportunityId)) {
+      setSuccess('Вы уже откликались на эту вакансию.')
+      return
+    }
+
+    setApplyingIds((current) => ({
+      ...current,
+      [opportunityId]: true,
+    }))
+
+    try {
+      const detail = await fetchOpportunityDetailById(opportunityId)
+
+      if (!detail.companyId) {
+        throw new Error('У вакансии не указан идентификатор компании.')
+      }
+
+      await createApplication({
+        companyId: detail.companyId,
+        candidateUserId: session.user.id,
+        opportunityId: detail.id,
+        initiatorRole: 1,
+      })
+
+      addApplication({
+        id: detail.id,
+        title: detail.title,
+        company: detail.company,
+        location: detail.location,
+      })
+
+      setSuccess('Отклик отправлен.')
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : 'Не удалось отправить отклик.')
+    } finally {
+      setApplyingIds((current) => {
+        const next = { ...current }
+        delete next[opportunityId]
+        return next
+      })
+    }
+  }
 
   async function onProfileSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -518,37 +520,30 @@ export function SeekerDashboardPage() {
                 <section className="card seeker-profile-panel">
                   <h2>Мои отклики</h2>
                   <div className="application-stats">
-                    {responseStatusCards.map((item) => (
-                      <article key={item.id}>
-                        <strong>{item.count}</strong>
-                        <span>{item.label}</span>
-                      </article>
-                    ))}
+                    <article><strong>{responsesStats.total}</strong><span>Всего откликов</span></article>
+                    <article><strong>{responsesStats.success}</strong><span>Есть интервью</span></article>
+                    <article><strong>{responsesStats.warning}</strong><span>На рассмотрении</span></article>
+                    <article><strong>{responsesStats.danger}</strong><span>Нужны правки</span></article>
                   </div>
-                  <div className="application-list">
-                    {responseStatusCards.map((item) => (
-                      <article key={item.id} className="application-card">
-                        <div className="application-card__top">
-                          <div>
-                            <h3>{item.label}</h3>
-                            <p>Данные из API профиля</p>
+                  {!applications.length ? <p>Вы еще не отправляли отклики.</p> : null}
+                  {applications.length ? (
+                    <div className="application-list">
+                      {applications.map((item) => (
+                        <article key={item.id} className="application-card">
+                          <div className="application-card__top">
+                            <div><h3>{item.title}</h3><p>{item.company}</p></div>
+                            <span className={`status-chip status-chip--${item.tone}`}>{item.status}</span>
                           </div>
-                          <span className={`status-chip status-chip--${item.tone}`}>{item.count}</span>
-                        </div>
-                        <div className="application-card__meta">
-                          <span>
-                            <MapPin size={14} />
-                            Профиль соискателя
-                          </span>
-                          <span>
-                            <CalendarClock size={14} />
-                            Актуально на сейчас
-                          </span>
-                        </div>
-                        <p className="application-card__next">Статус: {item.description}</p>
-                      </article>
-                    ))}
-                  </div>
+                          <div className="application-card__meta">
+                            <span><MapPin size={14} />{item.location}</span>
+                            <span><CalendarClock size={14} />Отклик: {item.date}</span>
+                          </div>
+                          <p className="application-card__next">Следующий шаг: {item.next}</p>
+                          <p>{item.note}</p>
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
 
@@ -580,8 +575,8 @@ export function SeekerDashboardPage() {
                             <Link className="btn btn--ghost" to={`/opportunity/${item.id}`}>
                               Подробнее
                             </Link>
-                            <button type="button" className="btn btn--primary">
-                              Откликнуться
+                            <button type="button" className="btn btn--primary" disabled={Boolean(applyingIds[item.id]) || hasApplied(item.id)} onClick={() => void onApplyFromFavorites(item.id)}>
+                              {applyingIds[item.id] ? 'Отправляем...' : hasApplied(item.id) ? 'Отклик отправлен' : 'Откликнуться'}
                             </button>
                           </div>
                         </article>

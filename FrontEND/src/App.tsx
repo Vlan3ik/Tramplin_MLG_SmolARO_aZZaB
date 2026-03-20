@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom'
 import { DashboardRedirect } from './components/auth/DashboardRedirect'
 import { GuestOnlyRoute } from './components/auth/GuestOnlyRoute'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { ChatWidget } from './components/chat/ChatWidget'
 import { PublicLayout } from './components/layout/PublicLayout'
 import { AboutPlatformPage } from './pages/AboutPlatformPage'
 import { CompanyPage } from './pages/CompanyPage'
@@ -18,37 +19,40 @@ import { PlatformRole } from './types/auth'
 
 function App() {
   return (
-    <Routes>
-      <Route element={<PublicLayout />}>
-        <Route index element={<HomePage />} />
-        <Route path="about" element={<AboutPlatformPage />} />
-        <Route path="opportunity/:id" element={<OpportunityDetailsPage />} />
-        <Route path="company/:slug" element={<CompanyPage />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
+    <>
+      <Routes>
+        <Route element={<PublicLayout />}>
+          <Route index element={<HomePage />} />
+          <Route path="about" element={<AboutPlatformPage />} />
+          <Route path="opportunity/:id" element={<OpportunityDetailsPage />} />
+          <Route path="company/:slug" element={<CompanyPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
 
-      <Route element={<GuestOnlyRoute />}>
-        <Route path="register" element={<RegisterPage />} />
-        <Route path="login" element={<LoginPage />} />
-      </Route>
+        <Route element={<GuestOnlyRoute />}>
+          <Route path="register" element={<RegisterPage />} />
+          <Route path="login" element={<LoginPage />} />
+        </Route>
 
-      <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Employer]} />}>
-        <Route path="verification/employer" element={<EmployerVerificationPage />} />
-        <Route path="dashboard/employer" element={<EmployerDashboardPage />} />
-      </Route>
+        <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Employer]} />}>
+          <Route path="verification/employer" element={<EmployerVerificationPage />} />
+          <Route path="dashboard/employer" element={<EmployerDashboardPage />} />
+        </Route>
 
-      <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Seeker]} />}>
-        <Route path="dashboard/seeker" element={<SeekerDashboardPage />} />
-      </Route>
+        <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Seeker]} />}>
+          <Route path="dashboard/seeker" element={<SeekerDashboardPage />} />
+        </Route>
 
-      <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Curator]} />}>
-        <Route path="dashboard/curator" element={<CuratorDashboardPage />} />
-      </Route>
+        <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Curator]} />}>
+          <Route path="dashboard/curator" element={<CuratorDashboardPage />} />
+        </Route>
 
-      <Route element={<ProtectedRoute />}>
-        <Route path="dashboard" element={<DashboardRedirect />} />
-      </Route>
-    </Routes>
+        <Route element={<ProtectedRoute />}>
+          <Route path="dashboard" element={<DashboardRedirect />} />
+        </Route>
+      </Routes>
+      <ChatWidget />
+    </>
   )
 }
 

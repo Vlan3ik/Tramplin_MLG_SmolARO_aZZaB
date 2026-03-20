@@ -1,6 +1,6 @@
 import { getJson } from './client'
 import type { PagedResponse } from '../types/catalog'
-import type { Opportunity, OpportunityFilters, OpportunityType } from '../types/opportunity'
+import type { Opportunity, OpportunityDetail, OpportunityFilters, OpportunityType } from '../types/opportunity'
 
 type OpportunityTypeApi = string | number
 
@@ -58,17 +58,23 @@ type OpportunityDetailApi = {
   type: OpportunityTypeApi
   format: WorkFormatApi
   publishAt: string
+  applicationDeadline: string | null
   salaryFrom: number | null
   salaryTo: number | null
   currencyCode: string | null
   company?: {
+    id: number
     name: string | null
     verified: boolean
+    websiteUrl: string | null
+    publicEmail: string | null
   } | null
   location?: {
     cityName: string | null
     latitude: number | null
     longitude: number | null
+    streetName: string | null
+    houseNumber: string | null
   } | null
   tags?: string[] | null
 }
@@ -299,5 +305,44 @@ export async function fetchOpportunityById(id: number, signal?: AbortSignal): Pr
     verified: response.company?.verified ?? false,
     latitude: response.location?.latitude ?? null,
     longitude: response.location?.longitude ?? null,
+  }
+}
+
+function toAddress(location: OpportunityDetailApi['location']) {
+  if (!location) {
+    return 'Адрес не указан'
+  }
+
+  const parts = [location.cityName, location.streetName, location.houseNumber].filter(Boolean)
+  return parts.length ? parts.join(', ') : 'Адрес не указан'
+}
+
+export async function fetchOpportunityDetailById(id: number, signal?: AbortSignal): Promise<OpportunityDetail> {
+  const response = await getJson<OpportunityDetailApi>(`/opportunities/${id}`, { signal, withAuth: false })
+  const type = parseOpportunityType(response.type)
+  const normalizedFormat = parseFormat(response.format)
+
+  return {
+    id: response.id,
+    title: response.title ?? 'Без названия',
+    type,
+    company: response.company?.name ?? 'Компания',
+    location: response.location?.cityName ?? 'Локация не указана',
+    compensation: formatSalary(response.salaryFrom, response.salaryTo, response.currencyCode),
+    workFormat: normalizedFormat === 'onsite' ? 'Офис' : normalizedFormat === 'remote' ? 'Удаленно' : 'Гибрид',
+    date: formatRelativeDate(response.publishAt),
+    description: response.shortDescription ?? response.fullDescription ?? 'Описание добавляется в карточке вакансии.',
+    shortDescription: response.shortDescription ?? '',
+    fullDescription: response.fullDescription ?? '',
+    publishAt: response.publishAt ?? null,
+    applicationDeadline: response.applicationDeadline ?? null,
+    tags: response.tags ?? [],
+    verified: response.company?.verified ?? false,
+    latitude: response.location?.latitude ?? null,
+    longitude: response.location?.longitude ?? null,
+    companyId: response.company?.id ?? null,
+    companyWebsiteUrl: response.company?.websiteUrl ?? null,
+    companyPublicEmail: response.company?.publicEmail ?? null,
+    address: toAddress(response.location),
   }
 }

@@ -19,6 +19,17 @@ export type Opportunity = {
   longitude?: number | null
 }
 
+export type OpportunityDetail = Opportunity & {
+  shortDescription: string
+  fullDescription: string
+  publishAt: string | null
+  applicationDeadline: string | null
+  companyId: number | null
+  companyWebsiteUrl: string | null
+  companyPublicEmail: string | null
+  address: string
+}
+
 export type OpportunityFilters = {
   types: OpportunityType[]
   formats: string[]

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { fetchHomeOpportunities } from '../api/opportunities'
+import { createApplication } from '../api/applications'
+import { fetchHomeOpportunities, fetchOpportunityDetailById } from '../api/opportunities'
 import { FilterSidebar } from '../components/home/FilterSidebar'
 import { MapBoard } from '../components/home/MapBoard'
 import { OpportunityCard } from '../components/home/OpportunityCard'
 import { SearchHero } from '../components/home/SearchHero'
 import { SecondarySections } from '../components/home/SecondarySections'
 import { useCity } from '../contexts/CityContext'
+import { useApplications } from '../hooks/useApplications'
+import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityFilters, OpportunityType } from '../types/opportunity'
 
 const defaultFilters: OpportunityFilters = {
@@ -16,6 +19,8 @@ const defaultFilters: OpportunityFilters = {
 
 export function HomePage() {
   const { selectedCityId } = useCity()
+  const { session } = useAuth()
+  const { hasApplied, addApplication } = useApplications()
 
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map')
   const [searchInput, setSearchInput] = useState('')
@@ -26,6 +31,9 @@ export function HomePage() {
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+  const [actionMessage, setActionMessage] = useState('')
+  const [actionError, setActionError] = useState(false)
+  const [applyingIds, setApplyingIds] = useState<Record<number, boolean>>({})
 
   const query = useMemo(
     () => ({
@@ -101,6 +109,59 @@ export function HomePage() {
     setAppliedSearch('')
   }
 
+  async function handleApply(opportunity: Opportunity) {
+    if (!session?.accessToken || !session.user?.id) {
+      setActionError(true)
+      setActionMessage('Для отклика нужно войти как соискатель.')
+      return
+    }
+
+    if (hasApplied(opportunity.id)) {
+      setActionError(false)
+      setActionMessage('Вы уже откликались на эту вакансию.')
+      return
+    }
+
+    setApplyingIds((current) => ({
+      ...current,
+      [opportunity.id]: true,
+    }))
+
+    try {
+      const detail = await fetchOpportunityDetailById(opportunity.id)
+
+      if (!detail.companyId) {
+        throw new Error('У вакансии не указан идентификатор компании.')
+      }
+
+      await createApplication({
+        companyId: detail.companyId,
+        candidateUserId: session.user.id,
+        opportunityId: detail.id,
+        initiatorRole: 1,
+      })
+
+      addApplication({
+        id: detail.id,
+        title: detail.title,
+        company: detail.company,
+        location: detail.location,
+      })
+
+      setActionError(false)
+      setActionMessage('Отклик отправлен.')
+    } catch (error) {
+      setActionError(true)
+      setActionMessage(error instanceof Error ? error.message : 'Не удалось отправить отклик.')
+    } finally {
+      setApplyingIds((current) => {
+        const next = { ...current }
+        delete next[opportunity.id]
+        return next
+      })
+    }
+  }
+
   return (
     <>
       <SearchHero
@@ -112,6 +173,8 @@ export function HomePage() {
       />
 
       <section className="home-workspace container">
+        {actionMessage ? <div className={`state-card ${actionError ? 'state-card--error' : ''}`}>{actionMessage}</div> : null}
+
         {viewMode === 'map' ? (
           <MapBoard
             opportunities={items}
@@ -168,7 +231,15 @@ export function HomePage() {
               {!isLoading && !errorMessage && items.length > 0 ? (
                 <div className="result-list">
                   {items.map((item) => (
-                    <OpportunityCard key={item.id} opportunity={item} />
+                    <OpportunityCard
+                      key={item.id}
+                      opportunity={item}
+                      isApplying={Boolean(applyingIds[item.id])}
+                      isApplied={hasApplied(item.id)}
+                      onApply={(currentOpportunity) => {
+                        void handleApply(currentOpportunity)
+                      }}
+                    />
                   ))}
                 </div>
               ) : null}
