@@ -170,6 +170,8 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         dbContext.Opportunities.AddRange(opportunities);
         await dbContext.SaveChangesAsync();
 
+        await SeedPortfolioProjectsAsync(seekers, vacancies, opportunities);
+
         dbContext.VacancyTags.AddRange(BuildVacancyTags(vacancies, tags));
         dbContext.OpportunityTags.AddRange(BuildOpportunityTags(opportunities, tags));
         await dbContext.SaveChangesAsync();
@@ -186,6 +188,176 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
 
         await SeedApplicationChatsAsync(applications, companyMembers);
         await SeedDirectChatsAsync(seekers);
+    }
+
+    private async Task SeedPortfolioProjectsAsync(
+        IReadOnlyList<User> seekers,
+        IReadOnlyList<Vacancy> vacancies,
+        IReadOnlyList<Opportunity> opportunities)
+    {
+        if (seekers.Count < 6 || vacancies.Count == 0 || opportunities.Count == 0)
+        {
+            return;
+        }
+
+        var projects = new List<CandidateResumeProject>
+        {
+            new()
+            {
+                UserId = seekers[0].Id,
+                Title = "Campus Navigator",
+                Role = "Backend Developer",
+                Description = "Web service for campus navigation and event aggregation.",
+                StartDate = new DateOnly(2025, 2, 1),
+                EndDate = new DateOnly(2025, 5, 28),
+                RepoUrl = "https://github.com/tramplin-demo/campus-navigator",
+                DemoUrl = "https://demo.tramplin.local/campus-navigator"
+            },
+            new()
+            {
+                UserId = seekers[1].Id,
+                Title = "Retail Demand Predictor",
+                Role = "Data Engineer",
+                Description = "ML pipeline for weekly demand forecasting with dashboard export.",
+                StartDate = new DateOnly(2025, 3, 10),
+                EndDate = new DateOnly(2025, 7, 20),
+                RepoUrl = "https://github.com/tramplin-demo/retail-demand",
+                DemoUrl = "https://demo.tramplin.local/retail-demand"
+            },
+            new()
+            {
+                UserId = seekers[2].Id,
+                Title = "Junior Jobs Aggregator",
+                Role = "Frontend Developer",
+                Description = "Aggregator of internships and entry-level opportunities.",
+                StartDate = new DateOnly(2024, 11, 5),
+                EndDate = new DateOnly(2025, 2, 15),
+                RepoUrl = "https://github.com/tramplin-demo/junior-jobs",
+                DemoUrl = "https://demo.tramplin.local/junior-jobs"
+            },
+            new()
+            {
+                UserId = seekers[3].Id,
+                Title = "Hackday Team Board",
+                Role = "Product Manager",
+                Description = "Team board and matching service for hackathon participants.",
+                StartDate = new DateOnly(2025, 1, 12),
+                EndDate = new DateOnly(2025, 1, 29),
+                RepoUrl = "https://github.com/tramplin-demo/hackday-board",
+                DemoUrl = "https://demo.tramplin.local/hackday-board"
+            },
+            new()
+            {
+                UserId = seekers[4].Id,
+                Title = "Interview Simulator Bot",
+                Role = "NLP Engineer",
+                Description = "Chatbot for interview practice with answer scoring.",
+                StartDate = new DateOnly(2025, 4, 1),
+                EndDate = null,
+                RepoUrl = "https://github.com/tramplin-demo/interview-bot",
+                DemoUrl = null
+            }
+        };
+
+        dbContext.CandidateResumeProjects.AddRange(projects);
+        await dbContext.SaveChangesAsync();
+
+        var firstVacancy = vacancies[0];
+        var secondVacancy = vacancies[Math.Min(1, vacancies.Count - 1)];
+        var firstOpportunity = opportunities[0];
+        var secondOpportunity = opportunities[Math.Min(1, opportunities.Count - 1)];
+
+        dbContext.CandidateResumeProjectPhotos.AddRange(
+        [
+            new CandidateResumeProjectPhoto { ProjectId = projects[0].Id, Url = "/api/media/portfolio-projects/campus/cover.jpg", SortOrder = 0, IsMain = true },
+            new CandidateResumeProjectPhoto { ProjectId = projects[0].Id, Url = "/api/media/portfolio-projects/campus/screen-1.jpg", SortOrder = 1, IsMain = false },
+            new CandidateResumeProjectPhoto { ProjectId = projects[1].Id, Url = "/api/media/portfolio-projects/retail/cover.jpg", SortOrder = 0, IsMain = true },
+            new CandidateResumeProjectPhoto { ProjectId = projects[1].Id, Url = "/api/media/portfolio-projects/retail/screen-1.jpg", SortOrder = 1, IsMain = false },
+            new CandidateResumeProjectPhoto { ProjectId = projects[2].Id, Url = "/api/media/portfolio-projects/jobs/cover.jpg", SortOrder = 0, IsMain = true },
+            new CandidateResumeProjectPhoto { ProjectId = projects[3].Id, Url = "/api/media/portfolio-projects/hackday/cover.jpg", SortOrder = 0, IsMain = true },
+            new CandidateResumeProjectPhoto { ProjectId = projects[4].Id, Url = "/api/media/portfolio-projects/bot/cover.jpg", SortOrder = 0, IsMain = true }
+        ]);
+
+        dbContext.CandidateResumeProjectParticipants.AddRange(
+        [
+            new CandidateResumeProjectParticipant { ProjectId = projects[0].Id, UserId = seekers[0].Id, Role = "Backend Developer" },
+            new CandidateResumeProjectParticipant { ProjectId = projects[0].Id, UserId = seekers[2].Id, Role = "Frontend Developer" },
+            new CandidateResumeProjectParticipant { ProjectId = projects[0].Id, UserId = seekers[5].Id, Role = "QA Engineer" },
+
+            new CandidateResumeProjectParticipant { ProjectId = projects[1].Id, UserId = seekers[1].Id, Role = "Data Engineer" },
+            new CandidateResumeProjectParticipant { ProjectId = projects[1].Id, UserId = seekers[0].Id, Role = "API Developer" },
+            new CandidateResumeProjectParticipant { ProjectId = projects[1].Id, UserId = seekers[3].Id, Role = "Analyst" },
+
+            new CandidateResumeProjectParticipant { ProjectId = projects[2].Id, UserId = seekers[2].Id, Role = "Frontend Developer" },
+            new CandidateResumeProjectParticipant { ProjectId = projects[2].Id, UserId = seekers[4].Id, Role = "Designer" },
+
+            new CandidateResumeProjectParticipant { ProjectId = projects[3].Id, UserId = seekers[3].Id, Role = "Product Manager" },
+            new CandidateResumeProjectParticipant { ProjectId = projects[3].Id, UserId = seekers[0].Id, Role = "Mentor" },
+
+            new CandidateResumeProjectParticipant { ProjectId = projects[4].Id, UserId = seekers[4].Id, Role = "NLP Engineer" },
+            new CandidateResumeProjectParticipant { ProjectId = projects[4].Id, UserId = seekers[1].Id, Role = "Data Engineer" }
+        ]);
+
+        dbContext.CandidateResumeProjectCollaborations.AddRange(
+        [
+            new CandidateResumeProjectCollaboration
+            {
+                ProjectId = projects[0].Id,
+                Type = PortfolioCollaborationType.User,
+                UserId = seekers[2].Id,
+                Label = "UI collaboration",
+                SortOrder = 0
+            },
+            new CandidateResumeProjectCollaboration
+            {
+                ProjectId = projects[0].Id,
+                Type = PortfolioCollaborationType.Opportunity,
+                OpportunityId = firstOpportunity.Id,
+                Label = "Built during open challenge",
+                SortOrder = 1
+            },
+            new CandidateResumeProjectCollaboration
+            {
+                ProjectId = projects[1].Id,
+                Type = PortfolioCollaborationType.Vacancy,
+                VacancyId = firstVacancy.Id,
+                Label = "Result of internship assignment",
+                SortOrder = 0
+            },
+            new CandidateResumeProjectCollaboration
+            {
+                ProjectId = projects[1].Id,
+                Type = PortfolioCollaborationType.Custom,
+                Label = "Regional AI Bootcamp 2025",
+                SortOrder = 1
+            },
+            new CandidateResumeProjectCollaboration
+            {
+                ProjectId = projects[2].Id,
+                Type = PortfolioCollaborationType.User,
+                UserId = seekers[4].Id,
+                Label = "Design support",
+                SortOrder = 0
+            },
+            new CandidateResumeProjectCollaboration
+            {
+                ProjectId = projects[3].Id,
+                Type = PortfolioCollaborationType.Opportunity,
+                OpportunityId = secondOpportunity.Id,
+                Label = "Hackday internal event",
+                SortOrder = 0
+            },
+            new CandidateResumeProjectCollaboration
+            {
+                ProjectId = projects[4].Id,
+                Type = PortfolioCollaborationType.Vacancy,
+                VacancyId = secondVacancy.Id,
+                Label = "Prototype for internship program",
+                SortOrder = 0
+            }
+        ]);
+
+        await dbContext.SaveChangesAsync();
     }
 
     private async Task SeedSeekerProfilesAsync(IReadOnlyList<User> seekers)
@@ -1049,6 +1221,10 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         dbContext.ChatParticipants.RemoveRange(await dbContext.ChatParticipants.ToListAsync());
         dbContext.Chats.RemoveRange(await dbContext.Chats.ToListAsync());
         dbContext.Applications.RemoveRange(await dbContext.Applications.ToListAsync());
+        dbContext.CandidateResumeProjectCollaborations.RemoveRange(await dbContext.CandidateResumeProjectCollaborations.ToListAsync());
+        dbContext.CandidateResumeProjectParticipants.RemoveRange(await dbContext.CandidateResumeProjectParticipants.ToListAsync());
+        dbContext.CandidateResumeProjectPhotos.RemoveRange(await dbContext.CandidateResumeProjectPhotos.ToListAsync());
+        dbContext.CandidateResumeProjects.RemoveRange(await dbContext.CandidateResumeProjects.ToListAsync());
         dbContext.OpportunityParticipants.RemoveRange(await dbContext.OpportunityParticipants.ToListAsync());
         dbContext.OpportunityTags.RemoveRange(await dbContext.OpportunityTags.ToListAsync());
         dbContext.VacancyTags.RemoveRange(await dbContext.VacancyTags.ToListAsync());

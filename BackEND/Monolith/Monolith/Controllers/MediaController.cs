@@ -2,8 +2,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Monolith.Contexts;
+using Monolith.Entities;
 using Monolith.Models.Common;
 using Monolith.Models.Media;
+using Monolith.Models.Portfolio;
 using Monolith.Services.Common;
 using Monolith.Services.Storage;
 
@@ -72,6 +74,127 @@ public class MediaController(AppDbContext dbContext, IObjectStorageService stora
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return Ok(new UploadMediaResponse(url));
+    }
+
+    /// <summary>
+    /// Загружает баннер профиля текущего пользователя в S3-совместимое хранилище.
+    /// </summary>
+    /// <param name="file">Файл изображения (multipart/form-data).</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>URL изображения, доступный через API.</returns>
+    [Authorize]
+    [HttpPost("me/profile-banner")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(UploadMediaResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<UploadMediaResponse>> UploadMyProfileBanner(IFormFile file, CancellationToken cancellationToken)
+    {
+        var validation = ValidateImage(file);
+        if (validation is not null)
+        {
+            return validation;
+        }
+
+        var userId = User.GetUserId();
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        if (user is null)
+        {
+            return this.ToNotFoundError("media.user.not_found", "Пользователь не найден.");
+        }
+
+        await using var stream = file.OpenReadStream();
+        var key = await storageService.UploadImageAsync(
+            stream,
+            file.Length,
+            file.ContentType,
+            $"user-profile-banners/{userId}",
+            ResolveExtension(file),
+            cancellationToken);
+
+        var url = BuildApiMediaUrl(key);
+        user.ProfileBannerUrl = url;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(new UploadMediaResponse(url));
+    }
+
+    /// <summary>
+    /// Загружает фото проекта портфолио текущего пользователя в S3-совместимое хранилище.
+    /// </summary>
+    /// <param name="projectId">Идентификатор проекта портфолио.</param>
+    /// <param name="file">Файл изображения (multipart/form-data).</param>
+    /// <param name="isMain">Флаг главного фото проекта.</param>
+    /// <param name="sortOrder">Порядок сортировки фото в проекте.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Данные загруженного фото проекта.</returns>
+    [Authorize]
+    [HttpPost("me/portfolio-projects/{projectId:long}/photos")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(UploadPortfolioProjectPhotoResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<UploadPortfolioProjectPhotoResponse>> UploadMyPortfolioProjectPhoto(
+        long projectId,
+        IFormFile file,
+        [FromQuery] bool isMain,
+        [FromQuery] int? sortOrder,
+        CancellationToken cancellationToken)
+    {
+        var validation = ValidateImage(file);
+        if (validation is not null)
+        {
+            return validation;
+        }
+
+        var userId = User.GetUserId();
+        var project = await dbContext.CandidateResumeProjects
+            .FirstOrDefaultAsync(x => x.Id == projectId, cancellationToken);
+        if (project is null || project.UserId != userId)
+        {
+            return this.ToNotFoundError("media.portfolio.project.not_found", "Проект портфолио не найден.");
+        }
+
+        await using var stream = file.OpenReadStream();
+        var key = await storageService.UploadImageAsync(
+            stream,
+            file.Length,
+            file.ContentType,
+            $"portfolio-projects/{projectId}",
+            ResolveExtension(file),
+            cancellationToken);
+
+        var maxSortOrder = await dbContext.CandidateResumeProjectPhotos
+            .Where(x => x.ProjectId == projectId)
+            .Select(x => (int?)x.SortOrder)
+            .MaxAsync(cancellationToken);
+        var nextSortOrder = sortOrder ?? ((maxSortOrder ?? -1) + 1);
+
+        if (isMain)
+        {
+            var oldMainPhotos = await dbContext.CandidateResumeProjectPhotos
+                .Where(x => x.ProjectId == projectId && x.IsMain)
+                .ToListAsync(cancellationToken);
+            foreach (var oldMainPhoto in oldMainPhotos)
+            {
+                oldMainPhoto.IsMain = false;
+            }
+        }
+
+        var photo = new CandidateResumeProjectPhoto
+        {
+            ProjectId = projectId,
+            Url = BuildApiMediaUrl(key),
+            IsMain = isMain,
+            SortOrder = nextSortOrder
+        };
+
+        dbContext.CandidateResumeProjectPhotos.Add(photo);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new UploadPortfolioProjectPhotoResponse(photo.Id, photo.Url, photo.SortOrder, photo.IsMain));
     }
 
     /// <summary>

@@ -38,7 +38,7 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             .Select(x => x.Role.ToString().ToLowerInvariant())
             .ToListAsync(cancellationToken);
 
-        return Ok(new MeResponse(user.Id, user.Email, user.Username, user.AvatarUrl, roles));
+        return Ok(new MeResponse(user.Id, user.Email, user.Username, user.AvatarUrl, user.ProfileBannerUrl, roles));
     }
 
     /// <summary>

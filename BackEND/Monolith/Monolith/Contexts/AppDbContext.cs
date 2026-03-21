@@ -12,9 +12,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CandidateResumeProfile> CandidateResumeProfiles => Set<CandidateResumeProfile>();
     public DbSet<CandidateResumeSkill> CandidateResumeSkills => Set<CandidateResumeSkill>();
     public DbSet<CandidateResumeProject> CandidateResumeProjects => Set<CandidateResumeProject>();
+    public DbSet<CandidateResumeProjectPhoto> CandidateResumeProjectPhotos => Set<CandidateResumeProjectPhoto>();
+    public DbSet<CandidateResumeProjectParticipant> CandidateResumeProjectParticipants => Set<CandidateResumeProjectParticipant>();
+    public DbSet<CandidateResumeProjectCollaboration> CandidateResumeProjectCollaborations => Set<CandidateResumeProjectCollaboration>();
     public DbSet<CandidateResumeEducation> CandidateResumeEducation => Set<CandidateResumeEducation>();
     public DbSet<CandidateResumeLink> CandidateResumeLinks => Set<CandidateResumeLink>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<UserPublicLink> UserPublicLinks => Set<UserPublicLink>();
     public DbSet<ContactRequest> ContactRequests => Set<ContactRequest>();
     public DbSet<UserContact> UserContacts => Set<UserContact>();
     public DbSet<City> Cities => Set<City>();
@@ -53,6 +57,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.PasswordHash).HasColumnName("password_hash");
             entity.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(150);
             entity.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(500);
+            entity.Property(x => x.ProfileBannerUrl).HasColumnName("profile_banner_url").HasMaxLength(500);
             entity.Property(x => x.Status).HasColumnName("status");
             entity.Property(x => x.LastLoginAt).HasColumnName("last_login_at");
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
@@ -149,6 +154,67 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasOne(x => x.Resume).WithMany(x => x.Projects).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<CandidateResumeProjectPhoto>(entity =>
+        {
+            entity.ToTable("candidate_resume_project_photos");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.ProjectId).HasColumnName("project_id");
+            entity.Property(x => x.Url).HasColumnName("url").HasMaxLength(500);
+            entity.Property(x => x.SortOrder).HasColumnName("sort_order");
+            entity.Property(x => x.IsMain).HasColumnName("is_main");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => x.ProjectId);
+            entity.HasOne(x => x.Project).WithMany(x => x.Photos).HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CandidateResumeProjectParticipant>(entity =>
+        {
+            entity.ToTable("candidate_resume_project_participants");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.ProjectId).HasColumnName("project_id");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.Role).HasColumnName("role").HasMaxLength(150);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => x.ProjectId);
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => new { x.ProjectId, x.UserId }).IsUnique();
+            entity.HasOne(x => x.Project).WithMany(x => x.Participants).HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CandidateResumeProjectCollaboration>(entity =>
+        {
+            entity.ToTable(
+                "candidate_resume_project_collaborations",
+                table => table.HasCheckConstraint(
+                    "ck_candidate_resume_project_collaborations_type_ref",
+                    @"(type = 1 AND user_id IS NOT NULL AND vacancy_id IS NULL AND opportunity_id IS NULL)
+                  OR (type = 2 AND user_id IS NULL AND vacancy_id IS NOT NULL AND opportunity_id IS NULL)
+                  OR (type = 3 AND user_id IS NULL AND vacancy_id IS NULL AND opportunity_id IS NOT NULL)
+                  OR (type = 4 AND user_id IS NULL AND vacancy_id IS NULL AND opportunity_id IS NULL)"));
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.ProjectId).HasColumnName("project_id");
+            entity.Property(x => x.Type).HasColumnName("type");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.VacancyId).HasColumnName("vacancy_id");
+            entity.Property(x => x.OpportunityId).HasColumnName("opportunity_id");
+            entity.Property(x => x.Label).HasColumnName("label").HasMaxLength(300);
+            entity.Property(x => x.SortOrder).HasColumnName("sort_order");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => x.ProjectId);
+            entity.HasIndex(x => x.Type);
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.VacancyId);
+            entity.HasIndex(x => x.OpportunityId);
+            entity.HasOne(x => x.Project).WithMany(x => x.Collaborations).HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Vacancy).WithMany().HasForeignKey(x => x.VacancyId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Opportunity).WithMany().HasForeignKey(x => x.OpportunityId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<CandidateResumeEducation>(entity =>
         {
             entity.ToTable("candidate_resume_education");
@@ -193,6 +259,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.HasIndex(x => x.TokenHash).IsUnique();
             entity.HasOne(x => x.User).WithMany(x => x.RefreshTokens).HasForeignKey(x => x.UserId);
+        });
+
+        modelBuilder.Entity<UserPublicLink>(entity =>
+        {
+            entity.ToTable("user_public_links");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.Kind).HasColumnName("kind").HasMaxLength(50);
+            entity.Property(x => x.Url).HasColumnName("url").HasMaxLength(500);
+            entity.Property(x => x.Label).HasColumnName("label").HasMaxLength(150);
+            entity.Property(x => x.SortOrder).HasColumnName("sort_order");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => x.UserId);
+            entity.HasOne(x => x.User).WithMany(x => x.PublicLinks).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ContactRequest>(entity =>

@@ -2,7 +2,7 @@ using Monolith.Entities;
 
 namespace Monolith.Models.Me;
 
-public record MeResponse(long Id, string Email, string Username, string? AvatarUrl, IReadOnlyCollection<string> Roles);
+public record MeResponse(long Id, string Email, string Username, string? AvatarUrl, string? ProfileBannerUrl, IReadOnlyCollection<string> Roles);
 
 public record UpdateProfileRequest(
     string FirstName,

@@ -15,4 +15,7 @@ public class CandidateResumeProject
     public DateTimeOffset UpdatedAt { get; set; }
 
     public CandidateResumeProfile Resume { get; set; } = null!;
+    public List<CandidateResumeProjectPhoto> Photos { get; set; } = new();
+    public List<CandidateResumeProjectParticipant> Participants { get; set; } = new();
+    public List<CandidateResumeProjectCollaboration> Collaborations { get; set; } = new();
 }

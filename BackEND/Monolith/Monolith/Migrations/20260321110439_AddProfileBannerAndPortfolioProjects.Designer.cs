@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Monolith.Contexts;
 using NetTopologySuite.Geometries;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Monolith.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260321110439_AddProfileBannerAndPortfolioProjects")]
+    partial class AddProfileBannerAndPortfolioProjects
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1431,55 +1434,6 @@ namespace Monolith.Migrations
                     b.ToTable("user_contacts", (string)null);
                 });
 
-            modelBuilder.Entity("Monolith.Entities.UserPublicLink", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("kind");
-
-                    b.Property<string>("Label")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
-                        .HasColumnName("label");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("Url")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("url");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("user_public_links", (string)null);
-                });
-
             modelBuilder.Entity("Monolith.Entities.UserRole", b =>
                 {
                     b.Property<long>("UserId")
@@ -2065,17 +2019,6 @@ namespace Monolith.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Monolith.Entities.UserPublicLink", b =>
-                {
-                    b.HasOne("Monolith.Entities.User", "User")
-                        .WithMany("PublicLinks")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Monolith.Entities.UserRole", b =>
                 {
                     b.HasOne("Monolith.Entities.User", "User")
@@ -2241,8 +2184,6 @@ namespace Monolith.Migrations
                     b.Navigation("OpportunityParticipations");
 
                     b.Navigation("OutgoingContactRequests");
-
-                    b.Navigation("PublicLinks");
 
                     b.Navigation("RefreshTokens");
 

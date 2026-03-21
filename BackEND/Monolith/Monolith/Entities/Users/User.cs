@@ -8,6 +8,7 @@ public class User
     public string PasswordHash { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
+    public string? ProfileBannerUrl { get; set; }
     public AccountStatus Status { get; set; } = AccountStatus.Active;
     public DateTimeOffset? LastLoginAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -26,4 +27,5 @@ public class User
     public List<ContactRequest> IncomingContactRequests { get; set; } = new();
     public List<UserContact> Contacts { get; set; } = new();
     public List<UserContact> ContactOfUsers { get; set; } = new();
+    public List<UserPublicLink> PublicLinks { get; set; } = new();
 }
