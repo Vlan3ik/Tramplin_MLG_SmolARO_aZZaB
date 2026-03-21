@@ -18,6 +18,14 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubContext, IChatCacheService chatCache) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает список чатов текущего пользователя.
+    /// </summary>
+    /// <remarks>
+    /// Доступен по двум маршрутам: <c>/chats</c> и <c>/employer/chats</c>.
+    /// </remarks>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Список чатов с последними сообщениями.</returns>
     [HttpGet]
     [HttpGet("/employer/chats")]
     [ProducesResponseType(typeof(IReadOnlyCollection<ChatListItemDto>), StatusCodes.Status200OK)]
@@ -81,9 +89,16 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         return Ok(result);
     }
 
+    /// <summary>
+    /// Создает прямой чат между текущим и целевым пользователем.
+    /// </summary>
+    /// <param name="request">Идентификатор пользователя-собеседника.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Идентификатор созданного или уже существующего direct-чата.</returns>
     [HttpPost("direct")]
     [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<object>> CreateDirectChat(CreateDirectChatRequest request, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
@@ -92,17 +107,30 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
             return this.ToBadRequestError("chats.direct.self", "Cannot create direct chat with self.");
         }
 
-        var hasMutualContext =
-            await dbContext.CompanyMembers.AnyAsync(x => x.UserId == userId &&
-                dbContext.CompanyMembers.Any(y => y.CompanyId == x.CompanyId && y.UserId == request.UserId), cancellationToken)
-            || await dbContext.Applications.AnyAsync(x =>
-                (x.CandidateUserId == userId && dbContext.CompanyMembers.Any(m => m.CompanyId == x.CompanyId && m.UserId == request.UserId))
-                || (x.CandidateUserId == request.UserId && dbContext.CompanyMembers.Any(m => m.CompanyId == x.CompanyId && m.UserId == userId)),
-                cancellationToken);
-
-        if (!hasMutualContext)
+        var targetExists = await dbContext.Users.AnyAsync(x => x.Id == request.UserId, cancellationToken);
+        if (!targetExists)
         {
-            return this.ToBadRequestError("chats.direct.mutual_context_required", "Cannot create direct chat without mutual context.");
+            return this.ToNotFoundError("chats.direct.target_not_found", "Target user not found.");
+        }
+
+        var currentUserIsSeeker = await dbContext.UserRoles
+            .AsNoTracking()
+            .AnyAsync(x => x.UserId == userId && x.Role == PlatformRole.Seeker, cancellationToken);
+
+        if (!currentUserIsSeeker)
+        {
+            var hasMutualContext =
+                await dbContext.CompanyMembers.AnyAsync(x => x.UserId == userId &&
+                    dbContext.CompanyMembers.Any(y => y.CompanyId == x.CompanyId && y.UserId == request.UserId), cancellationToken)
+                || await dbContext.Applications.AnyAsync(x =>
+                    (x.CandidateUserId == userId && dbContext.CompanyMembers.Any(m => m.CompanyId == x.CompanyId && m.UserId == request.UserId))
+                    || (x.CandidateUserId == request.UserId && dbContext.CompanyMembers.Any(m => m.CompanyId == x.CompanyId && m.UserId == userId)),
+                    cancellationToken);
+
+            if (!hasMutualContext)
+            {
+                return this.ToBadRequestError("chats.direct.mutual_context_required", "Cannot create direct chat without mutual context.");
+            }
         }
 
         var existingChatId = await dbContext.Chats
@@ -131,6 +159,14 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         return Created(string.Empty, new { chatId = chat.Id });
     }
 
+    /// <summary>
+    /// Возвращает страницу истории сообщений чата.
+    /// </summary>
+    /// <param name="chatId">Идентификатор чата.</param>
+    /// <param name="beforeMessageId">Идентификатор сообщения для пагинации назад.</param>
+    /// <param name="limit">Размер страницы (1..200).</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Страница истории сообщений с признаком продолжения.</returns>
     [HttpGet("{chatId:long}/history")]
     [ProducesResponseType(typeof(ChatHistoryPageDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -162,8 +198,16 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
     }
 
     /// <summary>
-    /// Returns chat detail with linked card and first page of history.
+    /// Возвращает детальную информацию о чате, связанную карточку и первую страницу истории.
     /// </summary>
+    /// <remarks>
+    /// Доступен по двум маршрутам: <c>/chats/{chatId}/detail</c> и <c>/employer/chats/{chatId}/detail</c>.
+    /// </remarks>
+    /// <param name="chatId">Идентификатор чата.</param>
+    /// <param name="beforeMessageId">Идентификатор сообщения для пагинации назад.</param>
+    /// <param name="limit">Размер страницы истории (1..200).</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Детальная карточка чата.</returns>
     [HttpGet("{chatId:long}/detail")]
     [HttpGet("/employer/chats/{chatId:long}/detail")]
     [ProducesResponseType(typeof(ChatDetailDto), StatusCodes.Status200OK)]
@@ -217,6 +261,13 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         return Ok(dto);
     }
 
+    /// <summary>
+    /// Возвращает новые сообщения чата от указанного курсора.
+    /// </summary>
+    /// <param name="chatId">Идентификатор чата.</param>
+    /// <param name="cursor">Идентификатор сообщения, после которого нужно читать сообщения.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Список сообщений в порядке возрастания идентификатора.</returns>
     [HttpGet("{chatId:long}/messages")]
     [ProducesResponseType(typeof(IReadOnlyCollection<ChatMessageDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -250,6 +301,13 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         return Ok(messages);
     }
 
+    /// <summary>
+    /// Отправляет сообщение в чат от имени текущего пользователя.
+    /// </summary>
+    /// <param name="chatId">Идентификатор чата.</param>
+    /// <param name="request">Текст отправляемого сообщения.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Созданное сообщение.</returns>
     [HttpPost("{chatId:long}/messages")]
     [ProducesResponseType(typeof(ChatMessageDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -314,6 +372,13 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         return Created(string.Empty, dto);
     }
 
+    /// <summary>
+    /// Отмечает сообщение как прочитанное текущим пользователем.
+    /// </summary>
+    /// <param name="chatId">Идентификатор чата.</param>
+    /// <param name="request">Идентификатор сообщения для отметки о прочтении.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Пустой ответ при успешной отметке.</returns>
     [HttpPost("{chatId:long}/read")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]

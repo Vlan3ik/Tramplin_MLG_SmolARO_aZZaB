@@ -7,17 +7,22 @@ public class UnifiedOperationDocumentationFilter : IOperationFilter
 {
     private static readonly IReadOnlyDictionary<string, string> ParameterHints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
-        ["cityId"] = "City id from GET /catalog/cities.",
-        ["locationId"] = "Location id from GET /catalog/locations.",
-        ["groupId"] = "Tag group id from GET /catalog/tag-groups.",
-        ["tagIds"] = "Tag ids from GET /catalog/tags.",
-        ["companyId"] = "Company id from GET /companies.",
-        ["opportunityId"] = "Opportunity id from GET /opportunities.",
-        ["vacancyId"] = "Vacancy id from GET /vacancies.",
-        ["userId"] = "User id.",
-        ["newOwnerUserId"] = "Target user id for ownership transfer.",
-        ["chatId"] = "Chat id from GET /chats.",
-        ["messageId"] = "Message id from GET /chats/{chatId}/messages."
+        ["cityId"] = "Идентификатор города из GET /catalog/cities.",
+        ["locationId"] = "Идентификатор локации из GET /catalog/locations.",
+        ["groupId"] = "Идентификатор группы тегов из GET /catalog/tag-groups.",
+        ["tagIds"] = "Идентификаторы тегов из GET /catalog/tags.",
+        ["companyId"] = "Идентификатор компании из GET /companies.",
+        ["opportunityId"] = "Идентификатор возможности из GET /opportunities.",
+        ["vacancyId"] = "Идентификатор вакансии из GET /vacancies.",
+        ["userId"] = "Идентификатор пользователя.",
+        ["newOwnerUserId"] = "Идентификатор пользователя для передачи владения.",
+        ["candidateUserId"] = "Идентификатор кандидата.",
+        ["linkId"] = "Идентификатор ссылки компании.",
+        ["chatId"] = "Идентификатор чата из GET /chats.",
+        ["messageId"] = "Идентификатор сообщения из GET /chats/{chatId}/messages.",
+        ["q"] = "Текст поискового запроса.",
+        ["types"] = "Повторяющийся query-параметр: types=vacancy&types=opportunity.",
+        ["limit"] = "Максимальный размер ответа (1..20)."
     };
 
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
@@ -44,7 +49,7 @@ public class UnifiedOperationDocumentationFilter : IOperationFilter
                 continue;
             }
 
-            var enumHint = $"Allowed codes: {string.Join(", ", enumValues)}.";
+            var enumHint = $"Допустимые коды: {string.Join(", ", enumValues)}.";
             parameter.Description = string.IsNullOrWhiteSpace(parameter.Description)
                 ? enumHint
                 : $"{parameter.Description} {enumHint}";

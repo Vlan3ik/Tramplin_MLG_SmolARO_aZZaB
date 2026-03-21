@@ -1,12 +1,17 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Monolith.Contexts;
 using Monolith.Entities;
+using Monolith.Hubs;
+using Monolith.Models.Chat;
 using Monolith.Models.Common;
 using Monolith.Models.Employer;
 using Monolith.Models.Opportunities;
+using Monolith.Services.Chats;
 using Monolith.Services.Common;
+using Monolith.Services.Geo;
 
 namespace Monolith.Controllers;
 
@@ -14,10 +19,15 @@ namespace Monolith.Controllers;
 [Authorize(Roles = "employer")]
 [Route("employer/vacancies")]
 [Produces("application/json")]
-public class EmployerVacanciesController(AppDbContext dbContext) : ControllerBase
+public class EmployerVacanciesController(
+    AppDbContext dbContext,
+    IEmployerLocationService employerLocationService,
+    IHubContext<ChatHub> hubContext,
+    IChatCacheService chatCache,
+    IConfiguration configuration) : ControllerBase
 {
     /// <summary>
-    /// Get employer vacancies with filters and paging.
+    /// Возвращает вакансии компании работодателя с фильтрами и пагинацией.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<EmployerVacancyListItemDto>), StatusCodes.Status200OK)]
@@ -111,7 +121,7 @@ public class EmployerVacanciesController(AppDbContext dbContext) : ControllerBas
     }
 
     /// <summary>
-    /// Get employer vacancy detail with application statistics.
+    /// Возвращает детальную карточку вакансии с агрегированной статистикой по откликам.
     /// </summary>
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(EmployerVacancyDetailDto), StatusCodes.Status200OK)]
@@ -198,8 +208,11 @@ public class EmployerVacanciesController(AppDbContext dbContext) : ControllerBas
     }
 
     /// <summary>
-    /// Create vacancy in employer company.
+    /// Создает вакансию компании работодателя.
     /// </summary>
+    /// <remarks>
+    /// При передаче mapPoint сервер выполняет reverse geocode и сам заполняет CityId/LocationId.
+    /// </remarks>
     [HttpPost]
     [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -218,6 +231,7 @@ public class EmployerVacanciesController(AppDbContext dbContext) : ControllerBas
             return this.ToBadRequestError("employer.vacancies.invalid", validationError);
         }
 
+        var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
         var vacancy = new Vacancy
         {
             CompanyId = membership.CompanyId,
@@ -238,6 +252,12 @@ public class EmployerVacanciesController(AppDbContext dbContext) : ControllerBas
             ApplicationDeadline = request.ApplicationDeadline
         };
 
+        if (resolvedLocation is not null)
+        {
+            vacancy.CityId = resolvedLocation.CityId;
+            vacancy.LocationId = resolvedLocation.LocationId;
+        }
+
         dbContext.Vacancies.Add(vacancy);
         await dbContext.SaveChangesAsync(cancellationToken);
         await ReplaceVacancyTags(vacancy.Id, request.TagIds, cancellationToken);
@@ -246,8 +266,11 @@ public class EmployerVacanciesController(AppDbContext dbContext) : ControllerBas
     }
 
     /// <summary>
-    /// Update vacancy in employer company.
+    /// Обновляет вакансию компании работодателя.
     /// </summary>
+    /// <remarks>
+    /// При передаче mapPoint сервер выполняет reverse geocode и сам заполняет CityId/LocationId.
+    /// </remarks>
     [HttpPatch("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -272,6 +295,8 @@ public class EmployerVacanciesController(AppDbContext dbContext) : ControllerBas
             return this.ToNotFoundError("employer.vacancies.not_found", "Vacancy not found.");
         }
 
+        var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+
         vacancy.Title = request.Title.Trim();
         vacancy.ShortDescription = request.ShortDescription.Trim();
         vacancy.FullDescription = request.FullDescription.Trim();
@@ -287,13 +312,119 @@ public class EmployerVacanciesController(AppDbContext dbContext) : ControllerBas
         vacancy.PublishAt = request.PublishAt;
         vacancy.ApplicationDeadline = request.ApplicationDeadline;
 
+        if (resolvedLocation is not null)
+        {
+            vacancy.CityId = resolvedLocation.CityId;
+            vacancy.LocationId = resolvedLocation.LocationId;
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         await ReplaceVacancyTags(vacancy.Id, request.TagIds, cancellationToken);
         return NoContent();
     }
 
     /// <summary>
-    /// Archive vacancy (soft-delete).
+    /// Отправляет кандидату приглашение на вакансию в личный чат.
+    /// </summary>
+    /// <remarks>
+    /// Метод не создает отклик (application), а только создает/переиспользует direct-чат и отправляет системное сообщение.
+    /// </remarks>
+    [HttpPost("{id:long}/invite")]
+    [ProducesResponseType(typeof(EmployerVacancyInviteResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<EmployerVacancyInviteResponse>> Invite(
+        long id,
+        EmployerVacancyInviteRequest request,
+        CancellationToken cancellationToken)
+    {
+        var membership = await GetManagementMembership(cancellationToken);
+        if (membership is null)
+        {
+            return this.ToNotFoundError("employer.company.not_found", "Employer company not found.");
+        }
+
+        if (request.CandidateUserId == membership.UserId)
+        {
+            return this.ToBadRequestError("employer.vacancies.invite.self", "Нельзя отправить приглашение самому себе.");
+        }
+
+        var vacancy = await dbContext.Vacancies
+            .AsNoTracking()
+            .Include(x => x.Company)
+            .FirstOrDefaultAsync(x => x.Id == id && x.CompanyId == membership.CompanyId, cancellationToken);
+        if (vacancy is null)
+        {
+            return this.ToNotFoundError("employer.vacancies.not_found", "Vacancy not found.");
+        }
+
+        var candidateExists = await dbContext.Users.AnyAsync(x => x.Id == request.CandidateUserId, cancellationToken);
+        if (!candidateExists)
+        {
+            return this.ToNotFoundError("employer.vacancies.invite.candidate_not_found", "Кандидат не найден.");
+        }
+
+        var directChatId = await dbContext.Chats
+            .Where(x => x.Type == ChatType.Direct)
+            .Where(x => x.Participants.Any(p => p.UserId == membership.UserId) &&
+                        x.Participants.Any(p => p.UserId == request.CandidateUserId))
+            .Select(x => (long?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (directChatId is null)
+        {
+            var chat = new Chat { Type = ChatType.Direct };
+            dbContext.Chats.Add(chat);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            dbContext.ChatParticipants.AddRange(
+                new ChatParticipant { ChatId = chat.Id, UserId = membership.UserId },
+                new ChatParticipant { ChatId = chat.Id, UserId = request.CandidateUserId });
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            directChatId = chat.Id;
+        }
+
+        var vacancyUrl = BuildVacancyUrl(vacancy.Id);
+        var companyName = vacancy.Company.BrandName ?? vacancy.Company.LegalName;
+        var message = new ChatMessage
+        {
+            ChatId = directChatId.Value,
+            SenderUserId = membership.UserId,
+            Text = $"Компания {companyName} пригласила вас на вакансию \"{vacancy.Title}\". Если интересно, перейдите в вакансию: {vacancyUrl} и откликнитесь.",
+            IsSystem = true
+        };
+        dbContext.ChatMessages.Add(message);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await chatCache.InvalidateUserListAsync(membership.UserId, cancellationToken);
+        await chatCache.InvalidateUserListAsync(request.CandidateUserId, cancellationToken);
+        await chatCache.InvalidateChatHistoryAsync(directChatId.Value, cancellationToken);
+
+        var sender = await dbContext.Users
+            .AsNoTracking()
+            .Where(x => x.Id == membership.UserId)
+            .Select(x => new { x.DisplayName, x.AvatarUrl })
+            .FirstAsync(cancellationToken);
+
+        await hubContext.Clients.Group(ChatHub.GroupName(directChatId.Value)).SendAsync(
+            "new",
+            new ChatMessageDto(
+                message.Id,
+                message.ChatId,
+                message.SenderUserId,
+                sender.DisplayName,
+                sender.AvatarUrl,
+                message.Text,
+                message.IsSystem,
+                message.CreatedAt),
+            cancellationToken);
+
+        return Created(string.Empty, new EmployerVacancyInviteResponse(directChatId.Value, message.Id));
+    }
+
+    /// <summary>
+    /// Архивирует вакансию (мягкое удаление).
     /// </summary>
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -318,7 +449,7 @@ public class EmployerVacanciesController(AppDbContext dbContext) : ControllerBas
     }
 
     /// <summary>
-    /// Update vacancy status.
+    /// Обновляет статус вакансии.
     /// </summary>
     [HttpPatch("{id:long}/status")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -391,6 +522,38 @@ public class EmployerVacanciesController(AppDbContext dbContext) : ControllerBas
             return "salaryTo must be >= salaryFrom.";
         }
 
+        if (request.MapPoint is not null)
+        {
+            if (request.MapPoint.Latitude is < -90 or > 90)
+            {
+                return "mapPoint.latitude must be between -90 and 90.";
+            }
+
+            if (request.MapPoint.Longitude is < -180 or > 180)
+            {
+                return "mapPoint.longitude must be between -180 and 180.";
+            }
+        }
+
         return null;
+    }
+
+    private async Task<ResolvedLocationResult?> ResolveMapPointAsync(MapPointDto? mapPoint, CancellationToken cancellationToken)
+    {
+        if (mapPoint is null)
+        {
+            return null;
+        }
+
+        return await employerLocationService.ResolveOrCreateAsync(mapPoint.Latitude, mapPoint.Longitude, cancellationToken);
+    }
+
+    private string BuildVacancyUrl(long vacancyId)
+    {
+        var path = $"/vacancies/{vacancyId}";
+        var baseUrl = configuration["PublicWebBaseUrl"]?.Trim();
+        return string.IsNullOrWhiteSpace(baseUrl)
+            ? path
+            : $"{baseUrl.TrimEnd('/')}{path}";
     }
 }

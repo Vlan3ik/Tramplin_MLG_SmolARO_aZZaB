@@ -1,0 +1,22 @@
+namespace Monolith.Services.Geo;
+
+public sealed record ReverseGeocodingAddress(
+    string? CountryCode,
+    string? RegionName,
+    string? CityName,
+    string? StreetName,
+    string? HouseNumber,
+    decimal? Latitude,
+    decimal? Longitude);
+
+public interface IReverseGeocodingService
+{
+    Task<ReverseGeocodingAddress?> ReverseAsync(decimal latitude, decimal longitude, CancellationToken cancellationToken);
+}
+
+public sealed record ResolvedLocationResult(long CityId, long LocationId);
+
+public interface IEmployerLocationService
+{
+    Task<ResolvedLocationResult?> ResolveOrCreateAsync(decimal latitude, decimal longitude, CancellationToken cancellationToken);
+}

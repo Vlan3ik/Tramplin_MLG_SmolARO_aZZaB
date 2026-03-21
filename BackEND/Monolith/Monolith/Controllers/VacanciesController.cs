@@ -14,6 +14,12 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class VacanciesController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает список активных вакансий с фильтрами и пагинацией.
+    /// </summary>
+    /// <param name="query">Параметры фильтрации и пагинации вакансий.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Пагинированный список вакансий.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<VacancyListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<VacancyListItemDto>>> GetList([FromQuery] VacancyListQuery query, CancellationToken cancellationToken)
@@ -63,6 +69,12 @@ public class VacanciesController(AppDbContext dbContext) : ControllerBase
         return Ok(new PagedResponse<VacancyListItemDto>(items, totalCount, page, pageSize));
     }
 
+    /// <summary>
+    /// Возвращает детальную карточку вакансии.
+    /// </summary>
+    /// <param name="id">Идентификатор вакансии.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Детальная карточка вакансии.</returns>
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(VacancyDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]

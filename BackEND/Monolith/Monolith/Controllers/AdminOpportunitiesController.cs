@@ -15,6 +15,14 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает список возможностей для модерации с пагинацией и поиском.
+    /// </summary>
+    /// <param name="page">Номер страницы (начиная с 1).</param>
+    /// <param name="pageSize">Размер страницы (максимум 100).</param>
+    /// <param name="search">Поисковая строка по заголовку и краткому описанию.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Пагинированный список возможностей.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<AdminOpportunityListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<AdminOpportunityListItemDto>>> GetList(
@@ -43,6 +51,12 @@ public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBa
         return Ok(new PagedResponse<AdminOpportunityListItemDto>(rows, total, safePage, safePageSize));
     }
 
+    /// <summary>
+    /// Создает возможность от имени администратора.
+    /// </summary>
+    /// <param name="request">Данные возможности.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Созданная возможность в кратком формате.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(AdminOpportunityListItemDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -62,6 +76,13 @@ public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBa
         return CreatedAtAction(nameof(GetList), new { id = opportunity.Id }, dto);
     }
 
+    /// <summary>
+    /// Обновляет существующую возможность.
+    /// </summary>
+    /// <param name="id">Идентификатор возможности.</param>
+    /// <param name="request">Новые значения полей возможности.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Обновленная возможность в кратком формате.</returns>
     [HttpPut("{id:long}")]
     [ProducesResponseType(typeof(AdminOpportunityListItemDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -86,6 +107,12 @@ public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBa
         return Ok(dto);
     }
 
+    /// <summary>
+    /// Удаляет возможность по идентификатору.
+    /// </summary>
+    /// <param name="id">Идентификатор возможности.</param>
+    /// <param name="cancellationToken">Токен отмены операции удаления.</param>
+    /// <returns>Пустой ответ при успешном удалении.</returns>
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]

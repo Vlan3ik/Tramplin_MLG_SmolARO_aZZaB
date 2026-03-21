@@ -16,8 +16,11 @@ namespace Monolith.Controllers;
 public class EmployerApplicationsController(AppDbContext dbContext) : ControllerBase
 {
     /// <summary>
-    /// Get company applications with filters and paging.
+    /// Возвращает отклики компании с фильтрами и пагинацией.
     /// </summary>
+    /// <param name="query">Параметры фильтрации и пагинации откликов.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Пагинированный список откликов компании.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<EmployerApplicationListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -91,8 +94,11 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
     }
 
     /// <summary>
-    /// Get application detail for employer.
+    /// Возвращает детальную карточку отклика для работодателя.
     /// </summary>
+    /// <param name="id">Идентификатор отклика.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Детальная информация по отклику.</returns>
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(EmployerApplicationDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -142,8 +148,12 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
     }
 
     /// <summary>
-    /// Update application status with transition validation.
+    /// Обновляет статус отклика с проверкой допустимого перехода.
     /// </summary>
+    /// <param name="id">Идентификатор отклика.</param>
+    /// <param name="request">Новый статус отклика.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Пустой ответ при успешном обновлении статуса.</returns>
     [HttpPatch("{id:long}/status")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]

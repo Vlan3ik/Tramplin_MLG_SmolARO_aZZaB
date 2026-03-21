@@ -16,8 +16,11 @@ namespace Monolith.Controllers;
 public class CompanyInvitesController(AppDbContext dbContext) : ControllerBase
 {
     /// <summary>
-    /// Create one-time invite link for company employee.
+    /// Создает одноразовую ссылку-приглашение в компанию.
     /// </summary>
+    /// <param name="request">Параметры срока действия приглашения.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Токен приглашения, относительная ссылка и срок действия.</returns>
     [HttpPost("invites")]
     [ProducesResponseType(typeof(CompanyInviteCreatedResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -58,8 +61,11 @@ public class CompanyInvitesController(AppDbContext dbContext) : ControllerBase
     }
 
     /// <summary>
-    /// Accept one-time invite link.
+    /// Принимает одноразовое приглашение в компанию.
     /// </summary>
+    /// <param name="token">Токен приглашения из ссылки.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Пустой ответ при успешном вступлении в компанию.</returns>
     [HttpPost("invites/{token}/accept")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]

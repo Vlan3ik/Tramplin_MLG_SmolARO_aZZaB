@@ -11,6 +11,12 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class MapController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает GeoJSON-коллекцию активных вакансий и возможностей для карты.
+    /// </summary>
+    /// <param name="query">Параметры фильтрации карточек на карте.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>GeoJSON FeatureCollection с точками публикаций.</returns>
     [HttpGet("opportunities")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMapData([FromQuery] MapQuery query, CancellationToken cancellationToken)

@@ -16,6 +16,12 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class OpportunitiesController(AppDbContext dbContext, IChatCacheService chatCache) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает список активных возможностей с фильтрами и пагинацией.
+    /// </summary>
+    /// <param name="query">Параметры фильтрации и пагинации возможностей.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Пагинированный список возможностей.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<OpportunityListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<OpportunityListItemDto>>> GetList([FromQuery] OpportunityListQuery query, CancellationToken cancellationToken)
@@ -73,6 +79,12 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
         return Ok(new PagedResponse<OpportunityListItemDto>(items, totalCount, page, pageSize));
     }
 
+    /// <summary>
+    /// Возвращает детальную карточку возможности.
+    /// </summary>
+    /// <param name="id">Идентификатор возможности.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Детальная карточка возможности.</returns>
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(OpportunityDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -134,6 +146,12 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
         return Ok(dto);
     }
 
+    /// <summary>
+    /// Добавляет текущего пользователя в участники возможности.
+    /// </summary>
+    /// <param name="id">Идентификатор возможности.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Пустой ответ при успешном вступлении.</returns>
     [Authorize]
     [HttpPost("{id:long}/participation")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -190,6 +208,12 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
         return NoContent();
     }
 
+    /// <summary>
+    /// Удаляет текущего пользователя из участников возможности.
+    /// </summary>
+    /// <param name="id">Идентификатор возможности.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Пустой ответ при успешном выходе.</returns>
     [Authorize]
     [HttpDelete("{id:long}/participation")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

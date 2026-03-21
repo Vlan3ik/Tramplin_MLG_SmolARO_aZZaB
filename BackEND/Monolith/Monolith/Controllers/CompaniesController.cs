@@ -14,6 +14,12 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class CompaniesController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает список компаний с фильтрами и пагинацией.
+    /// </summary>
+    /// <param name="query">Параметры фильтрации и пагинации списка компаний.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Пагинированный список компаний.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<CompanyListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<CompanyListItemDto>>> GetList([FromQuery] CompanyListQuery query, CancellationToken cancellationToken)
@@ -73,6 +79,12 @@ public class CompaniesController(AppDbContext dbContext) : ControllerBase
         return Ok(new PagedResponse<CompanyListItemDto>(rows, totalCount, page, pageSize));
     }
 
+    /// <summary>
+    /// Возвращает детальную карточку компании по идентификатору.
+    /// </summary>
+    /// <param name="id">Идентификатор компании.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Детальная карточка компании со ссылками и активными публикациями.</returns>
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(CompanyDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]

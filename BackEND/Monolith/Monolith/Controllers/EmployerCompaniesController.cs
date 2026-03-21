@@ -16,8 +16,11 @@ namespace Monolith.Controllers;
 public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBase
 {
     /// <summary>
-    /// Create company draft for current employer user.
+    /// Создает черновик компании для текущего пользователя-работодателя.
     /// </summary>
+    /// <param name="request">Базовые данные создаваемой компании.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Идентификатор созданной компании и ее текущий статус.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
@@ -65,8 +68,10 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
     }
 
     /// <summary>
-    /// Get current employer company.
+    /// Возвращает компанию текущего работодателя.
     /// </summary>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Карточка компании с настройками чата и ролью пользователя.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(EmployerCompanyResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -82,8 +87,11 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
     }
 
     /// <summary>
-    /// Update legal and verification data.
+    /// Обновляет юридические и верификационные данные компании.
     /// </summary>
+    /// <param name="request">Новые значения юридических и публичных полей.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Пустой ответ при успешном обновлении.</returns>
     [HttpPatch("verification")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -113,8 +121,10 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
     }
 
     /// <summary>
-    /// Submit company for verification.
+    /// Отправляет компанию на верификацию.
     /// </summary>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Пустой ответ при успешной отправке на проверку.</returns>
     [HttpPost("submit-verification")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -144,8 +154,11 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
     }
 
     /// <summary>
-    /// Update company chat settings.
+    /// Обновляет настройки чата компании.
     /// </summary>
+    /// <param name="request">Новые параметры автосообщений и рабочего времени.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Пустой ответ при успешном обновлении.</returns>
     [HttpPatch("chat-settings")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -178,8 +191,10 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
     }
 
     /// <summary>
-    /// Get company members.
+    /// Возвращает список участников компании.
     /// </summary>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Список участников компании с ролями.</returns>
     [HttpGet("members")]
     [ProducesResponseType(typeof(IReadOnlyCollection<EmployerCompanyMemberDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -210,8 +225,11 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
     }
 
     /// <summary>
-    /// Transfer company owner role to another member.
+    /// Передает роль владельца компании другому участнику.
     /// </summary>
+    /// <param name="request">Идентификатор нового владельца.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Пустой ответ при успешной передаче роли.</returns>
     [HttpPost("owner/transfer")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]

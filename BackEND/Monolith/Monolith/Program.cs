@@ -8,6 +8,7 @@ using Monolith.Hubs;
 using Monolith.Infrastructure.Swagger;
 using Monolith.Services.Auth;
 using Monolith.Services.Chats;
+using Monolith.Services.Geo;
 using Monolith.Services.Storage;
 using Monolith.Services.Seeding;
 using Monolith.Contexts;
@@ -16,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<MinioOptions>(builder.Configuration.GetSection("Minio"));
+builder.Services.Configure<NominatimOptions>(builder.Configuration.GetSection(NominatimOptions.SectionName));
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
@@ -30,6 +32,14 @@ builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<ISeedDataService, SeedDataService>();
 builder.Services.AddScoped<IObjectStorageService, MinioObjectStorageService>();
 builder.Services.AddScoped<IChatCacheService, ChatCacheService>();
+builder.Services.AddScoped<IEmployerLocationService, EmployerLocationService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<IReverseGeocodingService, NominatimReverseGeocodingService>((sp, client) =>
+{
+    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<NominatimOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(Math.Max(options.TimeoutSeconds, 1));
+});
 
 builder.Services.AddCors(options =>
 {

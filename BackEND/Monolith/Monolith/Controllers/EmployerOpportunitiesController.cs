@@ -7,6 +7,7 @@ using Monolith.Models.Common;
 using Monolith.Models.Employer;
 using Monolith.Models.Opportunities;
 using Monolith.Services.Common;
+using Monolith.Services.Geo;
 
 namespace Monolith.Controllers;
 
@@ -14,10 +15,12 @@ namespace Monolith.Controllers;
 [Authorize(Roles = "employer")]
 [Route("employer/opportunities")]
 [Produces("application/json")]
-public class EmployerOpportunitiesController(AppDbContext dbContext) : ControllerBase
+public class EmployerOpportunitiesController(
+    AppDbContext dbContext,
+    IEmployerLocationService employerLocationService) : ControllerBase
 {
     /// <summary>
-    /// Get employer opportunities with filters and paging.
+    /// Возвращает возможности компании работодателя с фильтрами и пагинацией.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<EmployerOpportunityListItemDto>), StatusCodes.Status200OK)]
@@ -111,7 +114,7 @@ public class EmployerOpportunitiesController(AppDbContext dbContext) : Controlle
     }
 
     /// <summary>
-    /// Get employer opportunity detail with participant statistics.
+    /// Возвращает детальную карточку возможности со статистикой участников.
     /// </summary>
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(EmployerOpportunityDetailDto), StatusCodes.Status200OK)]
@@ -189,8 +192,11 @@ public class EmployerOpportunitiesController(AppDbContext dbContext) : Controlle
     }
 
     /// <summary>
-    /// Create opportunity in employer company.
+    /// Создает возможность в компании работодателя.
     /// </summary>
+    /// <remarks>
+    /// При передаче mapPoint сервер выполняет reverse geocode и сам заполняет CityId/LocationId.
+    /// </remarks>
     [HttpPost]
     [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -209,6 +215,7 @@ public class EmployerOpportunitiesController(AppDbContext dbContext) : Controlle
             return this.ToBadRequestError("employer.opportunities.invalid", validationError);
         }
 
+        var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
         var opportunity = new Opportunity
         {
             CompanyId = membership.CompanyId,
@@ -229,6 +236,12 @@ public class EmployerOpportunitiesController(AppDbContext dbContext) : Controlle
             EventDate = request.EventDate
         };
 
+        if (resolvedLocation is not null)
+        {
+            opportunity.CityId = resolvedLocation.CityId;
+            opportunity.LocationId = resolvedLocation.LocationId;
+        }
+
         dbContext.Opportunities.Add(opportunity);
         await dbContext.SaveChangesAsync(cancellationToken);
         await ReplaceOpportunityTags(opportunity.Id, request.TagIds, cancellationToken);
@@ -237,8 +250,11 @@ public class EmployerOpportunitiesController(AppDbContext dbContext) : Controlle
     }
 
     /// <summary>
-    /// Update opportunity in employer company.
+    /// Обновляет возможность в компании работодателя.
     /// </summary>
+    /// <remarks>
+    /// При передаче mapPoint сервер выполняет reverse geocode и сам заполняет CityId/LocationId.
+    /// </remarks>
     [HttpPatch("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -263,6 +279,8 @@ public class EmployerOpportunitiesController(AppDbContext dbContext) : Controlle
             return this.ToNotFoundError("employer.opportunities.not_found", "Opportunity not found.");
         }
 
+        var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+
         opportunity.Title = request.Title.Trim();
         opportunity.ShortDescription = request.ShortDescription.Trim();
         opportunity.FullDescription = request.FullDescription.Trim();
@@ -278,13 +296,19 @@ public class EmployerOpportunitiesController(AppDbContext dbContext) : Controlle
         opportunity.PublishAt = request.PublishAt;
         opportunity.EventDate = request.EventDate;
 
+        if (resolvedLocation is not null)
+        {
+            opportunity.CityId = resolvedLocation.CityId;
+            opportunity.LocationId = resolvedLocation.LocationId;
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         await ReplaceOpportunityTags(opportunity.Id, request.TagIds, cancellationToken);
         return NoContent();
     }
 
     /// <summary>
-    /// Archive opportunity (soft-delete).
+    /// Архивирует возможность (мягкое удаление).
     /// </summary>
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -309,7 +333,7 @@ public class EmployerOpportunitiesController(AppDbContext dbContext) : Controlle
     }
 
     /// <summary>
-    /// Update opportunity status.
+    /// Обновляет статус возможности.
     /// </summary>
     [HttpPatch("{id:long}/status")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -397,6 +421,29 @@ public class EmployerOpportunitiesController(AppDbContext dbContext) : Controlle
             }
         }
 
+        if (request.MapPoint is not null)
+        {
+            if (request.MapPoint.Latitude is < -90 or > 90)
+            {
+                return "mapPoint.latitude must be between -90 and 90.";
+            }
+
+            if (request.MapPoint.Longitude is < -180 or > 180)
+            {
+                return "mapPoint.longitude must be between -180 and 180.";
+            }
+        }
+
         return null;
+    }
+
+    private async Task<ResolvedLocationResult?> ResolveMapPointAsync(MapPointDto? mapPoint, CancellationToken cancellationToken)
+    {
+        if (mapPoint is null)
+        {
+            return null;
+        }
+
+        return await employerLocationService.ResolveOrCreateAsync(mapPoint.Latitude, mapPoint.Longitude, cancellationToken);
     }
 }

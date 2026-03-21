@@ -15,6 +15,14 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class AdminVacanciesController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает список вакансий для модерации с пагинацией и поиском.
+    /// </summary>
+    /// <param name="page">Номер страницы (начиная с 1).</param>
+    /// <param name="pageSize">Размер страницы (максимум 100).</param>
+    /// <param name="search">Поисковая строка по заголовку и краткому описанию.</param>
+    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
+    /// <returns>Пагинированный список вакансий.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<AdminVacancyListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<AdminVacancyListItemDto>>> GetList(
@@ -43,6 +51,12 @@ public class AdminVacanciesController(AppDbContext dbContext) : ControllerBase
         return Ok(new PagedResponse<AdminVacancyListItemDto>(rows, total, safePage, safePageSize));
     }
 
+    /// <summary>
+    /// Создает вакансию от имени администратора.
+    /// </summary>
+    /// <param name="request">Данные вакансии.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Созданная вакансия в кратком формате.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(AdminVacancyListItemDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -61,6 +75,13 @@ public class AdminVacanciesController(AppDbContext dbContext) : ControllerBase
         return CreatedAtAction(nameof(GetList), new { id = vacancy.Id }, dto);
     }
 
+    /// <summary>
+    /// Обновляет существующую вакансию.
+    /// </summary>
+    /// <param name="id">Идентификатор вакансии.</param>
+    /// <param name="request">Новые значения полей вакансии.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Обновленная вакансия в кратком формате.</returns>
     [HttpPut("{id:long}")]
     [ProducesResponseType(typeof(AdminVacancyListItemDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -84,6 +105,12 @@ public class AdminVacanciesController(AppDbContext dbContext) : ControllerBase
         return Ok(dto);
     }
 
+    /// <summary>
+    /// Удаляет вакансию по идентификатору.
+    /// </summary>
+    /// <param name="id">Идентификатор вакансии.</param>
+    /// <param name="cancellationToken">Токен отмены операции удаления.</param>
+    /// <returns>Пустой ответ при успешном удалении.</returns>
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]

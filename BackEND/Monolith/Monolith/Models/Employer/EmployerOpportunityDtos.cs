@@ -77,6 +77,7 @@ public record EmployerOpportunityUpsertRequest(
     bool ParticipantsCanWrite,
     DateTimeOffset PublishAt,
     DateTimeOffset? EventDate,
-    IReadOnlyCollection<long>? TagIds);
+    IReadOnlyCollection<long>? TagIds,
+    MapPointDto? MapPoint = null);
 
 public record EmployerOpportunityStatusUpdateRequest(OpportunityStatus Status);

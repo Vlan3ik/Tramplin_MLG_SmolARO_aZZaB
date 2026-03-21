@@ -10,22 +10,23 @@ public class UnifiedSchemaDocumentationFilter : ISchemaFilter
 {
     private static readonly IReadOnlyDictionary<string, string> IdHints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
-        ["userId"] = "User id.",
-        ["candidateUserId"] = "Candidate user id.",
-        ["createdByUserId"] = "Creator user id.",
-        ["newOwnerUserId"] = "Target user id for ownership transfer.",
-        ["companyId"] = "Company id.",
-        ["baseCityId"] = "City id from GET /catalog/cities.",
-        ["cityId"] = "City id from GET /catalog/cities.",
-        ["locationId"] = "Location id from GET /catalog/locations.",
-        ["groupId"] = "Tag group id from GET /catalog/tag-groups.",
-        ["tagId"] = "Tag id from GET /catalog/tags.",
-        ["tagIds"] = "Tag ids from GET /catalog/tags.",
-        ["opportunityId"] = "Opportunity id from GET /opportunities.",
-        ["vacancyId"] = "Vacancy id from GET /vacancies.",
-        ["vacancyIds"] = "Vacancy ids from GET /vacancies.",
-        ["chatId"] = "Chat id from GET /chats.",
-        ["messageId"] = "Message id from GET /chats/{chatId}/messages."
+        ["userId"] = "Идентификатор пользователя.",
+        ["candidateUserId"] = "Идентификатор кандидата.",
+        ["createdByUserId"] = "Идентификатор автора создания.",
+        ["newOwnerUserId"] = "Идентификатор пользователя для передачи владения.",
+        ["linkId"] = "Идентификатор ссылки компании.",
+        ["companyId"] = "Идентификатор компании.",
+        ["baseCityId"] = "Идентификатор города из GET /catalog/cities.",
+        ["cityId"] = "Идентификатор города из GET /catalog/cities.",
+        ["locationId"] = "Идентификатор локации из GET /catalog/locations.",
+        ["groupId"] = "Идентификатор группы тегов из GET /catalog/tag-groups.",
+        ["tagId"] = "Идентификатор тега из GET /catalog/tags.",
+        ["tagIds"] = "Идентификаторы тегов из GET /catalog/tags.",
+        ["opportunityId"] = "Идентификатор возможности из GET /opportunities.",
+        ["vacancyId"] = "Идентификатор вакансии из GET /vacancies.",
+        ["vacancyIds"] = "Идентификаторы вакансий из GET /vacancies.",
+        ["chatId"] = "Идентификатор чата из GET /chats.",
+        ["messageId"] = "Идентификатор сообщения из GET /chats/{chatId}/messages."
     };
 
     private static readonly IReadOnlyDictionary<Type, IReadOnlyDictionary<string, string>> EnumLabels =
@@ -33,52 +34,52 @@ public class UnifiedSchemaDocumentationFilter : ISchemaFilter
         {
             [typeof(VacancyKind)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Internship"] = "Internship",
-                ["Job"] = "Job"
+                ["Internship"] = "Стажировка",
+                ["Job"] = "Работа"
             },
             [typeof(SalaryTaxMode)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["BeforeTax"] = "Before tax",
-                ["AfterTax"] = "After tax",
-                ["Unknown"] = "Unknown"
+                ["BeforeTax"] = "До вычета налогов",
+                ["AfterTax"] = "После вычета налогов",
+                ["Unknown"] = "Не указано"
             },
             [typeof(OpportunityStatus)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Draft"] = "Draft",
-                ["PendingModeration"] = "Pending moderation",
-                ["Active"] = "Active",
-                ["Finished"] = "Finished",
-                ["Canceled"] = "Canceled",
-                ["Rejected"] = "Rejected",
-                ["Archived"] = "Archived"
+                ["Draft"] = "Черновик",
+                ["PendingModeration"] = "На модерации",
+                ["Active"] = "Активна",
+                ["Finished"] = "Завершена",
+                ["Canceled"] = "Отменена",
+                ["Rejected"] = "Отклонена",
+                ["Archived"] = "Архив"
             },
             [typeof(ApplicationStatus)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["New"] = "New",
-                ["InReview"] = "In review",
-                ["Interview"] = "Interview",
-                ["Offer"] = "Offer",
-                ["Hired"] = "Hired",
-                ["Rejected"] = "Rejected",
-                ["Canceled"] = "Canceled"
+                ["New"] = "Новый",
+                ["InReview"] = "На рассмотрении",
+                ["Interview"] = "Собеседование",
+                ["Offer"] = "Оффер",
+                ["Hired"] = "Нанят",
+                ["Rejected"] = "Отклонен",
+                ["Canceled"] = "Отменен"
             },
             [typeof(OpportunityKind)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Hackathon"] = "Hackathon",
-                ["OpenDay"] = "Open day",
-                ["Lecture"] = "Lecture",
-                ["Other"] = "Other"
+                ["Hackathon"] = "Хакатон",
+                ["OpenDay"] = "День открытых дверей",
+                ["Lecture"] = "Лекция",
+                ["Other"] = "Другое"
             },
             [typeof(PriceType)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Free"] = "Free",
-                ["Paid"] = "Paid",
-                ["Prize"] = "Prize"
+                ["Free"] = "Бесплатно",
+                ["Paid"] = "Платно",
+                ["Prize"] = "Приз"
             },
             [typeof(MapEntityType)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Vacancy"] = "Vacancy",
-                ["Opportunity"] = "Opportunity"
+                ["Vacancy"] = "Вакансия",
+                ["Opportunity"] = "Возможность"
             }
         };
 
@@ -129,7 +130,7 @@ public class UnifiedSchemaDocumentationFilter : ISchemaFilter
             return $"{numeric} = {name}";
         });
 
-        var enumDescription = $"Codes: {string.Join("; ", lines)}.";
+        var enumDescription = $"Коды: {string.Join("; ", lines)}.";
         schema.Description = string.IsNullOrWhiteSpace(schema.Description)
             ? enumDescription
             : $"{schema.Description} {enumDescription}";
@@ -150,13 +151,13 @@ public class UnifiedSchemaDocumentationFilter : ISchemaFilter
 
         if (propertyName.EndsWith("Ids", StringComparison.OrdinalIgnoreCase))
         {
-            description = "Array of numeric ids.";
+            description = "Массив числовых идентификаторов.";
             return true;
         }
 
         if (propertyName.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
         {
-            description = "Numeric id.";
+            description = "Числовой идентификатор.";
             return true;
         }
 

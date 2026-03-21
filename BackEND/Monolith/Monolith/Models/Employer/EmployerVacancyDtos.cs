@@ -86,6 +86,27 @@ public record EmployerVacancyUpsertRequest(
     SalaryTaxMode SalaryTaxMode,
     DateTimeOffset PublishAt,
     DateTimeOffset? ApplicationDeadline,
-    IReadOnlyCollection<long>? TagIds);
+    IReadOnlyCollection<long>? TagIds,
+    MapPointDto? MapPoint = null);
+
+/// <summary>
+/// Географическая точка для определения текстового адреса.
+/// </summary>
+/// <param name="Latitude">Широта WGS84.</param>
+/// <param name="Longitude">Долгота WGS84.</param>
+public record MapPointDto(decimal Latitude, decimal Longitude);
+
+/// <summary>
+/// Запрос приглашения пользователя на вакансию в личный чат.
+/// </summary>
+/// <param name="CandidateUserId">Идентификатор пользователя, которого нужно пригласить.</param>
+public record EmployerVacancyInviteRequest(long CandidateUserId);
+
+/// <summary>
+/// Ответ при отправке приглашения в чат.
+/// </summary>
+/// <param name="ChatId">Идентификатор чата.</param>
+/// <param name="MessageId">Идентификатор системного сообщения приглашения.</param>
+public record EmployerVacancyInviteResponse(long ChatId, long MessageId);
 
 public record EmployerVacancyStatusUpdateRequest(OpportunityStatus Status);

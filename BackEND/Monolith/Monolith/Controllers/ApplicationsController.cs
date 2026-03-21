@@ -18,6 +18,16 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub> hubContext, IChatCacheService chatCache) : ControllerBase
 {
+    /// <summary>
+    /// Создает отклик на вакансию и связанный чат по отклику.
+    /// </summary>
+    /// <remarks>
+    /// Инициатор может быть соискателем или работодателем.
+    /// При создании отклика в чат добавляются кандидат и владельцы/администраторы компании.
+    /// </remarks>
+    /// <param name="request">Данные отклика: компания, вакансия, кандидат и роль инициатора.</param>
+    /// <param name="cancellationToken">Токен отмены операции записи.</param>
+    /// <returns>Идентификаторы созданных отклика и чата.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
