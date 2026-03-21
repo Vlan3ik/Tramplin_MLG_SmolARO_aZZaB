@@ -15,6 +15,7 @@ body {
   color: var(--text-primary);
   background: var(--bg-page);
   line-height: 1.5;
+  overflow-x: hidden;
 }
 
 a {
@@ -166,12 +167,24 @@ textarea:focus {
 .brand {
   display: inline-flex;
   align-items: center;
+  gap: 0.55rem;
+  justify-content: flex-start;
   min-height: 48px;
 
+  &__dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+
   &__logo {
-    width: 140px;
-    height: auto;
-    max-width: 100%;
+    width: auto;
+    height: 48px;
+    max-width: 180px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.14));
   }
 }
 
@@ -264,4 +277,3 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
-

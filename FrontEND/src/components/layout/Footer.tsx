@@ -1,41 +1,81 @@
-const footerColumns = [
-  {
-    title: 'Платформа',
-    links: ['О проекте', 'Партнёрам', 'Карьера', 'Пресса'],
-  },
+import './Footer.css'
+
+type FooterColumn = {
+  title: string
+  links: string[]
+}
+
+const columns: FooterColumn[] = [
   {
     title: 'Соискателям',
-    links: ['Вакансии', 'Стажировки', 'Менторы', 'События'],
+    links: ['Компании', 'Вакансии', 'Резюме', 'Мероприятия', 'Нетворкинг'],
   },
   {
     title: 'Работодателям',
-    links: ['Размещение', 'Верификация', 'Аналитика', 'Брендинг'],
+    links: ['Размещение', 'Верификация', 'Соискатели', 'Учебные заведения'],
   },
   {
-    title: 'Поддержка',
-    links: ['FAQ', 'Политика', 'Контакты', 'Сообщить о проблеме'],
+    title: 'Учебным заведениям',
+    links: ['Работодатели', 'Стажировки', 'Мероприятия'],
   },
 ]
 
+function SocialIcon({ src, alt }: { src: string; alt: string }) {
+  return (
+    <a href="#" className="platform-footer__social-item" aria-label={alt} title={alt}>
+      <img src={src} alt={alt} />
+    </a>
+  )
+}
+
 export function Footer() {
   return (
-    <footer className="footer">
-      <div className="container footer__grid">
-        {footerColumns.map((column) => (
-          <div key={column.title}>
-            <h4>{column.title}</h4>
-            <ul>
-              {column.links.map((link) => (
-                <li key={link}>{link}</li>
-              ))}
-            </ul>
+    <footer className="platform-footer">
+      <div className="platform-footer__inner">
+        <div className="platform-footer__columns">
+          {columns.map((column) => (
+            <div className="platform-footer__column" key={column.title}>
+              <h4>{column.title}</h4>
+              <ul>
+                {column.links.map((link) => (
+                  <li key={link}>
+                    <a href="#">{link}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div className="platform-footer__contacts">
+          <h4>Консультация</h4>
+          <a href="tel:+74812546578">8 (4812) 54-65-78</a>
+          <a href="mailto:codeinsite@mail.ru">codeinsite@mail.ru</a>
+        </div>
+
+        <div className="platform-footer__socials">
+          <SocialIcon src="/Group 35.svg" alt="VK" />
+          <SocialIcon src="/Логотип_MAX 1.svg" alt="MAX" />
+          <SocialIcon src="/Rutube_icon 1.svg" alt="Rutube" />
+          <SocialIcon src="/Yandex_Zen_logo_icon 1.svg" alt="Яндекс Дзен" />
+        </div>
+
+        <div className="platform-footer__bottom">
+          <div className="platform-footer__brand-logo">
+            <img src="/logo.svg" alt="Трамплин" />
           </div>
-        ))}
+          <span className="platform-footer__brand-name">Трамплин © 2026</span>
+          <a href="#">Пользовательское соглашение</a>
+          <a href="#">Политика конфиденциальности</a>
+        </div>
       </div>
-      <div className="container footer__bottom">
-        <span>Трамплин © 2026</span>
-        <span>Надёжная карьерная платформа для IT и смежных направлений</span>
-      </div>
+
+      <img
+        className="platform-footer__decor"
+        src="/руки бакалы шапки и тд.svg"
+        alt=""
+        aria-hidden="true"
+      />
     </footer>
   )
 }
