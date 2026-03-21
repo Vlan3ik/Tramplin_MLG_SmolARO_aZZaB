@@ -80,6 +80,12 @@ public class UnifiedSchemaDocumentationFilter : ISchemaFilter
             {
                 ["Vacancy"] = "Вакансия",
                 ["Opportunity"] = "Возможность"
+            },
+            [typeof(CandidateGender)] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Unknown"] = "Не указан",
+                ["Male"] = "Мужской",
+                ["Female"] = "Женский"
             }
         };
 

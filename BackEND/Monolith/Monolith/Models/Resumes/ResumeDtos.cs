@@ -1,3 +1,5 @@
+using Monolith.Entities;
+
 namespace Monolith.Models.Resumes;
 
 /// <summary>
@@ -46,6 +48,8 @@ public record ResumeDetailDto(
     string FirstName,
     string LastName,
     string? MiddleName,
+    DateOnly? BirthDate,
+    CandidateGender Gender,
     string? Phone,
     string? About,
     string? AvatarUrl,

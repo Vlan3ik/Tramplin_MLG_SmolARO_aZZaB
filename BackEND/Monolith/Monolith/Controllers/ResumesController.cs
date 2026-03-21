@@ -135,6 +135,8 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
             profile.FirstName,
             profile.LastName,
             profile.MiddleName,
+            profile.BirthDate,
+            profile.Gender,
             privacy?.ShowContactsInResume == true ? profile.Phone : null,
             profile.About,
             profile.User.AvatarUrl,

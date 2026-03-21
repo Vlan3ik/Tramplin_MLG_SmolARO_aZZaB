@@ -4,6 +4,7 @@ export type OpportunityType = MockOpportunityType
 
 export type Opportunity = {
   id: number
+  entityType?: 'vacancy' | 'opportunity'
   title: string
   type: OpportunityType
   compensation: string

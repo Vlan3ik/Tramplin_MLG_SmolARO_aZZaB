@@ -79,6 +79,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.LastName).HasColumnName("last_name").HasMaxLength(100);
             entity.Property(x => x.FirstName).HasColumnName("first_name").HasMaxLength(100);
             entity.Property(x => x.MiddleName).HasColumnName("middle_name").HasMaxLength(100);
+            entity.Property(x => x.BirthDate).HasColumnName("birth_date");
+            entity.Property(x => x.Gender).HasColumnName("gender");
             entity.Property(x => x.Phone).HasColumnName("phone").HasMaxLength(30);
             entity.Property(x => x.About).HasColumnName("about");
             entity.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(500);

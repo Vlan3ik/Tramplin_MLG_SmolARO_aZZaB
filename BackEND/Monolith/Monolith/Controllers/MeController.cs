@@ -67,6 +67,8 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             profile.FirstName,
             profile.LastName,
             profile.MiddleName,
+            profile.BirthDate,
+            profile.Gender,
             profile.Phone,
             profile.About,
             profile.AvatarUrl));
@@ -97,6 +99,8 @@ public class MeController(AppDbContext dbContext) : ControllerBase
         profile.LastName = request.LastName.Trim();
         profile.User.DisplayName = $"{profile.FirstName} {profile.LastName}".Trim();
         profile.MiddleName = request.MiddleName?.Trim();
+        profile.BirthDate = request.BirthDate;
+        profile.Gender = request.Gender ?? CandidateGender.Unknown;
         profile.Phone = request.Phone?.Trim();
         profile.About = request.About?.Trim();
         profile.AvatarUrl = request.AvatarUrl?.Trim();
@@ -110,6 +114,8 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             profile.FirstName,
             profile.LastName,
             profile.MiddleName,
+            profile.BirthDate,
+            profile.Gender,
             profile.Phone,
             profile.About,
             profile.AvatarUrl));

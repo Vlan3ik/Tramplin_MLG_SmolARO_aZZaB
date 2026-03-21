@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createApplication } from '../api/applications'
-import { fetchHomeOpportunities, fetchOpportunityDetailById, participateInOpportunity } from '../api/opportunities'
+import {
+  fetchHomeListOpportunities,
+  fetchMapOpportunities,
+  fetchOpportunityDetailById,
+  participateInOpportunity,
+  type MapViewportBounds,
+} from '../api/opportunities'
 import { FilterSidebar } from '../components/home/FilterSidebar'
 import { MapBoard } from '../components/home/MapBoard'
 import { OpportunityCard } from '../components/home/OpportunityCard'
@@ -10,6 +16,7 @@ import { useCity } from '../contexts/CityContext'
 import { useApplications } from '../hooks/useApplications'
 import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityFilters, OpportunityType } from '../types/opportunity'
+import type { SearchSuggestItem } from '../types/search'
 import { Hu } from '../components/layout/hu/Hu'
 
 const defaultFilters: OpportunityFilters = {
@@ -28,15 +35,23 @@ export function HomePage() {
   const [appliedSearch, setAppliedSearch] = useState('')
   const [filters, setFilters] = useState<OpportunityFilters>(defaultFilters)
 
-  const [items, setItems] = useState<Opportunity[]>([])
-  const [total, setTotal] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [errorMessage, setErrorMessage] = useState('')
+  const [listItems, setListItems] = useState<Opportunity[]>([])
+  const [listTotal, setListTotal] = useState(0)
+  const [isListLoading, setIsListLoading] = useState(true)
+  const [listErrorMessage, setListErrorMessage] = useState('')
+
+  const [mapItems, setMapItems] = useState<Opportunity[]>([])
+  const [mapTotal, setMapTotal] = useState(0)
+  const [isMapLoading, setIsMapLoading] = useState(false)
+  const [mapErrorMessage, setMapErrorMessage] = useState('')
+  const [mapBounds, setMapBounds] = useState<MapViewportBounds | null>(null)
+  const [mapJumpRequest, setMapJumpRequest] = useState<{ token: number; lngLat: [number, number] } | null>(null)
+
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState(false)
   const [applyingIds, setApplyingIds] = useState<Record<number, boolean>>({})
 
-  const query = useMemo(
+  const listQuery = useMemo(
     () => ({
       page: 1,
       pageSize: 24,
@@ -47,40 +62,113 @@ export function HomePage() {
     [appliedSearch, filters, selectedCityId],
   )
 
-  const loadOpportunities = useCallback(
+  const mapQuery = useMemo(
+    () => ({
+      search: appliedSearch,
+      filters,
+      bounds: mapBounds,
+    }),
+    [appliedSearch, filters, mapBounds],
+  )
+
+  const loadListOpportunities = useCallback(
     async (signal?: AbortSignal) => {
-      setIsLoading(true)
-      setErrorMessage('')
+      setIsListLoading(true)
+      setListErrorMessage('')
 
       try {
-        const response = await fetchHomeOpportunities(query, signal)
-        setItems(response.items)
-        setTotal(response.total)
+        const response = await fetchHomeListOpportunities(listQuery, signal)
+        setListItems(response.items)
+        setListTotal(response.total)
       } catch (error) {
         if (signal?.aborted) {
           return
         }
 
-        setErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить данные главной страницы.')
+        setListErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить список возможностей.')
       } finally {
         if (!signal?.aborted) {
-          setIsLoading(false)
+          setIsListLoading(false)
         }
       }
     },
-    [query],
+    [listQuery],
+  )
+
+  const loadMapOpportunities = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!mapQuery.bounds) {
+        return
+      }
+
+      setIsMapLoading(true)
+      setMapErrorMessage('')
+
+      try {
+        const response = await fetchMapOpportunities(mapQuery, signal)
+        setMapItems(response.items)
+        setMapTotal(response.total)
+      } catch (error) {
+        if (signal?.aborted) {
+          return
+        }
+
+        setMapErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить карту возможностей.')
+      } finally {
+        if (!signal?.aborted) {
+          setIsMapLoading(false)
+        }
+      }
+    },
+    [mapQuery],
   )
 
   useEffect(() => {
     const abortController = new AbortController()
+    void loadListOpportunities(abortController.signal)
+    return () => abortController.abort()
+  }, [loadListOpportunities])
 
-    void loadOpportunities(abortController.signal)
+  useEffect(() => {
+    if (viewMode !== 'map' || !mapBounds) {
+      return
+    }
+
+    const abortController = new AbortController()
+    void loadMapOpportunities(abortController.signal)
 
     return () => abortController.abort()
-  }, [loadOpportunities])
+  }, [loadMapOpportunities, mapBounds, viewMode])
 
-  function handleSearchSubmit() {
-    setAppliedSearch(searchInput.trim())
+  function handleSearchSubmit(valueOverride?: string) {
+    setAppliedSearch((valueOverride ?? searchInput).trim())
+  }
+
+  async function handleSuggestionSelect(item: SearchSuggestItem) {
+    const selectedText = item.title.trim()
+    setViewMode('map')
+    setAppliedSearch(selectedText)
+
+    try {
+      const response = await fetchMapOpportunities({
+        search: selectedText,
+        filters,
+        bounds: null,
+      })
+
+      const target =
+        response.items.find((current) => current.id === item.id && current.entityType === item.entityType) ??
+        response.items.find((current) => current.id === item.id)
+
+      if (target?.latitude != null && target.longitude != null) {
+        setMapJumpRequest({
+          token: Date.now(),
+          lngLat: [target.longitude, target.latitude],
+        })
+      }
+    } catch {
+      // No-op: fallback is regular search filtering without fly-to.
+    }
   }
 
   function handleTypesChange(types: OpportunityType[]) {
@@ -178,6 +266,7 @@ export function HomePage() {
         onModeChange={setViewMode}
         onSearchChange={setSearchInput}
         onSearchSubmit={handleSearchSubmit}
+        onSuggestionSelect={handleSuggestionSelect}
       />
 
       <section className="home-workspace container">
@@ -185,13 +274,15 @@ export function HomePage() {
 
         {viewMode === 'map' ? (
           <MapBoard
-            opportunities={items}
-            total={total}
-            isLoading={isLoading}
-            errorMessage={errorMessage}
+            opportunities={mapItems}
+            total={mapTotal}
+            isLoading={isMapLoading}
+            errorMessage={mapErrorMessage}
             onRetry={() => {
-              void loadOpportunities()
+              void loadMapOpportunities()
             }}
+            onBoundsChange={setMapBounds}
+            jumpToRequest={mapJumpRequest}
           />
         ) : (
           <div className="list-mode">
@@ -205,26 +296,24 @@ export function HomePage() {
             <div className="list-mode__results">
               <div className="result-toolbar card">
                 <div>
-                  <strong>Найдено: {total}</strong>
+                  <strong>Найдено: {listTotal}</strong>
                   <span>Сортировка: сначала новые</span>
                 </div>
-                <button type="button" className="btn btn--ghost" onClick={handleSearchSubmit}>
+                <button type="button" className="btn btn--ghost" onClick={() => handleSearchSubmit()}>
                   Обновить поиск
                 </button>
               </div>
 
-              {isLoading ? (
-                <div className="state-card">Загружаем список возможностей...</div>
-              ) : null}
+              {isListLoading ? <div className="state-card">Загружаем список возможностей...</div> : null}
 
-              {!isLoading && errorMessage ? (
+              {!isListLoading && listErrorMessage ? (
                 <div className="state-card state-card--error">
-                  <p>{errorMessage}</p>
+                  <p>{listErrorMessage}</p>
                   <button
                     type="button"
                     className="btn btn--ghost"
                     onClick={() => {
-                      void loadOpportunities()
+                      void loadListOpportunities()
                     }}
                   >
                     Повторить
@@ -232,13 +321,13 @@ export function HomePage() {
                 </div>
               ) : null}
 
-              {!isLoading && !errorMessage && items.length === 0 ? (
+              {!isListLoading && !listErrorMessage && listItems.length === 0 ? (
                 <div className="state-card">Ничего не найдено. Попробуйте изменить фильтры или текст поиска.</div>
               ) : null}
 
-              {!isLoading && !errorMessage && items.length > 0 ? (
+              {!isListLoading && !listErrorMessage && listItems.length > 0 ? (
                 <div className="result-list">
-                  {items.map((item) => (
+                  {listItems.map((item) => (
                     <OpportunityCard
                       key={item.id}
                       opportunity={item}
@@ -255,7 +344,7 @@ export function HomePage() {
           </div>
         )}
       </section>
-      <Hu/>
+      <Hu />
 
       <SecondarySections />
     </>

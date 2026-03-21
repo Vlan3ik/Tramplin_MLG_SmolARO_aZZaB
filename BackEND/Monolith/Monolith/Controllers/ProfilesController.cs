@@ -64,6 +64,8 @@ public class ProfilesController(AppDbContext dbContext) : ControllerBase
             canViewProfile ? profile.FirstName : string.Empty,
             canViewProfile ? profile.LastName : string.Empty,
             canViewProfile ? profile.MiddleName : null,
+            canViewProfile ? profile.BirthDate : null,
+            canViewProfile ? profile.Gender : null,
             canViewProfile && settings.ShowContactsInResume ? profile.Phone : null,
             canViewProfile ? profile.About : null,
             canViewProfile ? profile.AvatarUrl : null,

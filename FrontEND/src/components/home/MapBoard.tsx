@@ -21,6 +21,8 @@ type MapBoardProps = {
   isLoading: boolean
   errorMessage: string
   onRetry: () => void
+  onBoundsChange: (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => void
+  jumpToRequest: { token: number; lngLat: [number, number] } | null
 }
 
 function createOpportunityTags(tags: string[]) {
@@ -121,10 +123,13 @@ function createPopupContent(
   return wrapper
 }
 
-export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetry }: MapBoardProps) {
+export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetry, onBoundsChange, jumpToRequest }: MapBoardProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const mapMarkersRef = useRef<maplibregl.Marker[]>([])
+  const hasAutoFittedRef = useRef(false)
+  const boundsDebounceRef = useRef<number | null>(null)
+  const lastJumpTokenRef = useRef<number | null>(null)
   const [activeCluster, setActiveCluster] = useState<OpportunityMarker | null>(null)
 
   const markerData = useMemo<OpportunityMarker[]>(() => {
@@ -197,15 +202,43 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     map.addControl(new maplibregl.AttributionControl({ compact: true }))
 
+    const emitBounds = () => {
+      const bounds = map.getBounds()
+      onBoundsChange({
+        minLat: bounds.getSouth(),
+        maxLat: bounds.getNorth(),
+        minLng: bounds.getWest(),
+        maxLng: bounds.getEast(),
+      })
+    }
+
+    const handleMoveEnd = () => {
+      if (boundsDebounceRef.current != null) {
+        window.clearTimeout(boundsDebounceRef.current)
+      }
+
+      boundsDebounceRef.current = window.setTimeout(() => {
+        emitBounds()
+      }, 300)
+    }
+
+    map.on('load', emitBounds)
+    map.on('moveend', handleMoveEnd)
+
     mapRef.current = map
 
     return () => {
+      map.off('moveend', handleMoveEnd)
+      map.off('load', emitBounds)
+      if (boundsDebounceRef.current != null) {
+        window.clearTimeout(boundsDebounceRef.current)
+      }
       mapMarkersRef.current.forEach((marker) => marker.remove())
       mapMarkersRef.current = []
       map.remove()
       mapRef.current = null
     }
-  }, [])
+  }, [onBoundsChange])
 
   useEffect(() => {
     const map = mapRef.current
@@ -296,17 +329,43 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
 
     mapMarkersRef.current = newMarkers
 
-    const bounds = markerData.reduce(
-      (acc, marker) => acc.extend(marker.lngLat),
-      new maplibregl.LngLatBounds(markerData[0].lngLat, markerData[0].lngLat),
-    )
+    if (!hasAutoFittedRef.current && markerData.length > 0) {
+      const bounds = markerData.reduce(
+        (acc, marker) => acc.extend(marker.lngLat),
+        new maplibregl.LngLatBounds(markerData[0].lngLat, markerData[0].lngLat),
+      )
 
-    map.fitBounds(bounds, {
-      padding: { top: 140, right: 80, bottom: 90, left: 420 },
-      duration: 900,
-      maxZoom: 8,
-    })
+      map.fitBounds(bounds, {
+        padding: { top: 140, right: 80, bottom: 90, left: 420 },
+        duration: 900,
+        maxZoom: 8,
+      })
+
+      hasAutoFittedRef.current = true
+    }
   }, [markerData])
+
+  useEffect(() => {
+    const map = mapRef.current
+
+    if (!map || !jumpToRequest) {
+      return
+    }
+
+    if (lastJumpTokenRef.current === jumpToRequest.token) {
+      return
+    }
+
+    lastJumpTokenRef.current = jumpToRequest.token
+    hasAutoFittedRef.current = true
+    map.flyTo({
+      center: jumpToRequest.lngLat,
+      zoom: Math.max(map.getZoom(), 11),
+      speed: 0.85,
+      curve: 1.25,
+      essential: true,
+    })
+  }, [jumpToRequest])
 
   const displayedItems = activeCluster ? activeCluster.opportunities : opportunities.slice(0, 6)
 

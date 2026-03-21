@@ -1,16 +1,16 @@
 import { LogOut } from 'lucide-react'
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
+import logoUrl from '../../assets/logo.svg'
 import { useAuth } from '../../hooks/useAuth'
 
-const menuItems = [
-  { label: 'Возможности', to: '/', isActive: (pathname: string) => pathname === '/' },
-  { label: 'Компании', to: '/companies', isActive: (pathname: string) => pathname === '/companies' || pathname.startsWith('/companies/') },
-  { label: 'Мероприятия', to: '/opportunity/1', isActive: (pathname: string) => pathname.startsWith('/opportunity/') },
-  { label: 'О платформе', to: '/about', isActive: (pathname: string) => pathname === '/about' },
+const menuItems: Array<{ label: string; to?: string }> = [
+  { label: 'Вакансии', to: '/' },
+  { label: 'Мероприятия' },
+  { label: 'Компании', to: '/companies' },
+  { label: 'Резюме' },
 ]
 
 export function MainHeader() {
-  const location = useLocation()
   const navigate = useNavigate()
   const { isAuthenticated, signOut } = useAuth()
 
@@ -22,22 +22,22 @@ export function MainHeader() {
   return (
     <header className="main-header">
       <div className="container main-header__inner">
-        <Link to="/" className="brand">
-          <span className="brand__dot" />
-          Трамплин
+        <Link to="/" className="brand" aria-label="На главную">
+          <img src={logoUrl} alt="Трамплин" className="brand__logo" />
         </Link>
 
         <nav className="main-nav" aria-label="Основная навигация">
-          {menuItems.map((item) => (
-            <NavLink
-              key={item.label}
-              to={item.to}
-              end={item.to === '/'}
-              className={item.isActive(location.pathname) ? 'is-active' : ''}
-            >
-              {item.label}
-            </NavLink>
-          ))}
+          {menuItems.map((item) =>
+            item.to ? (
+              <NavLink key={item.label} to={item.to} end={item.to === '/'}>
+                {item.label}
+              </NavLink>
+            ) : (
+              <span key={item.label} className="main-nav__placeholder" aria-disabled="true">
+                {item.label}
+              </span>
+            ),
+          )}
         </nav>
 
         <div className="main-header__actions">

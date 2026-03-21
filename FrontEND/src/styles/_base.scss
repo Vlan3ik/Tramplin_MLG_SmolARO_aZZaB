@@ -166,17 +166,12 @@ textarea:focus {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
-  font-family: var(--font-heading);
-  font-weight: 800;
-  font-size: 1.2rem;
+  min-height: 48px;
 
-  &__dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 0 4px var(--accent-soft);
+  &__logo {
+    width: 140px;
+    height: auto;
+    max-width: 100%;
   }
 }
 

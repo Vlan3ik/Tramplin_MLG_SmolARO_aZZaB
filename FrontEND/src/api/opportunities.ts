@@ -107,6 +107,29 @@ type MapOpportunityFeatureApi = {
   properties?: {
     id?: number
     entityType?: string | number | null
+    title?: string | null
+    shortDescription?: string | null
+    fullDescription?: string | null
+    kind?: KindApi
+    format?: WorkFormatApi
+    publishAt?: string
+    salaryFrom?: number | null
+    salaryTo?: number | null
+    currencyCode?: string | null
+    priceType?: string | number | null
+    priceAmount?: number | null
+    priceCurrencyCode?: string | null
+    companyName?: string | null
+    locationName?: string | null
+    tags?: string[] | null
+    company?: {
+      id?: number
+      name?: string | null
+      verified?: boolean
+    } | null
+    location?: {
+      cityName?: string | null
+    } | null
   }
 }
 
@@ -120,6 +143,19 @@ export type HomeSearchQuery = {
   search?: string
   cityId?: number | null
   filters: OpportunityFilters
+}
+
+export type MapViewportBounds = {
+  minLat: number
+  maxLat: number
+  minLng: number
+  maxLng: number
+}
+
+export type MapSearchQuery = {
+  search?: string
+  filters: OpportunityFilters
+  bounds?: MapViewportBounds | null
 }
 
 const formatByText: Record<string, string> = {
@@ -247,6 +283,7 @@ function toOpportunityFromVacancy(apiItem: VacancyListItemApi, coordinates: { la
 
   return {
     id: apiItem.id,
+    entityType: 'vacancy',
     title: apiItem.title ?? 'Без названия',
     type,
     company: apiItem.companyName ?? 'Компания',
@@ -276,6 +313,7 @@ function toOpportunityFromOpportunity(
 
   return {
     id: apiItem.id,
+    entityType: 'opportunity',
     title: apiItem.title ?? 'Р‘РµР· РЅР°Р·РІР°РЅРёСЏ',
     type: type === 'vacancy' ? 'event' : type,
     company: apiItem.companyName ?? 'РљРѕРјРїР°РЅРёСЏ',
@@ -438,6 +476,96 @@ function buildMapQueryString(query: HomeSearchQuery) {
   return params.toString()
 }
 
+function buildMapSearchQueryString(query: MapSearchQuery) {
+  const params = new URLSearchParams()
+
+  if (query.search?.trim()) {
+    params.set('Search', query.search.trim())
+  }
+
+  if (query.bounds) {
+    params.set('MinLat', String(query.bounds.minLat))
+    params.set('MaxLat', String(query.bounds.maxLat))
+    params.set('MinLng', String(query.bounds.minLng))
+    params.set('MaxLng', String(query.bounds.maxLng))
+  }
+
+  params.append('EntityTypes', '1')
+  params.append('EntityTypes', '2')
+
+  const hasInternship = query.filters.types.includes('internship')
+  const hasVacancy = query.filters.types.includes('vacancy')
+
+  if (!query.filters.types.length || hasInternship || hasVacancy) {
+    if (!query.filters.types.length || hasInternship) {
+      params.append('VacancyKinds', '1')
+    }
+
+    if (!query.filters.types.length || hasVacancy) {
+      params.append('VacancyKinds', '2')
+    }
+  }
+
+  const hasEvent = query.filters.types.includes('event')
+  const hasMentorship = query.filters.types.includes('mentorship')
+
+  if (!query.filters.types.length || hasEvent || hasMentorship) {
+    params.append('OpportunityKinds', '1')
+    params.append('OpportunityKinds', '2')
+    params.append('OpportunityKinds', '3')
+    params.append('OpportunityKinds', '4')
+  }
+
+  for (const format of query.filters.formats) {
+    if (format === 'onsite') params.append('Formats', '1')
+    if (format === 'hybrid') params.append('Formats', '2')
+    if (format === 'remote') params.append('Formats', '3')
+  }
+
+  if (query.filters.verifiedOnly) {
+    params.set('VerifiedOnly', 'true')
+  }
+
+  return params.toString()
+}
+
+function mapOpportunityFromFeature(feature: MapOpportunityFeatureApi): Opportunity | null {
+  const id = feature.properties?.id
+
+  if (!id) {
+    return null
+  }
+
+  const [longitude, latitude] = feature.geometry?.coordinates ?? [null, null]
+  const props = feature.properties
+  const entityType = parseMapEntityType(props?.entityType)
+  const type = parseOpportunityType(props?.kind)
+  const normalizedFormat = parseFormat(props?.format)
+  const companyName = props?.company?.name ?? props?.companyName ?? 'Компания'
+  const locationName = props?.location?.cityName ?? props?.locationName ?? 'Локация не указана'
+  const compensation =
+    entityType === 'vacancy'
+      ? formatSalary(props?.salaryFrom, props?.salaryTo, props?.currencyCode)
+      : formatPrice(props?.priceType, props?.priceAmount, props?.priceCurrencyCode)
+
+  return {
+    id,
+    title: props?.title ?? 'Без названия',
+    type: entityType === 'opportunity' && type === 'vacancy' ? 'event' : type,
+    company: companyName,
+    location: locationName,
+    compensation,
+    workFormat: normalizedFormat === 'onsite' ? 'Офис' : normalizedFormat === 'remote' ? 'Удаленно' : 'Гибрид',
+    date: formatRelativeDate(props?.publishAt),
+    description: props?.shortDescription ?? props?.fullDescription ?? 'Описание добавляется в карточке возможности.',
+    tags: props?.tags ?? [],
+    verified: Boolean(props?.company?.verified),
+    latitude,
+    longitude,
+    entityType: entityType ?? undefined,
+  }
+}
+
 export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: AbortSignal) {
   const queryString = buildVacanciesQueryString(query)
   const opportunitiesQueryString = buildOpportunitiesQueryString(query)
@@ -491,6 +619,50 @@ export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: Ab
   return {
     items,
     total: (vacanciesResponse.totalCount ?? vacanciesResponse.total ?? 0) + (opportunitiesResponse.totalCount ?? opportunitiesResponse.total ?? 0),
+  }
+}
+
+export async function fetchHomeListOpportunities(query: HomeSearchQuery, signal?: AbortSignal) {
+  const queryString = buildVacanciesQueryString(query)
+  const opportunitiesQueryString = buildOpportunitiesQueryString(query)
+  const [vacanciesResponse, opportunitiesResponse] = await Promise.all([
+    getJson<PagedResponse<VacancyListItemApi>>(`/vacancies?${queryString}`, { signal, withAuth: false }),
+    getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal, withAuth: false }),
+  ])
+
+  const vacancyItems = (vacanciesResponse.items ?? []).map((item) =>
+    toOpportunityFromVacancy(item, {
+      latitude: null,
+      longitude: null,
+    }),
+  )
+
+  const opportunityItems = (opportunitiesResponse.items ?? []).map((item) =>
+    toOpportunityFromOpportunity(item, {
+      latitude: null,
+      longitude: null,
+    }),
+  )
+
+  const items = [...vacancyItems, ...opportunityItems].sort((a, b) => b.id - a.id)
+
+  return {
+    items,
+    total: (vacanciesResponse.totalCount ?? vacanciesResponse.total ?? 0) + (opportunitiesResponse.totalCount ?? opportunitiesResponse.total ?? 0),
+  }
+}
+
+export async function fetchMapOpportunities(query: MapSearchQuery, signal?: AbortSignal) {
+  const mapQueryString = buildMapSearchQueryString(query)
+  const mapResponse = await getJson<MapOpportunityResponseApi>(`/map/opportunities?${mapQueryString}`, { signal, withAuth: false })
+
+  const items = (mapResponse.features ?? [])
+    .map((feature) => mapOpportunityFromFeature(feature))
+    .filter((item): item is Opportunity => item !== null)
+
+  return {
+    items,
+    total: items.length,
   }
 }
 

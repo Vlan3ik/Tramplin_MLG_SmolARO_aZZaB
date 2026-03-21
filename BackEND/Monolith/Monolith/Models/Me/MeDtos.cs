@@ -8,6 +8,8 @@ public record UpdateProfileRequest(
     string FirstName,
     string LastName,
     string? MiddleName,
+    DateOnly? BirthDate,
+    CandidateGender? Gender,
     string? Phone,
     string? About,
     string? AvatarUrl);
@@ -18,6 +20,8 @@ public record ProfileResponse(
     string FirstName,
     string LastName,
     string? MiddleName,
+    DateOnly? BirthDate,
+    CandidateGender Gender,
     string? Phone,
     string? About,
     string? AvatarUrl);
@@ -150,6 +154,8 @@ public record PublicProfileResponse(
     string FirstName,
     string LastName,
     string? MiddleName,
+    DateOnly? BirthDate,
+    CandidateGender? Gender,
     string? Phone,
     string? About,
     string? AvatarUrl,
