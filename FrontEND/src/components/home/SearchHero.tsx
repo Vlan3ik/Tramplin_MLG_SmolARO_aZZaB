@@ -13,13 +13,14 @@ type SearchHeroProps = {
 }
 
 const HERO_IFRAME_URL =
-  'https://app-472062.games.s3.yandex.net/472062/orblvcxwuye8naqml6g09l4bz8c59wnw_brotli/index.html?sdk=%2Fsdk%2F_%2Fv2.1cfa6241c8b6991a4ef6.js#origin=https%3A%2F%2Fyandex.ru&app-id=472062&device-type=desktop'
+      'https://g.igroutka.ru/games/1652/1u2NbYJlreRAtwo7/3fdb3fff-ce9a-467e-aa21-a2f103202af3/index.html'
+  // 'https://igroutka.ru/loader/game/54272/'
 
 const SUGGEST_MIN_QUERY_LENGTH = 2
 const SUGGEST_DEBOUNCE_MS = 250
 
 function formatSuggestMeta(item: SearchSuggestItem) {
-  return [item.companyName, item.locationName].filter(Boolean).join(' • ')
+  return [item.companyName, item.locationName].filter(Boolean).join(' - ')
 }
 
 export function SearchHero({
@@ -35,6 +36,7 @@ export function SearchHero({
   const [suggestions, setSuggestions] = useState<SearchSuggestItem[]>([])
   const [suggestError, setSuggestError] = useState('')
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
 
   const shouldLoadSuggest = useMemo(() => searchValue.trim().length >= SUGGEST_MIN_QUERY_LENGTH, [searchValue])
 
@@ -113,6 +115,41 @@ export function SearchHero({
     onSearchSubmit(item.title)
   }
 
+  function removeIframeBranding() {
+    const frame = iframeRef.current
+
+    if (!frame) {
+      return
+    }
+
+    const tryRemoveBranding = () => {
+      try {
+        const frameDocument = frame.contentDocument ?? frame.contentWindow?.document
+        const branding = frameDocument?.getElementById('more_g')
+
+        if (branding) {
+          branding.remove()
+        }
+      } catch {
+        // Cross-origin iframe can block DOM access; keep silent.
+      }
+    }
+
+    let attemptsLeft = 12
+    const timer = window.setInterval(() => {
+      attemptsLeft -= 1
+      tryRemoveBranding()
+
+      if (attemptsLeft <= 0) {
+        window.clearInterval(timer)
+      }
+    }, 300)
+
+    window.setTimeout(() => {
+      tryRemoveBranding()
+    }, 5000)
+  }
+
   return (
     <section className="search-hero container">
       <div className="search-hero__search card">
@@ -186,10 +223,12 @@ export function SearchHero({
 
       <div className="search-hero__iframe" aria-label="Интерактивный виджет карты">
         <iframe
+          ref={iframeRef}
           src={HERO_IFRAME_URL}
           title="Карта карьерных возможностей"
           loading="lazy"
           referrerPolicy="strict-origin-when-cross-origin"
+          onLoad={removeIframeBranding}
         />
       </div>
     </section>
