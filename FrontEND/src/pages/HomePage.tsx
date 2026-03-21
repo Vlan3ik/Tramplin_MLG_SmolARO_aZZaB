@@ -345,12 +345,10 @@ export function HomePage() {
           </div>
         )}
       </section>
-<<<<<<< Updated upstream
-      <Hu />
-=======
+
       <Hu/>
       <Po/>
->>>>>>> Stashed changes
+
 
       <SecondarySections />
     </>

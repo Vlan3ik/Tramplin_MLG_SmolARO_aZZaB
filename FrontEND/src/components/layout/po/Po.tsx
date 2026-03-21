@@ -1,5 +1,5 @@
-﻿import type { WheelEvent } from 'react'
-import styles from './стили.module.css'
+﻿import { useRef, useState, type WheelEvent } from 'react'
+import styles from './styles.module.css'
 
 type BlueCardItem = {
   id: number
@@ -20,35 +20,62 @@ const cards: BlueCardItem[] = Array.from({ length: 4 }, (_, index) => ({
 }))
 
 export function Po() {
+  const [activeIndex, setActiveIndex] = useState(cards.length > 1 ? 1 : 0)
+  const wheelLockUntilRef = useRef(0)
+
   function handleWheel(event: WheelEvent<HTMLDivElement>) {
-    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const now = Date.now()
+    if (now < wheelLockUntilRef.current) {
       return
     }
 
-    event.preventDefault()
-    event.currentTarget.scrollBy({
-      left: event.deltaY * 1.15,
-      behavior: 'smooth',
+    const direction = event.deltaY > 0 ? 1 : event.deltaY < 0 ? -1 : 0
+    if (!direction) {
+      return
+    }
+
+    const maxIndex = cards.length - 1
+    setActiveIndex((current) => {
+      if (direction > 0) {
+        return current >= maxIndex ? 0 : current + 1
+      }
+
+      return current <= 0 ? maxIndex : current - 1
     })
+
+    wheelLockUntilRef.current = now + 320
   }
 
   return (
     <section className={styles.poSection}>
       <h2 className={styles.title}>Новые мероприятия</h2>
 
-      <div className={styles.poCarousel} onWheel={handleWheel}>
-        {cards.map((card) => (
-          <div className={styles.poCarouselSlide} key={card.id}>
-            <КарточкаСиняя
-              число={card.day}
-              месяц={card.month}
-              время={card.time}
-              текстЧерный={card.title}
-              текстСерый={card.description}
-              порядковыйНомер={card.id}
-            />
-          </div>
-        ))}
+      <div className={styles.poCarouselViewport} onWheel={handleWheel}>
+        <div
+          className={styles.poCarouselTrack}
+          style={{
+            transform: `translateY(calc(var(--po-center-offset) - var(--po-step) * ${activeIndex}))`,
+          }}
+        >
+          {cards.map((card, index) => (
+            <div
+              className={`${styles.poCarouselSlide} ${index === activeIndex ? styles.poCarouselSlideActive : styles.poCarouselSlideSide}`}
+              key={card.id}
+            >
+              <КарточкаСиняя
+                число={card.day}
+                месяц={card.month}
+                время={card.time}
+                текстЧерный={card.title}
+                текстСерый={card.description}
+                порядковыйНомер={card.id}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   )
