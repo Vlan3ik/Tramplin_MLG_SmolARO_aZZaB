@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import hu from './hu.module.css'
+import hu from './Hu.module.css'
 
 const HU_TABS = [
   {
@@ -30,27 +30,20 @@ export function Hu() {
 
     
   return (
-    <section style={{
-        width: '100vw',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'column',
-        gap: '30px',
-    }}>
-      <h2 style={{
-        fontSize: "46px",
-        fontWeight: '900',
-        lineHeight: "130%",
-      }}>Стань частью IT-сообщества</h2>
-      <div style={{
-        display: 'flex',
-        flexDirection: 'row',
-        gap: '30px',
-        fontSize: 16
-      }} className='hu_tabs_header'>
+    <section className={hu.i}>
+      <h2 className={hu.b}>Стань частью IT-сообщества</h2>
+      <div className={hu.c}>
         {HU_TABS.map((tab, index) => 
-            <div key={index} onClick={() => setA(index)}>
+            <div style={{
+                color: a === index ? "#0171E1" : "#9A9CA5",
+                fontWeight: 600,
+                border: a === index ? '1px solid #0171E1' : '1px solid transparent',
+                borderRadius: '4px',
+                padding: '5px',
+                cursor: 'pointer'
+
+            }} 
+            key={index} onClick={() => setA(index)}>
                 {tab.icon} <span>{tab.title}</span>
             </div>
         )}
@@ -64,12 +57,12 @@ function Stajirovki () {
 
     return (
         <div>
-            <h3>Экосистема «Трампмох»</h3>
-            <p>Транс</p>
+            <h3 className={hu.й}>Экосистема «Трампмох»</h3>
+            <p>Каурса: насьера с перкртавнич. Твркинество,иой нт здеетжировог, ставк ставого рсь!</p>
             <ul>
-                <li>Находи менторов</li>
-                <li>Участвуй в ивентах компаний</li>
-                <li>Получай офферы за свои навыки</li>
+                <li>Налучаав ивх кхменоров</li>
+                <li>Уи вуй втои номпаний</li>
+                <li>Пой оффеечастоднтары за свыки</li>
             </ul>
         </div>
     )
@@ -78,7 +71,7 @@ function Praktiki () {
 
     return (
         <div>
-            <h3>Экосистема «Трамплох»</h3>
+            <h3 className={hu.й}>Экосистема «Трамплох»</h3>
             <p>Карьера с первого курса: наставничество, нетворкинг, стажировки. Твой старт здесь!</p>
             <ul>
                 <li>Находи менторов</li>
@@ -92,7 +85,7 @@ function Topoviecompanii () {
 
     return (
         <div>
-            <h3>Экосистема «Трампплох»</h3>
+            <h3 className={hu.й}>Экосистема «Трампплох»</h3>
             <p>Карьера с первого курса: наставничество, нетворкинг, стажировки. Твой старт здесь!</p>
             <ul>
                 <li>Находи менторов</li>
@@ -106,7 +99,7 @@ function Soobshestvovuzov () {
 
     return (
         <div>
-            <h3>Экосистема «Трамп»</h3>
+            <h3 className={hu.й}>Экосистема «Трамп»</h3>
             <p>Карьера с первого курса: наставничество, нетворкинг, стажировки. Твой старт здесь!</p>
             <ul>
                 <li>Находи менторов</li>

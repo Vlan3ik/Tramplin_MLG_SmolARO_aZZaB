@@ -1,0 +1,152 @@
+﻿.poSection {
+  background: #d9ecff;
+  padding: 70px 0 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.title {
+  font-weight: 800;
+  font-size: 32px;
+  line-height: 1.2;
+}
+
+.poCarousel {
+  display: flex;
+  gap: 22px;
+  width: min(1320px, calc(100vw - 32px));
+  overflow-x: auto;
+  padding: 6px 10px 16px;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 10px;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+  perspective: 1100px;
+}
+
+.poCarousel::-webkit-scrollbar {
+  height: 10px;
+}
+
+.poCarousel::-webkit-scrollbar-thumb {
+  background: linear-gradient(315deg, #0171e1, #87c3ff);
+  border-radius: 999px;
+}
+
+.poCarousel::-webkit-scrollbar-track {
+  background: #c7def7;
+  border-radius: 999px;
+}
+
+.poCarouselSlide {
+  flex: 0 0 min(1280px, calc(100vw - 48px));
+  scroll-snap-align: center;
+  transform-origin: center center;
+  transition: transform 260ms ease, filter 260ms ease;
+}
+
+.poCarouselSlide:nth-child(odd) {
+  transform: rotateY(-6deg) scale(0.985);
+}
+
+.poCarouselSlide:nth-child(even) {
+  transform: rotateY(6deg) scale(0.985);
+}
+
+.poCarouselSlide:hover {
+  transform: rotateY(0deg) scale(1);
+  filter: saturate(1.05);
+}
+
+.cardContainer {
+  background: #d9ecff;
+  padding-block: 30px;
+  display: flex;
+  width: min(1280px, 100%);
+  box-shadow: 0 4px 4px 0 #00000042;
+  border-radius: 10px;
+  padding-inline: 20px;
+  justify-content: start;
+  align-items: center;
+  gap: 16px;
+}
+
+.cardDate {
+  margin-right: 40px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.cardDateMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardTime {
+  text-wrap: nowrap;
+  color: #787a80;
+}
+
+.cardDay {
+  color: #0171e1;
+  font-size: 48px;
+  font-weight: 900;
+}
+
+.cardMonth {
+  font-weight: 900;
+  font-size: 20px;
+  line-height: 150%;
+}
+
+.cardDescription {
+  color: #787a80;
+  font-size: 16px;
+}
+
+.cardTitle {
+  font-size: 20px;
+  line-height: 150%;
+  font-weight: 900;
+}
+
+.cardContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardButton {
+  margin-left: auto;
+  background: linear-gradient(315deg, #0171e1, #87c3ff);
+  height: 44px;
+  padding-inline: 32px;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.cardButton:hover {
+  opacity: 0.8;
+}
+
+@media (max-width: 980px) {
+  .cardContainer {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+  }
+
+  .cardDate {
+    margin-right: 0;
+  }
+
+  .cardButton {
+    margin-left: 0;
+  }
+}

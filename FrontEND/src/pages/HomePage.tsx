@@ -18,6 +18,7 @@ import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityFilters, OpportunityType } from '../types/opportunity'
 import type { SearchSuggestItem } from '../types/search'
 import { Hu } from '../components/layout/hu/Hu'
+import { Po } from '../components/layout/po/Po'
 
 const defaultFilters: OpportunityFilters = {
   types: [],
@@ -344,7 +345,12 @@ export function HomePage() {
           </div>
         )}
       </section>
+<<<<<<< Updated upstream
       <Hu />
+=======
+      <Hu/>
+      <Po/>
+>>>>>>> Stashed changes
 
       <SecondarySections />
     </>
