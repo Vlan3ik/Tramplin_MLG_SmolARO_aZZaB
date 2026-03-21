@@ -10,6 +10,7 @@ import { useCity } from '../contexts/CityContext'
 import { useApplications } from '../hooks/useApplications'
 import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityFilters, OpportunityType } from '../types/opportunity'
+import { Hu } from '../components/layout/hu/Hu'
 
 const defaultFilters: OpportunityFilters = {
   types: [],
@@ -254,6 +255,7 @@ export function HomePage() {
           </div>
         )}
       </section>
+      <Hu/>
 
       <SecondarySections />
     </>
