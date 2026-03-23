@@ -170,8 +170,13 @@ const formatByNumber: Record<number, string> = {
   3: 'remote',
 }
 
-function parseOpportunityType(value: KindApi): OpportunityType {
+function parseOpportunityType(value: KindApi, source: 'vacancy' | 'opportunity' | 'unknown' = 'unknown'): OpportunityType {
   if (typeof value === 'number') {
+    if (source === 'opportunity') {
+      // OpportunityKind is an event subtype enum (Hackathon/OpenDay/Lecture/Other).
+      return 'event'
+    }
+
     // VacancyKind in new API: 1 = Internship, 2 = Job.
     if (value === 1) return 'internship'
     if (value === 2) return 'vacancy'
@@ -275,7 +280,7 @@ function formatRelativeDate(publishAt: string | undefined) {
 }
 function toOpportunityFromVacancy(apiItem: VacancyListItemApi, coordinates: { latitude: number | null; longitude: number | null }): Opportunity {
   const kind = apiItem.kind ?? apiItem.type
-  const type = parseOpportunityType(kind)
+  const type = parseOpportunityType(kind, 'vacancy')
   const normalizedFormat = parseFormat(apiItem.format)
 
   return {
@@ -305,7 +310,7 @@ function toOpportunityFromOpportunity(
     longitude: number | null
   },
 ): Opportunity {
-  const type = parseOpportunityType(apiItem.kind)
+  const type = parseOpportunityType(apiItem.kind, 'opportunity')
   const normalizedFormat = parseFormat(apiItem.format)
 
   return {
@@ -535,7 +540,7 @@ function mapOpportunityFromFeature(feature: MapOpportunityFeatureApi): Opportuni
   const [longitude, latitude] = feature.geometry?.coordinates ?? [null, null]
   const props = feature.properties
   const entityType = parseMapEntityType(props?.entityType)
-  const type = parseOpportunityType(props?.kind)
+  const type = parseOpportunityType(props?.kind, entityType ?? 'unknown')
   const normalizedFormat = parseFormat(props?.format)
   const companyName = props?.company?.name ?? props?.companyName ?? 'Компания'
   const locationName = props?.location?.cityName ?? props?.locationName ?? 'Локация не указана'
@@ -663,7 +668,7 @@ export async function fetchMapOpportunities(query: MapSearchQuery, signal?: Abor
 
 function mapFromVacancyDetail(response: VacancyDetailApi): OpportunityDetail {
   const kind = response.kind ?? response.type
-  const type = parseOpportunityType(kind)
+  const type = parseOpportunityType(kind, 'vacancy')
   const normalizedFormat = parseFormat(response.format)
 
   return {
@@ -694,11 +699,12 @@ function mapFromVacancyDetail(response: VacancyDetailApi): OpportunityDetail {
 function mapFromOpportunityDetail(response: OpportunityDetailApi): OpportunityDetail {
   const kind = response.kind ?? response.type
   const normalizedFormat = parseFormat(response.format)
+  const type = parseOpportunityType(kind, 'opportunity')
 
   return {
     id: response.id,
     title: response.title ?? 'Без названия',
-    type: parseOpportunityType(kind) === 'vacancy' ? 'event' : parseOpportunityType(kind),
+    type,
     company: response.company?.name ?? 'Компания',
     location: response.location?.cityName ?? 'Локация не указана',
     compensation: formatPrice(response.priceType, response.priceAmount, response.priceCurrencyCode),
