@@ -93,3 +93,5 @@ public record AdminVacancyUpsertRequest(
     SalaryTaxMode SalaryTaxMode,
     DateTimeOffset PublishAt,
     DateTimeOffset? ApplicationDeadline);
+
+public record AdminVacancyStatusUpdateRequest(OpportunityStatus Status);

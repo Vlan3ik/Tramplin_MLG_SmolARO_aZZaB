@@ -111,6 +111,23 @@ public class AdminVacanciesController(AppDbContext dbContext) : ControllerBase
     /// <param name="id">Идентификатор вакансии.</param>
     /// <param name="cancellationToken">Токен отмены операции удаления.</param>
     /// <returns>Пустой ответ при успешном удалении.</returns>
+    /// <param name="request">Новый статус вакансии.</param>
+    [HttpPatch("{id:long}/status")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateStatus(long id, AdminVacancyStatusUpdateRequest request, CancellationToken cancellationToken)
+    {
+        var vacancy = await dbContext.Vacancies.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (vacancy is null)
+        {
+            return this.ToNotFoundError("admin.vacancies.not_found", "Vacancy not found.");
+        }
+
+        vacancy.Status = request.Status;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]

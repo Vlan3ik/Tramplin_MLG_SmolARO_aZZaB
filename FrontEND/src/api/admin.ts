@@ -1,4 +1,4 @@
-import { deleteJson, getJson, postJson, putJson } from './client'
+import { deleteJson, getJson, patchJson, postJson, putJson } from './client'
 
 type PagedResponse<TItem> = {
   items?: TItem[] | null
@@ -416,6 +416,10 @@ export function createAdminVacancy(payload: AdminVacancyUpsertRequest) {
 
 export function updateAdminVacancy(id: number, payload: AdminVacancyUpsertRequest) {
   return putJson<AdminVacancyApi, AdminVacancyUpsertApiRequest>(`/admin/vacancies/${id}`, mapVacancyUpsertRequest(payload))
+}
+
+export function updateAdminVacancyStatus(id: number, status: number) {
+  return patchJson<unknown, { status: number }>(`/admin/vacancies/${id}/status`, { status })
 }
 
 export function deleteAdminVacancy(id: number) {
