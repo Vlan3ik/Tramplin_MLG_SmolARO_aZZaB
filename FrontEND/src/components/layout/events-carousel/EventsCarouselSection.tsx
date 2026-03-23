@@ -1,7 +1,7 @@
 ﻿import { useRef, useState, type WheelEvent } from 'react'
-import styles from './styles.module.css'
+import styles from './EventsCarouselSection.module.css'
 
-type BlueCardItem = {
+type EventCardItem = {
   id: number
   day: string
   month: string
@@ -10,7 +10,15 @@ type BlueCardItem = {
   description: string
 }
 
-const cards: BlueCardItem[] = Array.from({ length: 4 }, (_, index) => ({
+type EventCardProps = {
+  day: string
+  month: string
+  time: string
+  title: string
+  description: string
+}
+
+const eventCards: EventCardItem[] = Array.from({ length: 4 }, (_, index) => ({
   id: index + 1,
   day: '05',
   month: 'Апреля',
@@ -19,8 +27,8 @@ const cards: BlueCardItem[] = Array.from({ length: 4 }, (_, index) => ({
   description: 'Мастер-класс по архитектурным паттернам и минимизации рисков при миграции данных.',
 }))
 
-export function Po() {
-  const [activeIndex, setActiveIndex] = useState(cards.length > 1 ? 1 : 0)
+export function EventsCarouselSection() {
+  const [activeIndex, setActiveIndex] = useState(eventCards.length > 1 ? 1 : 0)
   const wheelLockUntilRef = useRef(0)
 
   function handleWheel(event: WheelEvent<HTMLDivElement>) {
@@ -37,7 +45,7 @@ export function Po() {
       return
     }
 
-    const maxIndex = cards.length - 1
+    const maxIndex = eventCards.length - 1
     setActiveIndex((current) => {
       if (direction > 0) {
         return current >= maxIndex ? 0 : current + 1
@@ -50,29 +58,22 @@ export function Po() {
   }
 
   return (
-    <section className={styles.poSection}>
+    <section className={styles.eventsSection}>
       <h2 className={styles.title}>Новые мероприятия</h2>
 
-      <div className={styles.poCarouselViewport} onWheel={handleWheel}>
+      <div className={styles.eventsCarouselViewport} onWheel={handleWheel}>
         <div
-          className={styles.poCarouselTrack}
+          className={styles.eventsCarouselTrack}
           style={{
-            transform: `translateY(calc(var(--po-center-offset) - var(--po-step) * ${activeIndex}))`,
+            transform: `translateY(calc(var(--events-center-offset) - var(--events-step) * ${activeIndex}))`,
           }}
         >
-          {cards.map((card, index) => (
+          {eventCards.map((card, index) => (
             <div
-              className={`${styles.poCarouselSlide} ${index === activeIndex ? styles.poCarouselSlideActive : styles.poCarouselSlideSide}`}
+              className={`${styles.eventsCarouselSlide} ${index === activeIndex ? styles.eventsCarouselSlideActive : styles.eventsCarouselSlideSide}`}
               key={card.id}
             >
-              <КарточкаСиняя
-                число={card.day}
-                месяц={card.month}
-                время={card.time}
-                текстЧерный={card.title}
-                текстСерый={card.description}
-                порядковыйНомер={card.id}
-              />
+              <EventCard day={card.day} month={card.month} time={card.time} title={card.title} description={card.description} />
             </div>
           ))}
         </div>
@@ -81,32 +82,19 @@ export function Po() {
   )
 }
 
-function КарточкаСиняя({
-  число,
-  время,
-  месяц,
-  текстСерый,
-  текстЧерный,
-}: {
-  число: string
-  месяц: string
-  время: string
-  текстЧерный: string
-  текстСерый: string
-  порядковыйНомер: number
-}) {
+function EventCard({ day, month, time, title, description }: EventCardProps) {
   return (
     <div className={styles.cardContainer}>
       <div className={styles.cardDate}>
-        <span className={styles.cardDay}>{число}</span>
+        <span className={styles.cardDay}>{day}</span>
         <div className={styles.cardDateMeta}>
-          <span className={styles.cardMonth}>{месяц}</span>
-          <span className={styles.cardTime}>{время}</span>
+          <span className={styles.cardMonth}>{month}</span>
+          <span className={styles.cardTime}>{time}</span>
         </div>
       </div>
       <div className={styles.cardContent}>
-        <span className={styles.cardTitle}>{текстЧерный}</span>
-        <span className={styles.cardDescription}>{текстСерый}</span>
+        <span className={styles.cardTitle}>{title}</span>
+        <span className={styles.cardDescription}>{description}</span>
       </div>
       <button className={styles.cardButton}>Подробнее</button>
     </div>

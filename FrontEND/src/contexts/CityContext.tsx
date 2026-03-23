@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react'
+﻿import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { fetchCities } from '../api/catalog'
 import type { City } from '../types/catalog'
 
@@ -65,7 +65,7 @@ function persistManualSelectionState(isManual: boolean) {
 }
 
 function resolveFallbackCityId(cities: City[]) {
-  const preferredCity = cities.find((city) => city.name.toLowerCase() === 'москва')
+  const preferredCity = cities.find((city) => city.name.toLowerCase() === 'РјРѕСЃРєРІР°')
   return preferredCity?.id ?? cities[0]?.id ?? null
 }
 
@@ -77,11 +77,11 @@ function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: num
   const earthRadiusKm = 6371
   const deltaLat = toRadians(lat2 - lat1)
   const deltaLon = toRadians(lon2 - lon1)
-  const a =
+  const haversineValue =
     Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
     Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2)
 
-  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(haversineValue), Math.sqrt(1 - haversineValue))
 }
 
 function findNearestCity(cities: City[], latitude: number, longitude: number) {
@@ -245,7 +245,7 @@ export function CityProvider({ children }: CityProviderProps) {
           return
         }
 
-        setErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить список городов.')
+        setErrorMessage(error instanceof Error ? error.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃРїРёСЃРѕРє РіРѕСЂРѕРґРѕРІ.')
       } finally {
         if (!isDisposed) {
           setIsLoadingCities(false)
@@ -302,3 +302,4 @@ export function useCity() {
 
   return context
 }
+

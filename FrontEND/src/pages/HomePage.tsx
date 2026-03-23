@@ -17,8 +17,8 @@ import { useApplications } from '../hooks/useApplications'
 import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityFilters, OpportunityType } from '../types/opportunity'
 import type { SearchSuggestItem } from '../types/search'
-import { Hu } from '../components/layout/hu/Hu'
-import { Po } from '../components/layout/po/Po'
+import { CommunityTabsSection } from '../components/layout/community-tabs/CommunityTabsSection'
+import { EventsCarouselSection } from '../components/layout/events-carousel/EventsCarouselSection'
 
 const defaultFilters: OpportunityFilters = {
   types: [],
@@ -346,8 +346,8 @@ export function HomePage() {
         )}
       </section>
 
-      <Hu/>
-      <Po/>
+      <CommunityTabsSection />
+      <EventsCarouselSection />
 
 
       <SecondarySections />
