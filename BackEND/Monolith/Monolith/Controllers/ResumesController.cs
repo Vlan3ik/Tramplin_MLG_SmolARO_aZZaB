@@ -42,9 +42,20 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
             .Include(x => x.PrivacySettings)
             .Where(x =>
                 x.ResumeProfile != null &&
-                !string.IsNullOrEmpty(x.ResumeProfile.DesiredPosition) &&
-                x.PrivacySettings != null &&
-                x.PrivacySettings.ResumeVisibility == PrivacyScope.AuthorizedUsers);
+                !string.IsNullOrEmpty(x.ResumeProfile.DesiredPosition));
+
+        if (viewerId is null)
+        {
+            return Ok(new PagedResponse<ResumeListItemDto>([], 0, page, pageSize));
+        }
+
+        var currentViewerId = viewerId.Value;
+        baseQuery = baseQuery.Where(x =>
+            x.UserId == currentViewerId ||
+            x.PrivacySettings == null ||
+            x.PrivacySettings.ResumeVisibility == PrivacyScope.AuthorizedUsers ||
+            (x.PrivacySettings.ResumeVisibility == PrivacyScope.ContactsOnly &&
+             dbContext.UserContacts.Any(c => c.UserId == x.UserId && c.ContactUserId == currentViewerId)));
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
@@ -59,7 +70,9 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
 
         if (query.OpenToWork is not null)
         {
-            baseQuery = baseQuery.Where(x => x.PrivacySettings!.OpenToWork == query.OpenToWork.Value);
+            baseQuery = query.OpenToWork.Value
+                ? baseQuery.Where(x => x.PrivacySettings == null || x.PrivacySettings.OpenToWork)
+                : baseQuery.Where(x => x.PrivacySettings != null && !x.PrivacySettings.OpenToWork);
         }
 
         if (query.SalaryFrom is not null)
@@ -113,7 +126,7 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
                 x.ResumeProfile.SalaryTo,
                 x.ResumeProfile.CurrencyCode,
                 x.ResumeProfile.UpdatedAt,
-                x.PrivacySettings!.OpenToWork
+                OpenToWork = x.PrivacySettings != null && x.PrivacySettings.OpenToWork
             })
             .ToListAsync(cancellationToken);
 
@@ -201,8 +214,15 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
             return this.ToNotFoundError("resumes.not_found", "Резюме не найдено.");
         }
 
-        var privacy = profile.PrivacySettings;
-        if (privacy is null || privacy.ResumeVisibility != PrivacyScope.AuthorizedUsers || profile.ResumeProfile is null)
+        if (profile.ResumeProfile is null)
+        {
+            return this.ToNotFoundError("resumes.not_found", "Резюме не найдено.");
+        }
+
+        var viewerId = TryGetViewerId();
+        var privacy = profile.PrivacySettings ?? new CandidatePrivacySettings { UserId = profile.UserId };
+        var canView = await CanViewResume(profile.UserId, viewerId, privacy.ResumeVisibility, cancellationToken);
+        if (!canView)
         {
             return this.ToNotFoundError("resumes.not_found", "Резюме не найдено.");
         }
@@ -248,6 +268,7 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
         var projects = await dbContext.CandidateResumeProjects
             .AsNoTracking()
             .Where(x => x.UserId == id)
+            .Where(x => !x.IsPrivate || viewerId == id)
             .OrderByDescending(x => x.CreatedAt)
             .Select(x => new ResumeProjectDto(x.Id, x.Title, x.Role, x.Description, x.StartDate, x.EndDate, x.RepoUrl, x.DemoUrl))
             .ToListAsync(cancellationToken);
@@ -298,4 +319,28 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
         var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
         return long.TryParse(id, out var value) ? value : null;
     }
+
+    private async Task<bool> CanViewResume(long ownerUserId, long? viewerUserId, PrivacyScope scope, CancellationToken cancellationToken)
+    {
+        if (viewerUserId == ownerUserId)
+        {
+            return true;
+        }
+
+        if (viewerUserId is null)
+        {
+            return false;
+        }
+
+        return scope switch
+        {
+            PrivacyScope.Private => false,
+            PrivacyScope.ContactsOnly => await dbContext.UserContacts.AnyAsync(
+                x => x.UserId == ownerUserId && x.ContactUserId == viewerUserId.Value,
+                cancellationToken),
+            PrivacyScope.AuthorizedUsers => true,
+            _ => false
+        };
+    }
 }
+

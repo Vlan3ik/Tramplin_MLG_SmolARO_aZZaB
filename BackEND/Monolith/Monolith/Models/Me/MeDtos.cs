@@ -95,7 +95,7 @@ public record ResumeResponse(
 /// <param name="Level">Уровень навыка от 1 до 5.</param>
 /// <param name="YearsExperience">Опыт в годах.</param>
 public record ResumeSkillItemDto(long TagId, string TagName, int? Level, decimal? YearsExperience);
-public record ResumeProjectItemDto(long Id, string Title, string? Role, string? Description, DateOnly? StartDate, DateOnly? EndDate, string? RepoUrl, string? DemoUrl);
+public record ResumeProjectItemDto(long Id, string Title, string? Role, string? Description, DateOnly? StartDate, DateOnly? EndDate, string? RepoUrl, string? DemoUrl, bool IsPrivate);
 public record ResumeExperienceItemDto(
     long Id,
     long? CompanyId,

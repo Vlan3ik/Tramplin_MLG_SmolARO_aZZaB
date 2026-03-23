@@ -1,5 +1,11 @@
 import { getJson, putJson } from './client'
-import type { SeekerProfile, SeekerProfileStats, UpdateSeekerProfileRequest } from '../types/me'
+import type {
+  SeekerProfile,
+  SeekerProfileStats,
+  SeekerSettings,
+  UpdateSeekerProfileRequest,
+  UpdateSeekerSettingsRequest,
+} from '../types/me'
 import type { SeekerResume } from '../types/resume'
 
 type ResumeApiResponse = {
@@ -36,6 +42,7 @@ type ResumeApiResponse = {
     repoUrl: string | null
     demoUrl: string | null
     mainPhotoUrl?: string | null
+    isPrivate?: boolean | null
   }> | null
   education?: Array<{
     id: number
@@ -55,6 +62,14 @@ type ResumeApiResponse = {
 
 type PublicProfileResponse = {
   stats: SeekerProfileStats
+}
+
+type SeekerSettingsApiResponse = {
+  userId: number
+  profileVisibility: SeekerSettings['profileVisibility']
+  resumeVisibility: SeekerSettings['resumeVisibility']
+  openToWork: boolean
+  showContactsInResume: boolean
 }
 
 type UpdateResumeDetailsRequest = {
@@ -110,6 +125,30 @@ export function updateSeekerProfile(payload: UpdateSeekerProfileRequest) {
   return putJson<SeekerProfile, UpdateSeekerProfileRequest>('/me/profile', payload)
 }
 
+export async function fetchSeekerSettings(signal?: AbortSignal): Promise<SeekerSettings> {
+  const response = await getJson<SeekerSettingsApiResponse>('/me/settings', { signal })
+
+  return {
+    userId: response.userId,
+    profileVisibility: response.profileVisibility,
+    resumeVisibility: response.resumeVisibility,
+    openToWork: response.openToWork,
+    showContactsInResume: response.showContactsInResume,
+  }
+}
+
+export async function updateSeekerSettings(payload: UpdateSeekerSettingsRequest): Promise<SeekerSettings> {
+  const response = await putJson<SeekerSettingsApiResponse, UpdateSeekerSettingsRequest>('/me/settings', payload)
+
+  return {
+    userId: response.userId,
+    profileVisibility: response.profileVisibility,
+    resumeVisibility: response.resumeVisibility,
+    openToWork: response.openToWork,
+    showContactsInResume: response.showContactsInResume,
+  }
+}
+
 export async function fetchSeekerResume(signal?: AbortSignal): Promise<SeekerResume> {
   const response = await getJson<ResumeApiResponse>('/me/resume/details', { signal })
 
@@ -152,6 +191,7 @@ export async function fetchSeekerResume(signal?: AbortSignal): Promise<SeekerRes
           repoUrl: project.repoUrl ?? '',
           demoUrl: project.demoUrl ?? '',
           mainPhotoUrl: project.mainPhotoUrl ?? null,
+          isPrivate: Boolean(project.isPrivate),
         }))
       : [],
     education: Array.isArray(response.education)

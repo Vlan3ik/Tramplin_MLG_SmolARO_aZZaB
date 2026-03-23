@@ -1,11 +1,8 @@
-const RAW_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
+import { API_BASE_URL } from '../config/api'
+
 const AUTH_STORAGE_KEY = 'tramplin.auth.session'
 const AUTH_SESSION_EVENT = 'tramplin:auth-session-change'
 const TOKEN_REFRESH_SKEW_MS = 60_000
-
-export const API_BASE_URL = RAW_API_BASE_URL
-  ? RAW_API_BASE_URL.replace(/\/$/, '')
-  : 'http://169.254.185.29:1488/api'
 
 type ApiErrorPayload = {
   code?: string

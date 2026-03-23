@@ -5,19 +5,33 @@ import { Link } from 'react-router-dom'
 import { createApplication } from '../../api/applications'
 import { fetchTags } from '../../api/catalog'
 import { fetchCompanies } from '../../api/companies'
-import { fetchSeekerProfile, fetchSeekerResume, updateSeekerProfile, updateSeekerResume } from '../../api/me'
+import {
+  fetchSeekerProfile,
+  fetchSeekerResume,
+  fetchSeekerSettings,
+  updateSeekerProfile,
+  updateSeekerResume,
+  updateSeekerSettings,
+} from '../../api/me'
 import { uploadMyAvatar } from '../../api/media'
-import { createMyPortfolioProject, deleteMyPortfolioProject, fetchPublicPortfolioProjects, uploadMyPortfolioProjectPhoto } from '../../api/portfolio'
 import { fetchOpportunityById, fetchOpportunityDetailById, participateInOpportunity } from '../../api/opportunities'
+import {
+  createMyPortfolioProject,
+  deleteMyPortfolioProject,
+  fetchPublicPortfolioProjects,
+  updateMyPortfolioProject,
+  uploadMyPortfolioProjectPhoto,
+} from '../../api/portfolio'
 import { fetchMyFollowerSubscriptions, fetchMyFollowingSubscriptions, followUser, type SubscriptionUser, unfollowUser } from '../../api/subscriptions'
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
+import { API_ORIGIN } from '../../config/api'
 import { useApplications } from '../../hooks/useApplications'
 import { useAuth } from '../../hooks/useAuth'
 import type { TagListItem } from '../../types/catalog'
 import type { Company } from '../../types/company'
-import type { CandidateGender, SeekerProfile } from '../../types/me'
+import type { CandidateGender, SeekerProfile, SeekerSettings } from '../../types/me'
 import type { Opportunity } from '../../types/opportunity'
 import type { SeekerResume } from '../../types/resume'
 import { getFavoriteOpportunityIds, subscribeToFavoriteOpportunities } from '../../utils/favorites'
@@ -37,6 +51,12 @@ type ProfileFormState = {
   phone: string
   about: string
   avatarUrl: string
+}
+
+type SubscriptionProjectPreview = {
+  projectId: number
+  title: string
+  imageUrl: string | null
 }
 
 const tabs: Array<{ id: TabId; label: string }> = [
@@ -62,14 +82,6 @@ const profileGenderOptions: Array<{ value: ProfileGenderValue; label: string }> 
   { value: '2', label: 'Женский' },
 ]
 
-const subscriptionPreviewPhotos = [
-  'https://placehold.co/300x100?text=Project+1',
-  'https://placehold.co/300x100?text=Project+2',
-  'https://placehold.co/300x100?text=Project+3',
-  'https://placehold.co/300x100?text=Project+4',
-  'https://placehold.co/300x100?text=Project+5',
-  'https://placehold.co/300x100?text=Project+6',
-]
 const portfolioMockPhotos = [
   'https://placehold.co/300x300?text=Work+1',
   'https://placehold.co/300x300?text=Work+2',
@@ -82,15 +94,6 @@ const portfolioMockPhotos = [
   'https://placehold.co/300x300?text=Work+9',
   'https://placehold.co/300x300?text=Work+10',
 ]
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || 'http://169.254.185.29:1488/api'
-const API_ORIGIN = (() => {
-  try {
-    return new URL(API_BASE_URL).origin
-  } catch {
-    return typeof window !== 'undefined' ? window.location.origin : ''
-  }
-})()
 
 const initialResume = (userId = 0): SeekerResume => ({
   userId,
@@ -115,6 +118,7 @@ const initialProject = {
   endDate: '',
   repoUrl: '',
   demoUrl: '',
+  isPrivate: false,
 }
 
 const initialEducation = {
@@ -141,10 +145,29 @@ const initialExperience = {
   isCurrent: false,
 }
 
+type ProfileVisibilityMode = 'public' | 'private'
+
+const PRIVACY_SCOPE_PRIVATE = 1
+const PRIVACY_SCOPE_AUTHORIZED_USERS = 3
+
+function resolveProfileVisibilityMode(settings: Pick<SeekerSettings, 'profileVisibility' | 'resumeVisibility'>): ProfileVisibilityMode {
+  return settings.profileVisibility === PRIVACY_SCOPE_PRIVATE || settings.resumeVisibility === PRIVACY_SCOPE_PRIVATE
+    ? 'private'
+    : 'public'
+}
+
+function toResumeAndProfileScope(mode: ProfileVisibilityMode) {
+  return mode === 'private' ? PRIVACY_SCOPE_PRIVATE : PRIVACY_SCOPE_AUTHORIZED_USERS
+}
+
 function resolveAvatarUrl(value: string | null | undefined) {
   if (!value) return null
   if (value.startsWith('http://') || value.startsWith('https://')) return value
   return value.startsWith('/') ? `${API_ORIGIN}${value}` : `${API_ORIGIN}/${value}`
+}
+
+function normalizeUsernameKey(value: string | null | undefined) {
+  return value?.trim().toLowerCase() ?? ''
 }
 
 function formatPhone(rawValue: string) {
@@ -220,6 +243,7 @@ function normalizeProjectPayload(project: typeof initialProject) {
     endDate: project.endDate || null,
     repoUrl: normalizeUrl(project.repoUrl) || null,
     demoUrl: normalizeUrl(project.demoUrl) || null,
+    isPrivate: Boolean(project.isPrivate),
     participants: [],
     collaborations: [],
   }
@@ -275,6 +299,7 @@ export function SeekerDashboardPage() {
   const [followerUsers, setFollowerUsers] = useState<SubscriptionUser[]>([])
   const [subscriptionsTab, setSubscriptionsTab] = useState<SubscriptionTabId>('seekers')
   const [subscriptionActionLoading, setSubscriptionActionLoading] = useState<Record<number, boolean>>({})
+  const [subscriptionProjectsByUser, setSubscriptionProjectsByUser] = useState<Record<string, SubscriptionProjectPreview[]>>({})
   const [profilePanel, setProfilePanel] = useState<ProfilePanelId>('portfolio')
   const [followMode, setFollowMode] = useState<FollowMode>('subscriptions')
 
@@ -306,6 +331,8 @@ export function SeekerDashboardPage() {
   const [savingPortfolio, setSavingPortfolio] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [profileVisibility, setProfileVisibility] = useState<ProfileVisibilityMode>('public')
+  const [seekerSettings, setSeekerSettings] = useState<SeekerSettings | null>(null)
 
   const [profileError, setProfileError] = useState('')
   const [resumeError, setResumeError] = useState('')
@@ -338,9 +365,10 @@ export function SeekerDashboardPage() {
         ? fetchPublicPortfolioProjects(session.user.username, controller.signal)
         : Promise.resolve([] as Array<{ projectId: number; mainPhotoUrl: string | null }>)
 
-      const [profileResult, resumeResult, tagsResult, companiesResult, followingResult, followersResult, portfolioResult] = await Promise.allSettled([
+      const [profileResult, resumeResult, settingsResult, tagsResult, companiesResult, followingResult, followersResult, portfolioResult] = await Promise.allSettled([
         fetchSeekerProfile(controller.signal),
         fetchSeekerResume(controller.signal),
+        fetchSeekerSettings(controller.signal),
         fetchTags(controller.signal),
         fetchCompanies({ page: 1, pageSize: 100, verifiedOnly: true }, controller.signal),
         fetchMyFollowingSubscriptions(controller.signal),
@@ -381,16 +409,23 @@ export function SeekerDashboardPage() {
             }
           : apiResume
         const portfolioProjects = portfolioResult.status === 'fulfilled' ? portfolioResult.value : []
-        setResume(
-          sourceResume.projects.length
-            ? {
-                ...sourceResume,
-                projects: mergeProjectPhotos(sourceResume.projects, portfolioProjects),
-              }
-            : sourceResume,
-        )
+        const mergedResume = sourceResume.projects.length
+          ? {
+              ...sourceResume,
+              projects: mergeProjectPhotos(sourceResume.projects, portfolioProjects),
+            }
+          : sourceResume
+
+        setResume(mergedResume)
       } else if (!isAbortError(resumeResult.reason)) {
         setResumeError(resumeResult.reason instanceof Error ? resumeResult.reason.message : 'Ошибка загрузки резюме.')
+      }
+
+      if (settingsResult.status === 'fulfilled') {
+        setSeekerSettings(settingsResult.value)
+        setProfileVisibility(resolveProfileVisibilityMode(settingsResult.value))
+      } else if (!isAbortError(settingsResult.reason)) {
+        setProfileError((current) => current || (settingsResult.reason instanceof Error ? settingsResult.reason.message : 'Ошибка загрузки настроек приватности.'))
       }
 
       if (portfolioResult.status === 'rejected' && !isAbortError(portfolioResult.reason)) {
@@ -438,6 +473,60 @@ export function SeekerDashboardPage() {
 
     return unsubscribe
   }, [])
+
+  useEffect(() => {
+    const usernames = Array.from(
+      new Set(
+        [...followingUsers, ...followerUsers]
+          .map((user) => user.username.trim())
+          .filter(Boolean),
+      ),
+    )
+
+    if (!usernames.length) {
+      setSubscriptionProjectsByUser({})
+      return
+    }
+
+    const controller = new AbortController()
+
+    async function loadSubscriptionProjects() {
+      const results = await Promise.allSettled(
+        usernames.map(async (username) => {
+          const projects = await fetchPublicPortfolioProjects(username, controller.signal)
+          return {
+            usernameKey: normalizeUsernameKey(username),
+            projects: projects
+              .map((project) => ({
+                projectId: project.projectId,
+                title: project.title?.trim() || 'Проект без названия',
+                imageUrl: resolveAvatarUrl(project.mainPhotoUrl),
+              })),
+          }
+        }),
+      )
+
+      if (controller.signal.aborted) {
+        return
+      }
+
+      const nextMap: Record<string, SubscriptionProjectPreview[]> = {}
+
+      for (const result of results) {
+        if (result.status !== 'fulfilled') {
+          continue
+        }
+
+        nextMap[result.value.usernameKey] = result.value.projects.slice(0, 3)
+      }
+
+      setSubscriptionProjectsByUser(nextMap)
+    }
+
+    void loadSubscriptionProjects()
+
+    return () => controller.abort()
+  }, [followerUsers, followingUsers])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -506,32 +595,37 @@ export function SeekerDashboardPage() {
 
   const seekerSubscriptions = useMemo(() => {
     const source = (followMode === 'subscriptions' ? followingUsers : followerUsers).filter((user) => user.accountType !== 2)
-    return source.map((user, index) => ({
+    return source.map((user) => ({
       id: `${followMode}-seeker-${user.userId}`,
       userId: user.userId,
       title: user.displayName?.trim() || user.username?.trim() || `Пользователь #${user.userId}`,
       subtitle: 'Соискатель',
       description: followMode === 'subscriptions' ? 'Вы подписаны на этого пользователя.' : 'Подписан на вас.',
       avatarUrl: resolveAvatarUrl(user.avatarUrl),
-      previews: subscriptionPreviewPhotos.slice(index % 3, (index % 3) + 3),
+      previews: subscriptionProjectsByUser[normalizeUsernameKey(user.username)] ?? [],
     }))
-  }, [followMode, followerUsers, followingUsers])
+  }, [followMode, followerUsers, followingUsers, subscriptionProjectsByUser])
 
   const employerSubscriptions = useMemo(() => {
     const source = (followMode === 'subscriptions' ? followingUsers : followerUsers).filter((user) => user.accountType === 2)
-    return source.map((user, index) => ({
+    return source.map((user) => ({
       id: `${followMode}-employer-${user.userId}`,
       userId: user.userId,
       title: user.organizationName?.trim() || user.displayName?.trim() || user.username?.trim() || `Компания #${user.userId}`,
       subtitle: 'Работодатель',
       description: followMode === 'subscriptions' ? 'Вы подписаны на эту организацию.' : 'Организация подписана на вас.',
       avatarUrl: resolveAvatarUrl(user.avatarUrl),
-      previews: subscriptionPreviewPhotos.slice(index % 3, (index % 3) + 3),
+      previews: subscriptionProjectsByUser[normalizeUsernameKey(user.username)] ?? [],
     }))
-  }, [followMode, followerUsers, followingUsers])
+  }, [followMode, followerUsers, followingUsers, subscriptionProjectsByUser])
+
+  const visiblePortfolioProjects = useMemo(
+    () => resume.projects.filter((project) => !project.isPrivate),
+    [resume.projects],
+  )
 
   const portfolioItems = useMemo(() => {
-    return resume.projects.map((project, index) => ({
+    return visiblePortfolioProjects.map((project, index) => ({
       id: `resume-${project.id}`,
       projectId: project.id,
       image: resolveAvatarUrl(project.mainPhotoUrl) ?? portfolioMockPhotos[index % portfolioMockPhotos.length],
@@ -540,7 +634,7 @@ export function SeekerDashboardPage() {
       role: project.role || resume.desiredPosition || 'Соискатель',
       description: project.description || resume.summary || 'Описание проекта пока не добавлено.',
     }))
-  }, [displayName, resume.desiredPosition, resume.projects, resume.summary])
+  }, [displayName, resume.desiredPosition, resume.summary, visiblePortfolioProjects])
 
   async function onApplyFromFavorites(opportunityId: number) {
     if (!session?.accessToken || !session.user?.id) {
@@ -619,6 +713,24 @@ export function SeekerDashboardPage() {
       const updated = await updateSeekerProfile(payload)
       setProfile(updated)
       setProfileForm(createProfileForm(updated))
+
+      const nextScope = toResumeAndProfileScope(profileVisibility)
+      const settingsToSave = seekerSettings ?? {
+        userId: updated.userId,
+        profileVisibility: PRIVACY_SCOPE_AUTHORIZED_USERS,
+        resumeVisibility: PRIVACY_SCOPE_AUTHORIZED_USERS,
+        openToWork: true,
+        showContactsInResume: false,
+      }
+
+      const updatedSettings = await updateSeekerSettings({
+        profileVisibility: nextScope,
+        resumeVisibility: nextScope,
+        openToWork: settingsToSave.openToWork,
+        showContactsInResume: settingsToSave.showContactsInResume,
+      })
+
+      setSeekerSettings(updatedSettings)
       setSuccess('Профиль сохранен.')
       setIsSettingsOpen(false)
       if (session.user) {
@@ -701,6 +813,7 @@ export function SeekerDashboardPage() {
         repoUrl: payload.repoUrl ?? '',
         demoUrl: payload.demoUrl ?? '',
         mainPhotoUrl: uploadedPhotoUrl,
+        isPrivate: projectForm.isPrivate,
       }
 
       setResume((state) => ({
@@ -732,6 +845,53 @@ export function SeekerDashboardPage() {
       setSuccess('Проект удалён.')
     } catch (error) {
       setPortfolioError(error instanceof Error ? error.message : 'Не удалось удалить проект.')
+    } finally {
+      setSavingPortfolio(false)
+    }
+  }
+
+  async function onToggleProjectVisibility(projectId: number) {
+    if (typeof session?.accessToken !== 'string' || !session.accessToken) {
+      return
+    }
+
+    const project = resume.projects.find((item) => item.id === projectId)
+    if (!project) {
+      return
+    }
+
+    const nextIsPrivate = !Boolean(project.isPrivate)
+    setSavingPortfolio(true)
+    setPortfolioError('')
+
+    try {
+      await updateMyPortfolioProject(projectId, {
+        title: project.title.trim(),
+        role: project.role.trim() || null,
+        description: project.description.trim() || null,
+        startDate: project.startDate || null,
+        endDate: project.endDate || null,
+        repoUrl: normalizeUrl(project.repoUrl) || null,
+        demoUrl: normalizeUrl(project.demoUrl) || null,
+        isPrivate: nextIsPrivate,
+        participants: [],
+        collaborations: [],
+      })
+
+      setResume((state) => ({
+        ...state,
+        projects: state.projects.map((item) =>
+          item.id === projectId
+            ? {
+                ...item,
+                isPrivate: nextIsPrivate,
+              }
+            : item,
+        ),
+      }))
+      setSuccess(nextIsPrivate ? 'Проект скрыт из публичного портфолио.' : 'Проект снова виден в публичном портфолио.')
+    } catch (error) {
+      setPortfolioError(error instanceof Error ? error.message : 'Не удалось обновить приватность проекта.')
     } finally {
       setSavingPortfolio(false)
     }
@@ -853,7 +1013,6 @@ export function SeekerDashboardPage() {
               <div className="portfolio-panel__header">
                 <div>
                   <h3>Портфолио</h3>
-                  <p>Проекты сохраняются на backend. Фото добавляются на этапе создания проекта.</p>
                 </div>
                 {session?.user?.username ? (
                   <Link className="btn btn--ghost" to={`/portfolio/${encodeURIComponent(session.user.username)}`}>
@@ -937,11 +1096,29 @@ export function SeekerDashboardPage() {
                         </p>
                         <p>{item.description}</p>
                       </div>
-                    </div>
+                      </div>
                       <div className="subscriptions-row__previews">
-                        {item.previews.map((preview) => (
-                          <img key={`${item.id}-${preview}`} src={preview} alt={item.title} />
-                        ))}
+                        {item.previews.length ? (
+                          item.previews.map((preview) => (
+                            <article key={`${item.id}-${preview.projectId}`} className="subscriptions-preview-card">
+                              {preview.imageUrl ? (
+                                <img src={preview.imageUrl} alt={preview.title} />
+                              ) : (
+                                <div className="subscriptions-preview-card__logo">
+                                  <img src="/logo.svg" alt="Логотип сайта" />
+                                </div>
+                              )}
+                              <p>{preview.title}</p>
+                            </article>
+                          ))
+                        ) : (
+                          <article className="subscriptions-preview-card subscriptions-preview-card--empty">
+                            <div className="subscriptions-preview-card__logo">
+                              <img src="/logo.svg" alt="Логотип сайта" />
+                            </div>
+                            <p>Пока нет проектов</p>
+                          </article>
+                        )}
                       </div>
                       <div className="subscriptions-row__actions">
                         {(() => {
@@ -1213,6 +1390,14 @@ export function SeekerDashboardPage() {
                               <label>Дата окончания<input type="date" value={projectForm.endDate} onChange={(e) => setProjectForm((s) => ({ ...s, endDate: e.target.value }))} /></label>
                               <label>Repo URL<input value={projectForm.repoUrl} onChange={(e) => setProjectForm((s) => ({ ...s, repoUrl: e.target.value }))} /></label>
                               <label>Demo URL<input value={projectForm.demoUrl} onChange={(e) => setProjectForm((s) => ({ ...s, demoUrl: e.target.value }))} /></label>
+                              <label className="full-width resume-privacy-toggle">
+                                <input
+                                  type="checkbox"
+                                  checked={projectForm.isPrivate}
+                                  onChange={(e) => setProjectForm((s) => ({ ...s, isPrivate: e.target.checked }))}
+                                />
+                                Скрыть проект из публичного портфолио
+                              </label>
                               <label className="full-width">Описание<textarea rows={3} value={projectForm.description} onChange={(e) => setProjectForm((s) => ({ ...s, description: e.target.value }))} /></label>
                               <label className="full-width portfolio-upload">
                                 Фото проекта
@@ -1236,12 +1421,18 @@ export function SeekerDashboardPage() {
                                   <article key={project.id} className="resume-collection-card">
                                     <div>
                                       <strong>{project.title}</strong>
+                                      <p>{project.isPrivate ? 'Приватный проект' : 'Публичный проект'}</p>
                                       <p>{project.role || 'Роль не указана'}</p>
                                       <p>{project.description || 'Описание не заполнено'}</p>
                                     </div>
-                                    <button type="button" className="btn btn--ghost" onClick={() => void onDeletePortfolioProject(project.id)} disabled={savingPortfolio}>
-                                      Удалить
-                                    </button>
+                                    <div className="resume-collection-card__actions">
+                                      <button type="button" className="btn btn--ghost" onClick={() => void onToggleProjectVisibility(project.id)} disabled={savingPortfolio}>
+                                        {project.isPrivate ? 'Сделать публичным' : 'Скрыть проект'}
+                                      </button>
+                                      <button type="button" className="btn btn--ghost" onClick={() => void onDeletePortfolioProject(project.id)} disabled={savingPortfolio}>
+                                        Удалить
+                                      </button>
+                                    </div>
                                   </article>
                                 ))
                               ) : (
@@ -1340,6 +1531,17 @@ export function SeekerDashboardPage() {
                 <label>Телефон<input value={profileForm.phone} onChange={(e) => setProfileForm((s) => ({ ...s, phone: formatPhone(e.target.value) }))} placeholder="+7 (___) ___-__-__" maxLength={18} /></label>
                 <label className="full-width">О себе<textarea rows={4} value={profileForm.about} onChange={(e) => setProfileForm((s) => ({ ...s, about: e.target.value }))} /></label>
               </div>
+              <section className="profile-settings-modal__privacy">
+                <h3>Приватность</h3>
+                <label className="full-width">
+                  Видимость профиля в списке резюме
+                  <select value={profileVisibility} onChange={(e) => setProfileVisibility(e.target.value as ProfileVisibilityMode)}>
+                    <option value="public">Публичный</option>
+                    <option value="private">Скрытый</option>
+                  </select>
+                </label>
+                <p>Скрытый профиль не отображается в разделе «Резюме».</p>
+              </section>
               <div className="profile-settings-modal__actions">
                 <button type="button" className="btn btn--ghost" onClick={() => setIsSettingsOpen(false)} disabled={savingProfile || uploadingAvatar}>Отмена</button>
                 <button type="submit" className="btn btn--primary" disabled={savingProfile || uploadingAvatar}>{savingProfile ? 'Сохраняем...' : 'Сохранить'}</button>

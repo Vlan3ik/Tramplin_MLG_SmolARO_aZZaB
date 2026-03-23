@@ -119,6 +119,11 @@ export function PortfolioPage() {
   const summary = profile?.resume?.summary || profile?.about || 'Описание профиля не заполнено.'
   const salary = profile?.resume ? formatSalary(profile.resume.salaryFrom, profile.resume.salaryTo, profile.resume.currencyCode) : null
   const initials = useMemo(() => (displayName?.[0] || username?.[0] || 'P').toUpperCase(), [displayName, username])
+  const isProfileHidden = useMemo(
+    () => profile?.visibilityMode === 'hidden' || profile?.resume == null,
+    [profile?.resume, profile?.visibilityMode],
+  )
+  const visibleProjects = projects
 
   function closeProjectModal() {
     setIsProjectModalOpen(false)
@@ -161,7 +166,7 @@ export function PortfolioPage() {
           <p className="portfolio-page__headline">{headline}</p>
           <p className="portfolio-page__summary">{summary}</p>
           <div className="portfolio-page__stats">
-            <span className="status-chip">Проектов: {projects.length}</span>
+            <span className="status-chip">Проектов: {visibleProjects.length}</span>
             {profile?.stats ? <span className="status-chip">Откликов: {profile.stats.applicationsTotal}</span> : null}
             {profile?.visibilityMode ? <span className="status-chip">Профиль: {profile.visibilityMode}</span> : null}
           </div>
@@ -183,14 +188,15 @@ export function PortfolioPage() {
 
       {loading ? <div className="state-card">Загружаем портфолио...</div> : null}
       {error ? <div className="state-card state-card--error">{error}</div> : null}
+      {!loading && isProfileHidden ? <div className="state-card">Этот профиль скрыт владельцем и недоступен в публичном списке.</div> : null}
 
-      {!loading && !projects.length ? (
+      {!loading && !isProfileHidden && !visibleProjects.length ? (
         <div className="state-card">Проекты пока не добавлены.</div>
       ) : null}
 
-      {projects.length ? (
+      {!isProfileHidden && visibleProjects.length ? (
         <div className="portfolio-page__grid">
-          {projects.map((project) => (
+          {visibleProjects.map((project) => (
             <article
               className="card portfolio-page__card"
               key={project.projectId}

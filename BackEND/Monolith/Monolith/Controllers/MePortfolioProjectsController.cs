@@ -48,7 +48,8 @@ public class MePortfolioProjectsController(AppDbContext dbContext) : ControllerB
             StartDate = request.StartDate,
             EndDate = request.EndDate,
             RepoUrl = request.RepoUrl?.Trim(),
-            DemoUrl = request.DemoUrl?.Trim()
+            DemoUrl = request.DemoUrl?.Trim(),
+            IsPrivate = request.IsPrivate
         };
 
         dbContext.CandidateResumeProjects.Add(project);
@@ -98,6 +99,7 @@ public class MePortfolioProjectsController(AppDbContext dbContext) : ControllerB
         project.EndDate = request.EndDate;
         project.RepoUrl = request.RepoUrl?.Trim();
         project.DemoUrl = request.DemoUrl?.Trim();
+        project.IsPrivate = request.IsPrivate;
 
         var oldParticipants = await dbContext.CandidateResumeProjectParticipants
             .Where(x => x.ProjectId == id)

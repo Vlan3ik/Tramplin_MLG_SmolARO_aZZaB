@@ -11,6 +11,7 @@ public class CandidateResumeProject
     public DateOnly? EndDate { get; set; }
     public string? RepoUrl { get; set; }
     public string? DemoUrl { get; set; }
+    public bool IsPrivate { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 

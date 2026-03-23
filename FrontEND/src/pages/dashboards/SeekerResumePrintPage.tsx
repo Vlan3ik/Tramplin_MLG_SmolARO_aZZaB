@@ -2,18 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import logo from '../../assets/logo.svg'
 import { fetchSeekerProfile, fetchSeekerResume } from '../../api/me'
+import { API_ORIGIN } from '../../config/api'
 import type { SeekerProfile } from '../../types/me'
 import type { SeekerResume } from '../../types/resume'
 import './SeekerResumePrintPage.css'
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || 'http://169.254.185.29:1488/api'
-const API_ORIGIN = (() => {
-  try {
-    return new URL(API_BASE_URL).origin
-  } catch {
-    return typeof window !== 'undefined' ? window.location.origin : ''
-  }
-})()
 
 function resolveAvatarUrl(value: string | null | undefined) {
   if (!value) return null

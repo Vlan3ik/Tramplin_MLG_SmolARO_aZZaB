@@ -38,6 +38,7 @@ type PortfolioProjectMutationRequest = {
   endDate: string | null
   repoUrl: string | null
   demoUrl: string | null
+  isPrivate?: boolean
   participants: Array<{
     userId: number
     role: string
@@ -125,6 +126,7 @@ export async function fetchPublicPortfolioProjectDetail(projectId: number, signa
 export async function createMyPortfolioProject(payload: PortfolioProjectMutationRequest) {
   return postJson<PortfolioProjectMutationResponse, PortfolioProjectMutationRequest>('/me/portfolio/projects', {
     ...payload,
+    isPrivate: Boolean(payload.isPrivate),
     participants: Array.isArray(payload.participants) ? payload.participants : [],
     collaborations: Array.isArray(payload.collaborations) ? payload.collaborations : [],
   })
@@ -133,6 +135,7 @@ export async function createMyPortfolioProject(payload: PortfolioProjectMutation
 export async function updateMyPortfolioProject(projectId: number, payload: PortfolioProjectMutationRequest) {
   return putJson<PortfolioProjectMutationResponse, PortfolioProjectMutationRequest>(`/me/portfolio/projects/${projectId}`, {
     ...payload,
+    isPrivate: Boolean(payload.isPrivate),
     participants: Array.isArray(payload.participants) ? payload.participants : [],
     collaborations: Array.isArray(payload.collaborations) ? payload.collaborations : [],
   })

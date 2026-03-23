@@ -13,6 +13,7 @@ public record UpsertPortfolioProjectRequest(
     DateOnly? EndDate,
     string? RepoUrl,
     string? DemoUrl,
+    bool IsPrivate,
     IReadOnlyCollection<UpsertPortfolioProjectParticipantDto> Participants,
     IReadOnlyCollection<UpsertPortfolioProjectCollaborationDto> Collaborations);
 

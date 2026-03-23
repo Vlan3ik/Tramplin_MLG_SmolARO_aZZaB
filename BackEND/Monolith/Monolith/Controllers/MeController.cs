@@ -574,7 +574,7 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             .AsNoTracking()
             .Where(x => x.UserId == userId)
             .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new ResumeProjectItemDto(x.Id, x.Title, x.Role, x.Description, x.StartDate, x.EndDate, x.RepoUrl, x.DemoUrl))
+            .Select(x => new ResumeProjectItemDto(x.Id, x.Title, x.Role, x.Description, x.StartDate, x.EndDate, x.RepoUrl, x.DemoUrl, x.IsPrivate))
             .ToListAsync(cancellationToken);
         var education = await dbContext.CandidateResumeEducation
             .AsNoTracking()

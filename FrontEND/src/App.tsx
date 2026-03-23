@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, useLocation } from 'react-router-dom'
 import { DashboardRedirect } from './components/auth/DashboardRedirect'
 import { GuestOnlyRoute } from './components/auth/GuestOnlyRoute'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
@@ -24,6 +24,11 @@ import { SeekerResumePrintPage } from './pages/dashboards/SeekerResumePrintPage'
 import { PlatformRole } from './types/auth'
 
 function App() {
+  const location = useLocation()
+  const isResumePrintPage = location.pathname.startsWith('/dashboard/seeker/resume/print')
+  const isResumeViewPage = location.pathname === '/resumes'
+  const shouldHideChatWidget = isResumePrintPage || isResumeViewPage
+
   return (
     <>
       <Routes>
@@ -64,7 +69,7 @@ function App() {
           <Route path="dashboard" element={<DashboardRedirect />} />
         </Route>
       </Routes>
-      <ChatWidget />
+      {!shouldHideChatWidget ? <ChatWidget /> : null}
     </>
   )
 }

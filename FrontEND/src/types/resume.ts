@@ -15,6 +15,7 @@ export type ResumeProject = {
   repoUrl: string
   demoUrl: string
   mainPhotoUrl?: string | null
+  isPrivate?: boolean
 }
 
 export type ResumeExperience = {

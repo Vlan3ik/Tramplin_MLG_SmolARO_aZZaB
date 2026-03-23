@@ -61,6 +61,15 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
         var viewerId = TryGetCurrentUserId();
 
         var baseQuery = dbContext.CandidateResumeProjects.AsNoTracking();
+        if (viewerId is not null)
+        {
+            var currentViewerId = viewerId.Value;
+            baseQuery = baseQuery.Where(x => !x.IsPrivate || x.UserId == currentViewerId);
+        }
+        else
+        {
+            baseQuery = baseQuery.Where(x => !x.IsPrivate);
+        }
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
@@ -144,6 +153,11 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (project is null)
+        {
+            return this.ToNotFoundError("portfolio.project.not_found", "Проект портфолио не найден.");
+        }
+
+        if (project.IsPrivate && viewerId != project.UserId)
         {
             return this.ToNotFoundError("portfolio.project.not_found", "Проект портфолио не найден.");
         }
@@ -280,9 +294,11 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
         var similarIds = new List<long>();
         if (skillTagIds.Length > 0)
         {
+            var currentViewerId = viewerId;
             similarIds = await dbContext.CandidateResumeProjects
                 .AsNoTracking()
                 .Where(x => x.Id != project.Id)
+                .Where(x => !x.IsPrivate || (currentViewerId != null && x.UserId == currentViewerId.Value))
                 .Where(x => dbContext.CandidateResumeSkills.Any(s => s.UserId == x.UserId && skillTagIds.Contains(s.TagId)))
                 .OrderByDescending(x => x.CreatedAt)
                 .Select(x => x.Id)
@@ -293,9 +309,11 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
 
         if (similarIds.Count < similarLimit)
         {
+            var currentViewerId = viewerId;
             var fallbackIds = await dbContext.CandidateResumeProjects
                 .AsNoTracking()
                 .Where(x => x.Id != project.Id && !similarIds.Contains(x.Id))
+                .Where(x => !x.IsPrivate || (currentViewerId != null && x.UserId == currentViewerId.Value))
                 .OrderByDescending(x => x.CreatedAt)
                 .Select(x => x.Id)
                 .Take(similarLimit - similarIds.Count)

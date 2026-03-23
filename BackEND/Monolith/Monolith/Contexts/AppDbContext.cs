@@ -151,6 +151,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.EndDate).HasColumnName("end_date");
             entity.Property(x => x.RepoUrl).HasColumnName("repo_url").HasMaxLength(500);
             entity.Property(x => x.DemoUrl).HasColumnName("demo_url").HasMaxLength(500);
+            entity.Property(x => x.IsPrivate).HasColumnName("is_private");
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasOne(x => x.Resume).WithMany(x => x.Projects).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);

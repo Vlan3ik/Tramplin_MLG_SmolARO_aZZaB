@@ -71,3 +71,23 @@ export default defineConfig([
   },
 ])
 ```
+
+## Backend switch for debugging
+
+Frontend now supports runtime backend switching without code edits.
+
+Priority:
+1. URL query params
+2. Saved value in `localStorage`
+3. `VITE_API_BASE_URL`
+4. Default fallback
+
+Quick examples:
+- Use localhost backend: `http://localhost:5173/?apiHost=http://localhost:1488`
+- Use backend on another device: `http://localhost:5173/?apiHost=http://192.168.1.25:1488`
+- Set full API base directly: `http://localhost:5173/?apiBaseUrl=http://localhost:1488/api`
+- Reset override: `http://localhost:5173/?apiReset=1`
+
+Notes:
+- `apiHost` automatically uses `/api` path.
+- Query value is persisted to `localStorage` key `tramplin.dev.api-base-url`.

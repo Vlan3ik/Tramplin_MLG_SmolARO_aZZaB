@@ -33,3 +33,20 @@ export type SeekerProfileStats = {
   eventsAttended: number
   mentorshipParticipations: number
 }
+
+export type PrivacyScope = 1 | 2 | 3
+
+export type SeekerSettings = {
+  userId: number
+  profileVisibility: PrivacyScope
+  resumeVisibility: PrivacyScope
+  openToWork: boolean
+  showContactsInResume: boolean
+}
+
+export type UpdateSeekerSettingsRequest = {
+  profileVisibility: PrivacyScope
+  resumeVisibility: PrivacyScope
+  openToWork: boolean
+  showContactsInResume: boolean
+}
