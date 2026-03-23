@@ -8,7 +8,7 @@ const menuItems: Array<{ label: string; to?: string }> = [
   { label: 'Вакансии', to: '/' },
   { label: 'Мероприятия', to: '/events' },
   { label: 'Компании', to: '/companies' },
-  { label: 'Резюме' },
+  { label: 'Резюме', to: '/resumes' },
 ]
 
 export function MainHeader() {

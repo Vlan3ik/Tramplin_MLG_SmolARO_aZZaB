@@ -21,6 +21,11 @@ public class ResumeListQuery
     /// Поисковая строка.
     /// </summary>
     public string? Search { get; set; }
+    public bool? OpenToWork { get; set; }
+    public decimal? SalaryFrom { get; set; }
+    public decimal? SalaryTo { get; set; }
+    public long[]? TagIds { get; set; }
+    public bool OnlyFollowed { get; set; }
 }
 
 /// <summary>
@@ -37,7 +42,14 @@ public record ResumeListItemDto(
     decimal? SalaryTo,
     string? CurrencyCode,
     bool OpenToWork,
-    DateTimeOffset ResumeUpdatedAt);
+    DateTimeOffset ResumeUpdatedAt,
+    IReadOnlyCollection<ResumeSkillShortDto> Skills,
+    bool IsFollowedByMe,
+    int FollowersCount);
+
+public record ResumeSkillShortDto(
+    long TagId,
+    string TagName);
 
 /// <summary>
 /// Подробная карточка опубликованного резюме.

@@ -21,6 +21,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<UserPublicLink> UserPublicLinks => Set<UserPublicLink>();
     public DbSet<ContactRequest> ContactRequests => Set<ContactRequest>();
     public DbSet<UserContact> UserContacts => Set<UserContact>();
+    public DbSet<UserSubscription> UserSubscriptions => Set<UserSubscription>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<TagGroup> TagGroups => Set<TagGroup>();
@@ -301,6 +302,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.HasOne(x => x.User).WithMany(x => x.Contacts).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.ContactUser).WithMany(x => x.ContactOfUsers).HasForeignKey(x => x.ContactUserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserSubscription>(entity =>
+        {
+            entity.ToTable("user_subscriptions");
+            entity.HasKey(x => new { x.FollowerUserId, x.FollowingUserId });
+            entity.Property(x => x.FollowerUserId).HasColumnName("follower_user_id");
+            entity.Property(x => x.FollowingUserId).HasColumnName("following_user_id");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => x.FollowingUserId);
+            entity.HasOne(x => x.FollowerUser).WithMany(x => x.FollowingSubscriptions).HasForeignKey(x => x.FollowerUserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.FollowingUser).WithMany(x => x.FollowerSubscriptions).HasForeignKey(x => x.FollowingUserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<City>(entity =>

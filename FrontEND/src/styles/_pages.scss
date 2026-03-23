@@ -897,6 +897,137 @@
   gap: 1rem;
 }
 
+.resumes-page {
+  margin-top: 1.2rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.resumes-page__hero {
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.resumes-page__hero-copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.resumes-page__hero-actions {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.resumes-page__filters {
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+  align-items: end;
+
+  label {
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+}
+
+.resumes-page__search {
+  grid-column: span 2;
+}
+
+.resumes-page__only-followed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+
+  input {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.resumes-page__tag-list {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.resumes-page__summary {
+  min-height: 68px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+
+  span {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+  }
+}
+
+.resumes-page__pagination {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.resumes-page__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.resume-user-card {
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.resume-user-card__head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.resume-user-card__avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.resume-user-card__position {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.resume-user-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 /* Company pages overflow and responsive hardening */
 .companies-hero,
 .companies-toolbar__row,
@@ -1018,6 +1149,22 @@
     grid-template-columns: 1fr;
   }
 
+  .resumes-page__hero {
+    grid-template-columns: 1fr;
+  }
+
+  .resumes-page__filters {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .resumes-page__search {
+    grid-column: 1 / -1;
+  }
+
+  .resumes-page__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .events-page__hero-inner,
   .events-page__layout {
     grid-template-columns: 1fr;
@@ -1044,6 +1191,14 @@
   .company-hero,
   .company-panel {
     padding: 0.85rem;
+  }
+
+  .resumes-page__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .resumes-page__grid {
+    grid-template-columns: 1fr;
   }
 
   .companies-hero__stats span {
