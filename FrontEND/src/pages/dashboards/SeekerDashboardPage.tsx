@@ -671,7 +671,7 @@ export function SeekerDashboardPage() {
       <main>
         <section className="container seeker-profile-page">
           <header className="seeker-profile-hero-exact">
-            <p className="seeker-profile-hero-exact__position">{resume.desiredPosition || resume.headline || 'Frontend Нижний тагил'}</p>
+            <p className="seeker-profile-hero-exact__position">{resume.desiredPosition || resume.headline || 'Соискатель'}</p>
             <div className="seeker-profile-hero-exact__avatar">{avatarUrl ? <img src={avatarUrl} alt={displayName} /> : <span>{avatarFallback}</span>}</div>
             <h1 className="seeker-profile-hero-exact__name">{displayName}</h1>
 

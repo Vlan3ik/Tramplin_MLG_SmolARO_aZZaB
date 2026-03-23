@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarDays, CheckCircle2, RefreshCw, Search, SlidersHorizontal } from 'lucide-react'
-import { fetchHomeListOpportunities, participateInOpportunity } from '../api/opportunities'
+import { fetchEventsListOpportunities, participateInOpportunity } from '../api/opportunities'
 import { OpportunityCard } from '../components/home/OpportunityCard'
 import { useAuth } from '../hooks/useAuth'
 import { useCity } from '../contexts/CityContext'
@@ -47,10 +47,9 @@ export function EventsPage() {
       setErrorMessage('')
 
       try {
-        const response = await fetchHomeListOpportunities(query, signal)
-        const eventItems = response.items.filter((item) => item.type === 'event')
-        setItems(eventItems)
-        setTotal(eventItems.length)
+        const response = await fetchEventsListOpportunities(query, signal)
+        setItems(response.items)
+        setTotal(response.total)
       } catch (error) {
         if (signal?.aborted) {
           return
