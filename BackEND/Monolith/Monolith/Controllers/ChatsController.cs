@@ -68,6 +68,7 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
                         m.ChatId,
                         m.SenderUserId,
                         m.SenderUser.DisplayName,
+                        m.SenderUser.Username,
                         m.SenderUser.AvatarUrl,
                         m.Text,
                         m.IsSystem,
@@ -293,6 +294,7 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
                 x.ChatId,
                 x.SenderUserId,
                 x.SenderUser.DisplayName,
+                x.SenderUser.Username,
                 x.SenderUser.AvatarUrl,
                 x.Text,
                 x.IsSystem,
@@ -355,7 +357,7 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         var sender = await dbContext.Users
             .AsNoTracking()
             .Where(x => x.Id == userId)
-            .Select(x => new { x.DisplayName, x.AvatarUrl })
+            .Select(x => new { x.DisplayName, x.Username, x.AvatarUrl })
             .FirstAsync(cancellationToken);
 
         var dto = new ChatMessageDto(
@@ -363,6 +365,7 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
             message.ChatId,
             message.SenderUserId,
             sender.DisplayName,
+            sender.Username,
             sender.AvatarUrl,
             message.Text,
             message.IsSystem,
@@ -467,6 +470,7 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
                 x.ChatId,
                 x.SenderUserId,
                 x.SenderUser.DisplayName,
+                x.SenderUser.Username,
                 x.SenderUser.AvatarUrl,
                 x.Text,
                 x.IsSystem,
@@ -502,6 +506,7 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         projection.ChatId,
         projection.SenderUserId,
         projection.SenderDisplayName,
+        projection.SenderUsername,
         projection.SenderAvatarUrl,
         projection.Text,
         projection.IsSystem,
@@ -696,6 +701,7 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         long ChatId,
         long SenderUserId,
         string SenderDisplayName,
+        string? SenderUsername,
         string? SenderAvatarUrl,
         string Text,
         bool IsSystem,

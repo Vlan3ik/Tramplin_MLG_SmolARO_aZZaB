@@ -76,6 +76,35 @@ function mergeMessages(currentMessages: ChatMessage[], incomingMessages: ChatMes
   return Array.from(map.values()).sort((a, b) => a.id - b.id)
 }
 
+function getUsernameLabel(username: string | null | undefined) {
+  const normalized = username?.trim()
+  if (!normalized) {
+    return null
+  }
+
+  return normalized.startsWith('@') ? normalized : `@${normalized}`
+}
+
+function getAvatarInitials(displayName: string | null | undefined, username: string | null | undefined) {
+  const normalizedDisplay = displayName?.trim()
+  if (normalizedDisplay) {
+    const words = normalizedDisplay.split(/\s+/).filter(Boolean)
+    const first = words[0]?.[0] ?? ''
+    const second = words[1]?.[0] ?? ''
+    const initials = `${first}${second}`.toUpperCase()
+    if (initials) {
+      return initials
+    }
+  }
+
+  const normalizedUsername = username?.trim()
+  if (normalizedUsername) {
+    return normalizedUsername[0].toUpperCase()
+  }
+
+  return '?'
+}
+
 export function ChatWidget() {
   const { session, isAuthenticated } = useAuth()
   const currentUserId = session?.user?.id
@@ -369,6 +398,10 @@ export function ChatWidget() {
     return null
   }
 
+  const currentUserAvatarUrl = session?.user?.avatarUrl ?? null
+  const currentUserUsername = session?.user?.username ?? null
+  const currentUserDisplayName = session?.user?.username?.trim() || 'Вы'
+
   return (
     <div className="chat-widget">
       {isOpen ? (
@@ -407,15 +440,30 @@ export function ChatWidget() {
                   <div className="chat-widget__messages">
                     {isLoadingMessages ? <p>Загружаем сообщения...</p> : null}
                     {!isLoadingMessages && !activeMessages.length ? <p>Сообщений пока нет.</p> : null}
-                    {activeMessages.map((message) => (
-                      <article
-                        key={message.id}
-                        className={`chat-widget__message ${message.senderUserId === currentUserId ? 'is-mine' : ''} ${message.isSystem ? 'is-system' : ''}`}
-                      >
-                        <p>{message.text}</p>
-                        <small>{formatChatTime(message.createdAt)}</small>
-                      </article>
-                    ))}
+                    {activeMessages.map((message) => {
+                      const isMine = message.senderUserId === currentUserId
+                      const displayName = (isMine ? currentUserDisplayName : message.senderDisplayName)?.trim() || 'Пользователь'
+                      const username = isMine ? currentUserUsername : message.senderUsername
+                      const usernameLabel = getUsernameLabel(username)
+                      const avatarUrl = isMine ? currentUserAvatarUrl : message.senderAvatarUrl
+                      const avatarInitials = getAvatarInitials(displayName, username)
+
+                      return (
+                        <article key={message.id} className={`chat-widget__message ${isMine ? 'is-mine' : ''} ${message.isSystem ? 'is-system' : ''}`}>
+                          <div className="chat-widget__message-avatar" aria-hidden="true">
+                            {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{avatarInitials}</span>}
+                          </div>
+                          <div className="chat-widget__message-bubble">
+                            <div className="chat-widget__message-meta">
+                              <strong>{displayName}</strong>
+                              {usernameLabel ? <span>{usernameLabel}</span> : null}
+                            </div>
+                            <p>{message.text}</p>
+                            <small>{formatChatTime(message.createdAt)}</small>
+                          </div>
+                        </article>
+                      )
+                    })}
                   </div>
                   <div className="chat-widget__composer">
                     <input

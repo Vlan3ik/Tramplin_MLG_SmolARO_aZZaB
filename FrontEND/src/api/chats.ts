@@ -8,6 +8,7 @@ type ChatMessageApi = {
   chatId: number
   senderUserId: number
   senderDisplayName?: string | null
+  senderUsername?: string | null
   senderAvatarUrl?: string | null
   text: string | null
   isSystem: boolean
@@ -45,6 +46,7 @@ function mapMessage(item: ChatMessageApi): ChatMessage {
     chatId: item.chatId,
     senderUserId: item.senderUserId,
     senderDisplayName: item.senderDisplayName ?? null,
+    senderUsername: item.senderUsername ?? null,
     senderAvatarUrl: item.senderAvatarUrl ?? null,
     text: item.text ?? '',
     isSystem: item.isSystem,
