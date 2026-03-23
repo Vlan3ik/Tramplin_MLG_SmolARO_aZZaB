@@ -1165,6 +1165,47 @@
   }
 }
 
+.admin-profile-hero {
+  background:
+    radial-gradient(circle at 10% -15%, rgba(251, 146, 60, 0.14), transparent 42%),
+    linear-gradient(180deg, #ffffff 0%, #fffbf5 100%);
+}
+
+.admin-profile-hero__avatar {
+  background: linear-gradient(145deg, #f97316 0%, #fb923c 100%);
+  border-color: rgba(251, 146, 60, 0.28);
+  box-shadow: 0 12px 22px rgba(251, 146, 60, 0.24);
+
+  span {
+    font-size: 1.2rem;
+  }
+}
+
+.admin-toolbar {
+  display: inline-flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  align-items: center;
+
+  input {
+    min-width: 240px;
+  }
+}
+
+.admin-form-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  padding: 0.9rem;
+}
+
+.admin-checkbox-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
 .employer-analytics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1390,6 +1431,15 @@
 
   .employer-candidate-profile__grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-toolbar {
+    width: 100%;
+
+    input {
+      min-width: 0;
+      width: 100%;
+    }
   }
 }
 
