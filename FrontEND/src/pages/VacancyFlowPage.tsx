@@ -42,7 +42,7 @@ type EventForm = {
   eventDate: string
 }
 
-const steps = ['Р’С‹Р±РѕСЂ', 'РћСЃРЅРѕРІРЅС‹Рµ', 'РћРїРёСЃР°РЅРёРµ', 'РЎС‚РѕРёРјРѕСЃС‚СЊ Рё РѕРїС†РёРё', 'РџСѓР±Р»РёРєР°С†РёСЏ']
+const steps = ['Выбор', 'Основные', 'Описание', 'Стоимость и опции', 'Публикация']
 const validSteps = new Set(['1', '2', '3', '4', '5'])
 
 function toLocalDateTimeInputValue(value: string) {
@@ -106,7 +106,7 @@ function parseSelectedNumberOptions(options: HTMLOptionsCollection) {
 
 function locationOptionLabel(location: Location) {
   const addressParts = [location.streetName, location.houseNumber].filter(Boolean)
-  const address = addressParts.length ? addressParts.join(', ') : 'РђРґСЂРµСЃ РЅРµ СѓРєР°Р·Р°РЅ'
+  const address = addressParts.length ? addressParts.join(', ') : 'Адрес не указан'
   return `${location.cityName}: ${address}`
 }
 
@@ -116,7 +116,7 @@ type StepperProps = {
 
 function Stepper({ activeStep }: StepperProps) {
   return (
-    <div className="vf-stepper" aria-label="РџСЂРѕРіСЂРµСЃСЃ СЃРѕР·РґР°РЅРёСЏ">
+    <div className="vf-stepper" aria-label="Прогресс создания">
       {steps.map((label, index) => {
         const stepNumber = (index + 1) as Step
         const isActive = stepNumber === activeStep
@@ -374,23 +374,23 @@ export function VacancyFlowPage() {
     if (isVacancyFlow) {
       if (stepNumber >= 2) {
         if (!vacancyForm.title.trim()) {
-          return 'РЈРєР°Р¶РёС‚Рµ РЅР°Р·РІР°РЅРёРµ РІР°РєР°РЅСЃРёРё.'
+          return 'Укажите название вакансии.'
         }
       }
 
       if (stepNumber >= 3) {
         if (!vacancyForm.shortDescription.trim()) {
-          return 'РЈРєР°Р¶РёС‚Рµ РєСЂР°С‚РєРѕРµ РѕРїРёСЃР°РЅРёРµ РІР°РєР°РЅСЃРёРё.'
+          return 'Укажите краткое описание вакансии.'
         }
         if (!vacancyForm.fullDescription.trim()) {
-          return 'РЈРєР°Р¶РёС‚Рµ РїРѕР»РЅРѕРµ РѕРїРёСЃР°РЅРёРµ РІР°РєР°РЅСЃРёРё.'
+          return 'Укажите полное описание вакансии.'
         }
       }
 
       if (stepNumber >= 4) {
         const publishAt = toIsoDateTimeFromLocalInput(vacancyForm.publishAt)
         if (!publishAt) {
-          return 'РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅСѓСЋ РґР°С‚Сѓ РїСѓР±Р»РёРєР°С†РёРё РІР°РєР°РЅСЃРёРё.'
+          return 'Укажите корректную дату публикации вакансии.'
         }
 
         const applicationDeadline = vacancyForm.applicationDeadline.trim()
@@ -398,49 +398,49 @@ export function VacancyFlowPage() {
           : null
 
         if (vacancyForm.applicationDeadline.trim() && !applicationDeadline) {
-          return 'РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Р№ РґРµРґР»Р°Р№РЅ РѕС‚РєР»РёРєРѕРІ.'
+          return 'Укажите корректный дедлайн откликов.'
         }
 
         if (applicationDeadline && Date.parse(applicationDeadline) < Date.parse(publishAt)) {
-          return 'Р”РµРґР»Р°Р№РЅ РѕС‚РєР»РёРєРѕРІ РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ СЂР°РЅСЊС€Рµ РґР°С‚С‹ РїСѓР±Р»РёРєР°С†РёРё.'
+          return 'Дедлайн откликов не может быть раньше даты публикации.'
         }
 
         const salaryFrom = toNumberOrNull(vacancyForm.salaryFrom)
         const salaryTo = toNumberOrNull(vacancyForm.salaryTo)
         if (salaryFrom !== null && salaryTo !== null && salaryTo < salaryFrom) {
-          return 'Р—Р°СЂРїР»Р°С‚Р° "РґРѕ" РґРѕР»Р¶РЅР° Р±С‹С‚СЊ Р±РѕР»СЊС€Рµ РёР»Рё СЂР°РІРЅР° Р·Р°СЂРїР»Р°С‚Рµ "РѕС‚".'
+          return 'Зарплата "до" должна быть больше или равна зарплате "от".'
         }
       }
     } else {
       if (stepNumber >= 2) {
         if (!eventForm.title.trim()) {
-          return 'РЈРєР°Р¶РёС‚Рµ РЅР°Р·РІР°РЅРёРµ РјРµСЂРѕРїСЂРёСЏС‚РёСЏ.'
+          return 'Укажите название мероприятия.'
         }
       }
 
       if (stepNumber >= 3) {
         if (!eventForm.shortDescription.trim()) {
-          return 'РЈРєР°Р¶РёС‚Рµ РєСЂР°С‚РєРѕРµ РѕРїРёСЃР°РЅРёРµ РјРµСЂРѕРїСЂРёСЏС‚РёСЏ.'
+          return 'Укажите краткое описание мероприятия.'
         }
         if (!eventForm.fullDescription.trim()) {
-          return 'РЈРєР°Р¶РёС‚Рµ РїРѕР»РЅРѕРµ РѕРїРёСЃР°РЅРёРµ РјРµСЂРѕРїСЂРёСЏС‚РёСЏ.'
+          return 'Укажите полное описание мероприятия.'
         }
       }
 
       if (stepNumber >= 4) {
         const publishAt = toIsoDateTimeFromLocalInput(eventForm.publishAt)
         if (!publishAt) {
-          return 'РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅСѓСЋ РґР°С‚Сѓ РїСѓР±Р»РёРєР°С†РёРё РјРµСЂРѕРїСЂРёСЏС‚РёСЏ.'
+          return 'Укажите корректную дату публикации мероприятия.'
         }
 
         const eventDate = eventForm.eventDate.trim() ? toIsoDateTimeFromLocalInput(eventForm.eventDate) : null
         if (eventForm.eventDate.trim() && !eventDate) {
-          return 'РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅСѓСЋ РґР°С‚Сѓ РјРµСЂРѕРїСЂРёСЏС‚РёСЏ.'
+          return 'Укажите корректную дату мероприятия.'
         }
 
         const priceAmount = toNumberOrNull(eventForm.priceAmount)
         if ((eventForm.priceType === 2 || eventForm.priceType === 3) && priceAmount === null) {
-          return 'Р”Р»СЏ РїР»Р°С‚РЅРѕРіРѕ РёР»Рё РїСЂРёР·РѕРІРѕРіРѕ РјРµСЂРѕРїСЂРёСЏС‚РёСЏ СѓРєР°Р¶РёС‚Рµ СЃСѓРјРјСѓ.'
+          return 'Для платного или призового мероприятия укажите сумму.'
         }
       }
     }
@@ -494,7 +494,7 @@ export function VacancyFlowPage() {
         }
 
         await createEmployerVacancy(payload)
-        setSuccess('Р’Р°РєР°РЅСЃРёСЏ РѕС‚РїСЂР°РІР»РµРЅР° РЅР° РјРѕРґРµСЂР°С†РёСЋ.')
+        setSuccess('Вакансия отправлена на модерацию.')
       } else {
         const priceAmount = toNumberOrNull(eventForm.priceAmount)
         const payload = {
@@ -516,12 +516,12 @@ export function VacancyFlowPage() {
         }
 
         await createEmployerOpportunity(payload)
-        setSuccess('РњРµСЂРѕРїСЂРёСЏС‚РёРµ РѕС‚РїСЂР°РІР»РµРЅРѕ РЅР° РјРѕРґРµСЂР°С†РёСЋ.')
+        setSuccess('Мероприятие отправлено на модерацию.')
       }
 
       goStep(5)
     } catch (publishError) {
-      setError(publishError instanceof Error ? publishError.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕРїСѓР±Р»РёРєРѕРІР°С‚СЊ Р·Р°РїРёСЃСЊ.')
+      setError(publishError instanceof Error ? publishError.message : 'Не удалось опубликовать запись.')
     } finally {
       setIsSubmitting(false)
     }
@@ -533,30 +533,30 @@ export function VacancyFlowPage() {
         <section className="vf-section">
           <Stepper activeStep={currentStep} />
 
-          {loadingCatalogs ? <p className="vf-note">Р—Р°РіСЂСѓР¶Р°РµРј СЃРїСЂР°РІРѕС‡РЅРёРєРё РїР»Р°С‚С„РѕСЂРјС‹...</p> : null}
+          {loadingCatalogs ? <p className="vf-note">Загружаем справочники платформы...</p> : null}
           {error ? <p className="vf-message vf-message--error">{error}</p> : null}
           {success ? <p className="vf-message vf-message--success">{success}</p> : null}
 
           <div key={`${currentStep}-${flowType}`} className="vf-stage">
             {currentStep === 1 ? (
               <>
-                <h1 className="vf-title">Р’С‹Р±РµСЂРёС‚Рµ, С‡С‚Рѕ С…РѕС‚РёС‚Рµ СЃРѕР·РґР°С‚СЊ</h1>
+                <h1 className="vf-title">Выберите, что хотите создать</h1>
                 <div className="vf-choice-grid">
                   <article className="vf-choice-card">
-                    <img src="/С‡РµР» СЃРёРґРёС‚ РЅР° С†РІРµС‚РєРµ.svg" alt="РР»Р»СЋСЃС‚СЂР°С†РёСЏ СЃРѕР·РґР°РЅРёСЏ РІР°РєР°РЅСЃРёРё" />
-                    <h2>РЇ С…РѕС‡Сѓ СЃРѕР·РґР°С‚СЊ РІР°РєР°РЅСЃРёСЋ/СЃС‚Р°Р¶РёСЂРѕРІРєСѓ</h2>
+                    <img src="/чел сидит на цветке.svg" alt="Иллюстрация создания вакансии" />
+                    <h2>Я хочу создать вакансию/стажировку</h2>
                     <p>Разместите предложение о работе или стажировке, чтобы найти кандидатов в свою команду.</p>
                     <button type="button" className="vf-btn vf-btn--primary" onClick={() => goStep(2, 'vacancy')}>
-                      РЎРѕР·РґР°С‚СЊ
+                      Создать
                     </button>
                   </article>
 
                   <article className="vf-choice-card">
-                    <img src="/С‡РµР» СЃС‚РѕРёС‚ СЂСЏРґРѕРј С†РІРµС‚РѕРє.svg" alt="РР»Р»СЋСЃС‚СЂР°С†РёСЏ СЃРѕР·РґР°РЅРёСЏ РјРµСЂРѕРїСЂРёСЏС‚РёСЏ" />
-                    <h2>РЇ С…РѕС‡Сѓ СЃРѕР·РґР°С‚СЊ РјРµСЂРѕРїСЂРёСЏС‚РёРµ</h2>
-                    <p>РЎРѕР·РґР°Р№С‚Рµ СЃС‚СЂР°РЅРёС†Сѓ СЃРѕР±С‹С‚РёСЏ Рё РїСЂРёРіР»Р°С€Р°Р№С‚Рµ СѓС‡Р°СЃС‚РЅРёРєРѕРІ РЅР° РІСЃС‚СЂРµС‡Рё, РІРµР±РёРЅР°СЂС‹ Рё РјР°СЃС‚РµСЂ-РєР»Р°СЃСЃС‹.</p>
+                    <img src="/чел стоит рядом цветок.svg" alt="Иллюстрация создания мероприятия" />
+                    <h2>Я хочу создать мероприятие</h2>
+                    <p>Создайте страницу события и приглашайте участников на встречи, вебинары и мастер-классы.</p>
                     <button type="button" className="vf-btn vf-btn--primary" onClick={() => goStep(2, 'event')}>
-                      РЎРѕР·РґР°С‚СЊ
+                      Создать
                     </button>
                   </article>
                 </div>
@@ -565,62 +565,62 @@ export function VacancyFlowPage() {
 
             {currentStep === 2 ? (
               <>
-                <h2 className="vf-title">РћСЃРЅРѕРІРЅР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ</h2>
+                <h2 className="vf-title">Основная информация</h2>
 
                 <div className="vf-form-grid">
                   <label className="vf-field vf-field--full">
-                    <span>РќР°Р·РІР°РЅРёРµ</span>
+                    <span>Название</span>
                     <input
                       type="text"
                       name="title"
                       value={isVacancyFlow ? vacancyForm.title : eventForm.title}
                       onChange={isVacancyFlow ? onVacancyFormChange : onEventFormChange}
-                      placeholder={isVacancyFlow ? 'РќР°РїСЂРёРјРµСЂ, Frontend-СЂР°Р·СЂР°Р±РѕС‚С‡РёРє' : 'РќР°РїСЂРёРјРµСЂ, РҐР°РєР°С‚РѕРЅ РўСЂР°РјРїР»РёРЅ'}
+                      placeholder={isVacancyFlow ? 'Например, Frontend-разработчик' : 'Например, Хакатон Трамплин'}
                     />
                   </label>
 
                   <label className="vf-field">
-                    <span>Р’РёРґ</span>
+                    <span>Вид</span>
                     {isVacancyFlow ? (
                       <select name="kind" value={vacancyForm.kind} onChange={onVacancyFormChange}>
                         <option value={2}>Работа</option>
-                        <option value={1}>РЎС‚Р°Р¶РёСЂРѕРІРєР°</option>
+                        <option value={1}>Стажировка</option>
                       </select>
                     ) : (
                       <select name="kind" value={eventForm.kind} onChange={onEventFormChange}>
-                        <option value={1}>РҐР°РєР°С‚РѕРЅ</option>
-                        <option value={2}>Р”РµРЅСЊ РѕС‚РєСЂС‹С‚С‹С… РґРІРµСЂРµР№</option>
-                        <option value={3}>Р›РµРєС†РёСЏ</option>
-                        <option value={4}>Р”СЂСѓРіРѕРµ</option>
+                        <option value={1}>Хакатон</option>
+                        <option value={2}>День открытых дверей</option>
+                        <option value={3}>Лекция</option>
+                        <option value={4}>Другое</option>
                       </select>
                     )}
                   </label>
 
                   <label className="vf-field">
-                    <span>Р¤РѕСЂРјР°С‚</span>
+                    <span>Формат</span>
                     {isVacancyFlow ? (
                       <select name="format" value={vacancyForm.format} onChange={onVacancyFormChange}>
-                        <option value={1}>РћС„РёСЃ</option>
-                        <option value={2}>Р“РёР±СЂРёРґ</option>
-                        <option value={3}>РЈРґР°Р»РµРЅРЅРѕ</option>
+                        <option value={1}>Офис</option>
+                        <option value={2}>Гибрид</option>
+                        <option value={3}>Удаленно</option>
                       </select>
                     ) : (
                       <select name="format" value={eventForm.format} onChange={onEventFormChange}>
-                        <option value={1}>РћС„РёСЃ</option>
-                        <option value={2}>Р“РёР±СЂРёРґ</option>
-                        <option value={3}>РЈРґР°Р»РµРЅРЅРѕ</option>
+                        <option value={1}>Офис</option>
+                        <option value={2}>Гибрид</option>
+                        <option value={3}>Удаленно</option>
                       </select>
                     )}
                   </label>
 
                   <label className="vf-field">
-                    <span>Р“РѕСЂРѕРґ</span>
+                    <span>Город</span>
                     <select
                       name="cityId"
                       value={isVacancyFlow ? vacancyForm.cityId : eventForm.cityId}
                       onChange={isVacancyFlow ? onVacancyFormChange : onEventFormChange}
                     >
-                      <option value="">РќРµ РІС‹Р±СЂР°РЅ</option>
+                      <option value="">Не выбран</option>
                       {cities.map((city) => (
                         <option key={city.id} value={city.id}>
                           {city.name}
@@ -630,14 +630,14 @@ export function VacancyFlowPage() {
                   </label>
 
                   <label className="vf-field">
-                    <span>Р›РѕРєР°С†РёСЏ</span>
+                    <span>Локация</span>
                     <select
                       name="locationId"
                       value={isVacancyFlow ? vacancyForm.locationId : eventForm.locationId}
                       onChange={isVacancyFlow ? onVacancyFormChange : onEventFormChange}
                       disabled={!(isVacancyFlow ? vacancyForm.cityId : eventForm.cityId)}
                     >
-                      <option value="">РќРµ РІС‹Р±СЂР°РЅР°</option>
+                      <option value="">Не выбрана</option>
                       {locationOptions.map((location) => (
                         <option key={location.id} value={location.id}>
                           {locationOptionLabel(location)}
@@ -647,7 +647,7 @@ export function VacancyFlowPage() {
                   </label>
 
                   <label className="vf-field vf-field--full">
-                    <span>РўРµРіРё</span>
+                    <span>Теги</span>
                     <select
                       multiple
                       value={(isVacancyFlow ? vacancyForm.tagIds : eventForm.tagIds).map(String)}
@@ -666,10 +666,10 @@ export function VacancyFlowPage() {
 
                 <div className="vf-actions">
                   <button type="button" className="vf-btn vf-btn--secondary" onClick={prevStep}>
-                    РќР°Р·Р°Рґ
+                    Назад
                   </button>
                   <button type="button" className="vf-btn vf-btn--primary" onClick={onContinue}>
-                    Р”Р°Р»СЊС€Рµ
+                    Дальше
                   </button>
                 </div>
               </>
@@ -677,36 +677,36 @@ export function VacancyFlowPage() {
 
             {currentStep === 3 ? (
               <>
-                <h2 className="vf-title">РћРїРёСЃР°РЅРёРµ</h2>
+                <h2 className="vf-title">Описание</h2>
                 <div className="vf-editor-grid">
                   <label className="vf-editor">
-                    <span>РљСЂР°С‚РєРѕРµ РѕРїРёСЃР°РЅРёРµ</span>
+                    <span>Краткое описание</span>
                     <textarea
                       name="shortDescription"
                       rows={7}
                       value={isVacancyFlow ? vacancyForm.shortDescription : eventForm.shortDescription}
                       onChange={isVacancyFlow ? onVacancyFormChange : onEventFormChange}
-                      placeholder={isVacancyFlow ? 'РљСЂР°С‚РєРѕ РѕРїРёС€РёС‚Рµ РІР°РєР°РЅСЃРёСЋ' : 'РљСЂР°С‚РєРѕ РѕРїРёС€РёС‚Рµ РјРµСЂРѕРїСЂРёСЏС‚РёРµ'}
+                      placeholder={isVacancyFlow ? 'Кратко опишите вакансию' : 'Кратко опишите мероприятие'}
                     />
                   </label>
                   <label className="vf-editor">
-                    <span>РџРѕР»РЅРѕРµ РѕРїРёСЃР°РЅРёРµ</span>
+                    <span>Полное описание</span>
                     <textarea
                       name="fullDescription"
                       rows={7}
                       value={isVacancyFlow ? vacancyForm.fullDescription : eventForm.fullDescription}
                       onChange={isVacancyFlow ? onVacancyFormChange : onEventFormChange}
-                      placeholder={isVacancyFlow ? 'РџРѕРґСЂРѕР±РЅРѕ РѕРїРёС€РёС‚Рµ РІР°РєР°РЅСЃРёСЋ' : 'РџРѕРґСЂРѕР±РЅРѕ РѕРїРёС€РёС‚Рµ РїСЂРѕРіСЂР°РјРјСѓ РјРµСЂРѕРїСЂРёСЏС‚РёСЏ'}
+                      placeholder={isVacancyFlow ? 'Подробно опишите вакансию' : 'Подробно опишите программу мероприятия'}
                     />
                   </label>
                 </div>
 
                 <div className="vf-actions">
                   <button type="button" className="vf-btn vf-btn--secondary" onClick={prevStep}>
-                    РќР°Р·Р°Рґ
+                    Назад
                   </button>
                   <button type="button" className="vf-btn vf-btn--primary" onClick={onContinue}>
-                    Р”Р°Р»СЊС€Рµ
+                    Дальше
                   </button>
                 </div>
               </>
@@ -714,68 +714,68 @@ export function VacancyFlowPage() {
 
             {currentStep === 4 ? (
               <>
-                <h2 className="vf-title">РЎС‚РѕРёРјРѕСЃС‚СЊ Рё РѕРїС†РёРё</h2>
+                <h2 className="vf-title">Стоимость и опции</h2>
 
                 {isVacancyFlow ? (
                   <div className="vf-form-grid vf-form-grid--salary">
                     <label className="vf-field">
-                      <span>Р—Р°СЂРїР»Р°С‚Р° РѕС‚</span>
-                      <input type="number" name="salaryFrom" value={vacancyForm.salaryFrom} onChange={onVacancyFormChange} placeholder="РќР°РїСЂРёРјРµСЂ, 20000" />
+                      <span>Зарплата от</span>
+                      <input type="number" name="salaryFrom" value={vacancyForm.salaryFrom} onChange={onVacancyFormChange} placeholder="Например, 20000" />
                     </label>
                     <label className="vf-field">
-                      <span>Р—Р°СЂРїР»Р°С‚Р° РґРѕ</span>
-                      <input type="number" name="salaryTo" value={vacancyForm.salaryTo} onChange={onVacancyFormChange} placeholder="РќР°РїСЂРёРјРµСЂ, 50000" />
+                      <span>Зарплата до</span>
+                      <input type="number" name="salaryTo" value={vacancyForm.salaryTo} onChange={onVacancyFormChange} placeholder="Например, 50000" />
                     </label>
                     <label className="vf-field">
-                      <span>Р’Р°Р»СЋС‚Р°</span>
+                      <span>Валюта</span>
                       <input type="text" name="currencyCode" value={vacancyForm.currencyCode} onChange={onVacancyFormChange} maxLength={3} />
                     </label>
                     <label className="vf-field">
-                      <span>РќР°Р»РѕРіРѕРІС‹Р№ СЂРµР¶РёРј</span>
+                      <span>Налоговый режим</span>
                       <select name="salaryTaxMode" value={vacancyForm.salaryTaxMode} onChange={onVacancyFormChange}>
-                        <option value={1}>Р”Рѕ РІС‹С‡РµС‚Р° РЅР°Р»РѕРіРѕРІ</option>
-                        <option value={2}>РџРѕСЃР»Рµ РІС‹С‡РµС‚Р° РЅР°Р»РѕРіРѕРІ</option>
-                        <option value={3}>РќРµ СѓРєР°Р·Р°РЅРѕ</option>
+                        <option value={1}>До вычета налогов</option>
+                        <option value={2}>После вычета налогов</option>
+                        <option value={3}>Не указано</option>
                       </select>
                     </label>
                     <label className="vf-field">
-                      <span>Р”Р°С‚Р° РїСѓР±Р»РёРєР°С†РёРё</span>
+                      <span>Дата публикации</span>
                       <input type="datetime-local" name="publishAt" value={vacancyForm.publishAt} onChange={onVacancyFormChange} />
                     </label>
                     <label className="vf-field">
-                      <span>Р”РµРґР»Р°Р№РЅ РѕС‚РєР»РёРєРѕРІ</span>
+                      <span>Дедлайн откликов</span>
                       <input type="datetime-local" name="applicationDeadline" value={vacancyForm.applicationDeadline} onChange={onVacancyFormChange} />
                     </label>
                   </div>
                 ) : (
                   <div className="vf-form-grid vf-form-grid--event">
                     <label className="vf-field">
-                      <span>РўРёРї С†РµРЅС‹</span>
+                      <span>Тип цены</span>
                       <select name="priceType" value={eventForm.priceType} onChange={onEventFormChange}>
-                        <option value={1}>Р‘РµСЃРїР»Р°С‚РЅРѕ</option>
-                        <option value={2}>РџР»Р°С‚РЅРѕ</option>
-                        <option value={3}>РџСЂРёР·</option>
+                        <option value={1}>Бесплатно</option>
+                        <option value={2}>Платно</option>
+                        <option value={3}>Приз</option>
                       </select>
                     </label>
                     <label className="vf-field">
-                      <span>РЎСѓРјРјР°</span>
-                      <input type="number" name="priceAmount" value={eventForm.priceAmount} onChange={onEventFormChange} placeholder="РќР°РїСЂРёРјРµСЂ, 2000" />
+                      <span>Сумма</span>
+                      <input type="number" name="priceAmount" value={eventForm.priceAmount} onChange={onEventFormChange} placeholder="Например, 2000" />
                     </label>
                     <label className="vf-field">
-                      <span>Р’Р°Р»СЋС‚Р°</span>
+                      <span>Валюта</span>
                       <input type="text" name="priceCurrencyCode" value={eventForm.priceCurrencyCode} onChange={onEventFormChange} maxLength={3} />
                     </label>
                     <label className="vf-field">
-                      <span>Р”Р°С‚Р° РїСѓР±Р»РёРєР°С†РёРё</span>
+                      <span>Дата публикации</span>
                       <input type="datetime-local" name="publishAt" value={eventForm.publishAt} onChange={onEventFormChange} />
                     </label>
                     <label className="vf-field">
-                      <span>Р”Р°С‚Р° СЃРѕР±С‹С‚РёСЏ</span>
+                      <span>Дата события</span>
                       <input type="datetime-local" name="eventDate" value={eventForm.eventDate} onChange={onEventFormChange} />
                     </label>
 
                     <div className="vf-switch-row">
-                      <span>РЈС‡Р°СЃС‚РЅРёРєРё РіСЂСѓРїРїС‹ РјРѕРіСѓС‚ РїРёСЃР°С‚СЊ РІ С‡Р°С‚</span>
+                      <span>Участники группы могут писать в чат</span>
                       <button
                         type="button"
                         className={`vf-switch ${eventChatEnabled ? 'is-on' : ''}`}
@@ -790,10 +790,10 @@ export function VacancyFlowPage() {
 
                 <div className="vf-actions">
                   <button type="button" className="vf-btn vf-btn--secondary" onClick={prevStep}>
-                    РќР°Р·Р°Рґ
+                    Назад
                   </button>
                   <button type="button" className="vf-btn vf-btn--primary" onClick={onContinue}>
-                    Р”Р°Р»СЊС€Рµ
+                    Дальше
                   </button>
                 </div>
               </>
@@ -801,20 +801,20 @@ export function VacancyFlowPage() {
 
             {currentStep === 5 ? (
               <div className="vf-section--publish">
-                <h2 className="vf-congrats">РџСЂРѕРІРµСЂРєР° РїРµСЂРµРґ РѕС‚РїСЂР°РІРєРѕР№</h2>
+                <h2 className="vf-congrats">Проверка перед отправкой</h2>
                 <p className="vf-congrats__text">
                   {isVacancyFlow
-                    ? 'РџСЂРѕРІРµСЂСЊС‚Рµ Р·Р°РїРѕР»РЅРµРЅРёРµ РІР°РєР°РЅСЃРёРё Рё РѕС‚РїСЂР°РІСЊС‚Рµ РµРµ РЅР° РјРѕРґРµСЂР°С†РёСЋ.'
-                    : 'РџСЂРѕРІРµСЂСЊС‚Рµ Р·Р°РїРѕР»РЅРµРЅРёРµ РјРµСЂРѕРїСЂРёСЏС‚РёСЏ Рё РѕС‚РїСЂР°РІСЊС‚Рµ РµРіРѕ РЅР° РјРѕРґРµСЂР°С†РёСЋ.'}
+                    ? 'Проверьте заполнение вакансии и отправьте ее на модерацию.'
+                    : 'Проверьте заполнение мероприятия и отправьте его на модерацию.'}
                 </p>
-                {isVacancyFlow && success ? <p className="vf-note">Р§РµСЂРµР· РЅРµСЃРєРѕР»СЊРєРѕ СЃРµРєСѓРЅРґ РІС‹ РІРµСЂРЅРµС‚РµСЃСЊ РЅР° РіР»Р°РІРЅСѓСЋ СЃС‚СЂР°РЅРёС†Сѓ.</p> : null}
-                <img className="vf-congrats__image" src="/РіРѕСЂРґС‹Р№ С‡РµР» СЃС‚РѕРёС‚.svg" alt="РР»Р»СЋСЃС‚СЂР°С†РёСЏ РїСѓР±Р»РёРєР°С†РёРё" />
+                {isVacancyFlow && success ? <p className="vf-note">Через несколько секунд вы вернетесь на главную страницу.</p> : null}
+                <img className="vf-congrats__image" src="/гордый чел стоит.svg" alt="Иллюстрация публикации" />
                 <div className="vf-actions">
                   <button type="button" className="vf-btn vf-btn--secondary" onClick={prevStep} disabled={isSubmitting}>
-                    РќР°Р·Р°Рґ
+                    Назад
                   </button>
                   <button type="button" className="vf-btn vf-btn--primary" onClick={() => void onPublish()} disabled={isSubmitting}>
-                    {isSubmitting ? 'РћС‚РїСЂР°РІР»СЏРµРј...' : 'РћРїСѓР±Р»РёРєРѕРІР°С‚СЊ'}
+                    {isSubmitting ? 'Отправляем...' : 'Опубликовать'}
                   </button>
                 </div>
               </div>
