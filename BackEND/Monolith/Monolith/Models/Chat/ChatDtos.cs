@@ -16,6 +16,7 @@ public record ChatMessageDto(
     long ChatId,
     long SenderUserId,
     string SenderDisplayName,
+    string? SenderUsername,
     string? SenderAvatarUrl,
     string Text,
     bool IsSystem,

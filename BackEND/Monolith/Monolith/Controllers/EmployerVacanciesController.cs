@@ -404,7 +404,7 @@ public class EmployerVacanciesController(
         var sender = await dbContext.Users
             .AsNoTracking()
             .Where(x => x.Id == membership.UserId)
-            .Select(x => new { x.DisplayName, x.AvatarUrl })
+            .Select(x => new { x.DisplayName, x.Username, x.AvatarUrl })
             .FirstAsync(cancellationToken);
 
         await hubContext.Clients.Group(ChatHub.GroupName(directChatId.Value)).SendAsync(
@@ -414,6 +414,7 @@ public class EmployerVacanciesController(
                 message.ChatId,
                 message.SenderUserId,
                 sender.DisplayName,
+                sender.Username,
                 sender.AvatarUrl,
                 message.Text,
                 message.IsSystem,

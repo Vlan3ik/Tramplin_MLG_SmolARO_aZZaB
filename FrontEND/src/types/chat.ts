@@ -5,6 +5,7 @@ export type ChatMessage = {
   chatId: number
   senderUserId: number
   senderDisplayName: string | null
+  senderUsername: string | null
   senderAvatarUrl: string | null
   text: string
   isSystem: boolean
