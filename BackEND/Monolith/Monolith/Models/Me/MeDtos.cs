@@ -96,6 +96,15 @@ public record ResumeResponse(
 /// <param name="YearsExperience">Опыт в годах.</param>
 public record ResumeSkillItemDto(long TagId, string TagName, int? Level, decimal? YearsExperience);
 public record ResumeProjectItemDto(long Id, string Title, string? Role, string? Description, DateOnly? StartDate, DateOnly? EndDate, string? RepoUrl, string? DemoUrl);
+public record ResumeExperienceItemDto(
+    long Id,
+    long? CompanyId,
+    string CompanyName,
+    string Position,
+    string? Description,
+    DateOnly? StartDate,
+    DateOnly? EndDate,
+    bool IsCurrent);
 public record ResumeEducationItemDto(long Id, string University, string? Faculty, string? Specialty, int? Course, int? GraduationYear);
 public record ResumeLinkItemDto(long Id, string Kind, string Url, string? Label);
 
@@ -108,6 +117,7 @@ public record ResumeDetailsResponse(
     decimal? SalaryTo,
     string? CurrencyCode,
     IReadOnlyCollection<ResumeSkillItemDto> Skills,
+    IReadOnlyCollection<ResumeExperienceItemDto> Experiences,
     IReadOnlyCollection<ResumeProjectItemDto> Projects,
     IReadOnlyCollection<ResumeEducationItemDto> Education,
     IReadOnlyCollection<ResumeLinkItemDto> Links);
@@ -119,6 +129,14 @@ public record ResumeDetailsResponse(
 /// <param name="Level">Уровень навыка от 1 до 5.</param>
 /// <param name="YearsExperience">Опыт в годах.</param>
 public record ResumeSkillUpsertDto(long TagId, int? Level, decimal? YearsExperience);
+public record ResumeExperienceUpsertDto(
+    long? CompanyId,
+    string? CompanyName,
+    string Position,
+    string? Description,
+    DateOnly? StartDate,
+    DateOnly? EndDate,
+    bool IsCurrent);
 public record ResumeProjectUpsertDto(string Title, string? Role, string? Description, DateOnly? StartDate, DateOnly? EndDate, string? RepoUrl, string? DemoUrl);
 public record ResumeEducationUpsertDto(string University, string? Faculty, string? Specialty, int? Course, int? GraduationYear);
 public record ResumeLinkUpsertDto(string Kind, string Url, string? Label);
@@ -131,6 +149,7 @@ public record UpdateResumeDetailsRequest(
     decimal? SalaryTo,
     string? CurrencyCode,
     IReadOnlyCollection<ResumeSkillUpsertDto> Skills,
+    IReadOnlyCollection<ResumeExperienceUpsertDto> Experiences,
     IReadOnlyCollection<ResumeProjectUpsertDto> Projects,
     IReadOnlyCollection<ResumeEducationUpsertDto> Education,
     IReadOnlyCollection<ResumeLinkUpsertDto> Links);

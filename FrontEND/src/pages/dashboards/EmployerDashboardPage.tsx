@@ -1760,6 +1760,28 @@ export function EmployerDashboardPage() {
                 </div>
 
                 <div className="employer-candidate-profile__section employer-candidate-profile__section--wide">
+                  <strong>Опыт работы</strong>
+                  {selectedCandidateResume.experiences.length ? (
+                    <div className="employer-candidate-profile__list">
+                      {selectedCandidateResume.experiences.map((experience) => (
+                        <article key={experience.id} className="employer-candidate-profile__list-item">
+                          <div className="employer-candidate-profile__list-item-head">
+                            <strong>{experience.position}</strong>
+                            <span>{experience.companyName}</span>
+                          </div>
+                          <p>
+                            {formatDateOnly(experience.startDate)} - {experience.isCurrent ? 'по настоящее время' : formatDateOnly(experience.endDate)}
+                          </p>
+                          <p>{experience.description || 'Описание не заполнено'}</p>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Опыт работы не указан.</p>
+                  )}
+                </div>
+
+                <div className="employer-candidate-profile__section employer-candidate-profile__section--wide">
                   <strong>Проекты</strong>
                   {selectedCandidateResume.projects.length ? (
                     <div className="employer-candidate-profile__list">

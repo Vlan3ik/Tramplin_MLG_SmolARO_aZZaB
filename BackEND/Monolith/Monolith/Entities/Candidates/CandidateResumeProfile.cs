@@ -14,6 +14,7 @@ public class CandidateResumeProfile
     public CandidateProfile CandidateProfile { get; set; } = null!;
     public List<CandidateResumeSkill> Skills { get; set; } = new();
     public List<CandidateResumeProject> Projects { get; set; } = new();
+    public List<CandidateResumeExperience> Experiences { get; set; } = new();
     public List<CandidateResumeEducation> EducationEntries { get; set; } = new();
     public List<CandidateResumeLink> Links { get; set; } = new();
 }

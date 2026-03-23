@@ -25,5 +25,6 @@ public class Company
     public List<CompanyMember> Members { get; set; } = new();
     public List<CompanyInvite> Invites { get; set; } = new();
     public List<Application> Applications { get; set; } = new();
+    public List<CandidateResumeExperience> ResumeExperiences { get; set; } = new();
     public CompanyChatSettings? ChatSettings { get; set; }
 }

@@ -1,6 +1,6 @@
 import { deleteJson, getJson, patchJson, postJson } from './client'
 import type { OpportunityType } from '../types/opportunity'
-import type { ResumeEducation, ResumeLink, ResumeProject, ResumeSkill } from '../types/resume'
+import type { ResumeEducation, ResumeExperience, ResumeLink, ResumeProject, ResumeSkill } from '../types/resume'
 
 type PagedResponse<TItem> = {
   items?: TItem[] | null
@@ -129,6 +129,16 @@ type EmployerCandidateResumeApi = {
     tagName: string
     level: number | null
     yearsExperience: number | null
+  }> | null
+  experiences: Array<{
+    id: number
+    companyId: number | null
+    companyName: string
+    position: string
+    description: string | null
+    startDate: string | null
+    endDate: string | null
+    isCurrent: boolean
   }> | null
   projects: Array<{
     id: number
@@ -389,6 +399,7 @@ export type EmployerCandidateResume = {
   currencyCode: string
   openToWork: boolean
   skills: ResumeSkill[]
+  experiences: ResumeExperience[]
   projects: ResumeProject[]
   education: ResumeEducation[]
   links: ResumeLink[]
@@ -858,6 +869,18 @@ export async function fetchEmployerApplicationDetail(applicationId: number, sign
               tagName: skill.tagName,
               level: skill.level ?? 0,
               yearsExperience: skill.yearsExperience ?? 0,
+            }))
+          : [],
+        experiences: Array.isArray(response.candidateResume.experiences)
+          ? response.candidateResume.experiences.map((experience) => ({
+              id: experience.id,
+              companyId: experience.companyId ?? null,
+              companyName: experience.companyName,
+              position: experience.position,
+              description: experience.description ?? '',
+              startDate: experience.startDate ?? '',
+              endDate: experience.endDate ?? '',
+              isCurrent: Boolean(experience.isCurrent),
             }))
           : [],
         projects: Array.isArray(response.candidateResume.projects)

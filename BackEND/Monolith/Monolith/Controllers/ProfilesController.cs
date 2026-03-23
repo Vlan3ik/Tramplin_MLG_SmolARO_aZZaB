@@ -141,6 +141,35 @@ public class ProfilesController(AppDbContext dbContext) : ControllerBase
             .OrderBy(x => x.Tag.Name)
             .Select(x => new ResumeSkillItemDto(x.TagId, x.Tag.Name, x.Level, x.YearsExperience))
             .ToListAsync(cancellationToken);
+        var experiences = await dbContext.CandidateResumeExperiences
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .Select(x => new
+            {
+                x.Id,
+                x.CompanyId,
+                x.CompanyName,
+                x.Position,
+                x.Description,
+                x.StartDate,
+                x.EndDate,
+                x.IsCurrent,
+                LinkedCompanyName = x.Company != null ? (x.Company.BrandName ?? x.Company.LegalName) : null
+            })
+            .OrderByDescending(x => x.IsCurrent)
+            .ThenByDescending(x => x.EndDate)
+            .ThenByDescending(x => x.StartDate)
+            .ThenByDescending(x => x.Id)
+            .Select(x => new ResumeExperienceItemDto(
+                x.Id,
+                x.CompanyId,
+                x.LinkedCompanyName ?? x.CompanyName ?? "Компания не указана",
+                x.Position,
+                x.Description,
+                x.StartDate,
+                x.EndDate,
+                x.IsCurrent))
+            .ToListAsync(cancellationToken);
         var projects = await dbContext.CandidateResumeProjects
             .AsNoTracking()
             .Where(x => x.UserId == userId)
@@ -169,6 +198,7 @@ public class ProfilesController(AppDbContext dbContext) : ControllerBase
             resume.SalaryTo,
             resume.CurrencyCode,
             skills,
+            experiences,
             projects,
             education,
             links);

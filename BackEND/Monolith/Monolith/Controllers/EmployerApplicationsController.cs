@@ -140,6 +140,36 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
             .Select(x => new ResumeSkillDto(x.TagId, x.Tag.Name, x.Level, x.YearsExperience))
             .ToListAsync(cancellationToken);
 
+        var experiences = await dbContext.CandidateResumeExperiences
+            .AsNoTracking()
+            .Where(x => x.UserId == application.CandidateUserId)
+            .Select(x => new
+            {
+                x.Id,
+                x.CompanyId,
+                x.CompanyName,
+                x.Position,
+                x.Description,
+                x.StartDate,
+                x.EndDate,
+                x.IsCurrent,
+                LinkedCompanyName = x.Company != null ? (x.Company.BrandName ?? x.Company.LegalName) : null
+            })
+            .OrderByDescending(x => x.IsCurrent)
+            .ThenByDescending(x => x.EndDate)
+            .ThenByDescending(x => x.StartDate)
+            .ThenByDescending(x => x.Id)
+            .Select(x => new ResumeExperienceDto(
+                x.Id,
+                x.CompanyId,
+                x.LinkedCompanyName ?? x.CompanyName ?? "Компания не указана",
+                x.Position,
+                x.Description,
+                x.StartDate,
+                x.EndDate,
+                x.IsCurrent))
+            .ToListAsync(cancellationToken);
+
         var projects = await dbContext.CandidateResumeProjects
             .AsNoTracking()
             .Where(x => x.UserId == application.CandidateUserId)
@@ -165,6 +195,7 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
             candidateProfile is not null ||
             resume is not null ||
             skills.Count > 0 ||
+            experiences.Count > 0 ||
             projects.Count > 0 ||
             education.Count > 0 ||
             links.Count > 0;
@@ -198,6 +229,7 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
                 resume?.CurrencyCode,
                 privacy?.OpenToWork ?? true,
                 skills,
+                experiences,
                 projects,
                 education,
                 links);

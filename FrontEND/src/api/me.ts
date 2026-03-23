@@ -16,6 +16,16 @@ type ResumeApiResponse = {
     level: number | null
     yearsExperience: number | null
   }> | null
+  experiences?: Array<{
+    id: number
+    companyId: number | null
+    companyName: string
+    position: string
+    description: string | null
+    startDate: string | null
+    endDate: string | null
+    isCurrent: boolean
+  }> | null
   projects?: Array<{
     id: number
     title: string
@@ -57,6 +67,15 @@ type UpdateResumeDetailsRequest = {
     tagId: number
     level: number | null
     yearsExperience: number | null
+  }>
+  experiences: Array<{
+    companyId: number | null
+    companyName: string | null
+    position: string
+    description: string | null
+    startDate: string | null
+    endDate: string | null
+    isCurrent: boolean
   }>
   projects: Array<{
     title: string
@@ -108,6 +127,18 @@ export async function fetchSeekerResume(signal?: AbortSignal): Promise<SeekerRes
           yearsExperience: skill.yearsExperience ?? 0,
         }))
       : [],
+    experiences: Array.isArray(response.experiences)
+      ? response.experiences.map((experience) => ({
+          id: experience.id,
+          companyId: experience.companyId ?? null,
+          companyName: experience.companyName,
+          position: experience.position,
+          description: experience.description ?? '',
+          startDate: experience.startDate ?? '',
+          endDate: experience.endDate ?? '',
+          isCurrent: Boolean(experience.isCurrent),
+        }))
+      : [],
     projects: Array.isArray(response.projects)
       ? response.projects.map((project) => ({
           id: project.id,
@@ -153,6 +184,15 @@ export async function updateSeekerResume(payload: SeekerResume) {
       tagId: skill.tagId,
       level: skill.level || null,
       yearsExperience: skill.yearsExperience || null,
+    })),
+    experiences: payload.experiences.map((experience) => ({
+      companyId: experience.companyId ?? null,
+      companyName: experience.companyName || null,
+      position: experience.position,
+      description: experience.description || null,
+      startDate: experience.startDate || null,
+      endDate: experience.isCurrent ? null : experience.endDate || null,
+      isCurrent: experience.isCurrent,
     })),
     projects: payload.projects.map((project) => ({
       title: project.title,

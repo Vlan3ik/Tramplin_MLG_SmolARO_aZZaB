@@ -16,6 +16,17 @@ export type ResumeProject = {
   demoUrl: string
 }
 
+export type ResumeExperience = {
+  id: number
+  companyId: number | null
+  companyName: string
+  position: string
+  description: string
+  startDate: string
+  endDate: string
+  isCurrent: boolean
+}
+
 export type ResumeEducation = {
   id: number
   university: string
@@ -41,6 +52,7 @@ export type SeekerResume = {
   salaryTo: number | null
   currencyCode: string
   skills: ResumeSkill[]
+  experiences: ResumeExperience[]
   projects: ResumeProject[]
   education: ResumeEducation[]
   links: ResumeLink[]

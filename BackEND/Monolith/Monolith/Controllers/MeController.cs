@@ -349,6 +349,41 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             }
         }
 
+        foreach (var experience in request.Experiences)
+        {
+            if (string.IsNullOrWhiteSpace(experience.Position))
+            {
+                return this.ToBadRequestError("me.resume.experiences.position_required", "Для каждого опыта работы обязательно укажите должность.");
+            }
+
+            if (experience.CompanyId is null && string.IsNullOrWhiteSpace(experience.CompanyName))
+            {
+                return this.ToBadRequestError("me.resume.experiences.company_required", "Для каждого опыта работы выберите компанию или укажите её название.");
+            }
+
+            if (experience.StartDate is not null && experience.EndDate is not null && experience.EndDate < experience.StartDate)
+            {
+                return this.ToBadRequestError("me.resume.experiences.period_invalid", "Дата окончания опыта работы не может быть раньше даты начала.");
+            }
+        }
+
+        var requestedCompanyIds = request.Experiences
+            .Where(x => x.CompanyId is not null)
+            .Select(x => x.CompanyId!.Value)
+            .Distinct()
+            .ToArray();
+        if (requestedCompanyIds.Length > 0)
+        {
+            var existingCompanyIds = await dbContext.Companies
+                .Where(x => requestedCompanyIds.Contains(x.Id))
+                .Select(x => x.Id)
+                .ToArrayAsync(cancellationToken);
+            if (existingCompanyIds.Length != requestedCompanyIds.Length)
+            {
+                return this.ToBadRequestError("me.resume.experiences.company_not_found", "Одна или несколько выбранных компаний не найдены.");
+            }
+        }
+
         await using var tx = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         resume.Headline = request.Headline?.Trim();
@@ -359,11 +394,13 @@ public class MeController(AppDbContext dbContext) : ControllerBase
         resume.CurrencyCode = request.CurrencyCode?.Trim().ToUpperInvariant();
 
         var oldSkills = await dbContext.CandidateResumeSkills.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
+        var oldExperiences = await dbContext.CandidateResumeExperiences.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
         var oldProjects = await dbContext.CandidateResumeProjects.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
         var oldEducation = await dbContext.CandidateResumeEducation.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
         var oldLinks = await dbContext.CandidateResumeLinks.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
 
         dbContext.CandidateResumeSkills.RemoveRange(oldSkills);
+        dbContext.CandidateResumeExperiences.RemoveRange(oldExperiences);
         dbContext.CandidateResumeProjects.RemoveRange(oldProjects);
         dbContext.CandidateResumeEducation.RemoveRange(oldEducation);
         dbContext.CandidateResumeLinks.RemoveRange(oldLinks);
@@ -377,6 +414,18 @@ public class MeController(AppDbContext dbContext) : ControllerBase
                 Level = x.Level,
                 YearsExperience = x.YearsExperience
             }));
+
+        dbContext.CandidateResumeExperiences.AddRange(request.Experiences.Select(x => new CandidateResumeExperience
+        {
+            UserId = userId,
+            CompanyId = x.CompanyId,
+            CompanyName = x.CompanyId is null ? x.CompanyName?.Trim() : null,
+            Position = x.Position.Trim(),
+            Description = x.Description?.Trim(),
+            StartDate = x.StartDate,
+            EndDate = x.IsCurrent ? null : x.EndDate,
+            IsCurrent = x.IsCurrent
+        }));
 
         dbContext.CandidateResumeProjects.AddRange(request.Projects.Select(x => new CandidateResumeProject
         {
@@ -438,6 +487,35 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             .OrderBy(x => x.Tag.Name)
             .Select(x => new ResumeSkillItemDto(x.TagId, x.Tag.Name, x.Level, x.YearsExperience))
             .ToListAsync(cancellationToken);
+        var experiences = await dbContext.CandidateResumeExperiences
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .Select(x => new
+            {
+                x.Id,
+                x.CompanyId,
+                x.CompanyName,
+                x.Position,
+                x.Description,
+                x.StartDate,
+                x.EndDate,
+                x.IsCurrent,
+                LinkedCompanyName = x.Company != null ? (x.Company.BrandName ?? x.Company.LegalName) : null
+            })
+            .OrderByDescending(x => x.IsCurrent)
+            .ThenByDescending(x => x.EndDate)
+            .ThenByDescending(x => x.StartDate)
+            .ThenByDescending(x => x.Id)
+            .Select(x => new ResumeExperienceItemDto(
+                x.Id,
+                x.CompanyId,
+                x.LinkedCompanyName ?? x.CompanyName ?? "Компания не указана",
+                x.Position,
+                x.Description,
+                x.StartDate,
+                x.EndDate,
+                x.IsCurrent))
+            .ToListAsync(cancellationToken);
         var projects = await dbContext.CandidateResumeProjects
             .AsNoTracking()
             .Where(x => x.UserId == userId)
@@ -466,6 +544,7 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             resume.SalaryTo,
             resume.CurrencyCode,
             skills,
+            experiences,
             projects,
             education,
             links);

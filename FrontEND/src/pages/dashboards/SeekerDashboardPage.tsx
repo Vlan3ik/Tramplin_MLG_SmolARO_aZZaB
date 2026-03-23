@@ -4,6 +4,7 @@ import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from '
 import { Link } from 'react-router-dom'
 import { createApplication } from '../../api/applications'
 import { fetchTags } from '../../api/catalog'
+import { fetchCompanies } from '../../api/companies'
 import { fetchSeekerProfile, fetchSeekerResume, updateSeekerProfile, updateSeekerResume } from '../../api/me'
 import { uploadMyAvatar } from '../../api/media'
 import { fetchOpportunityById, fetchOpportunityDetailById, participateInOpportunity } from '../../api/opportunities'
@@ -14,6 +15,7 @@ import { TopServiceBar } from '../../components/layout/TopServiceBar'
 import { useApplications } from '../../hooks/useApplications'
 import { useAuth } from '../../hooks/useAuth'
 import type { TagListItem } from '../../types/catalog'
+import type { Company } from '../../types/company'
 import type { CandidateGender, SeekerProfile } from '../../types/me'
 import type { Opportunity } from '../../types/opportunity'
 import type { SeekerResume } from '../../types/resume'
@@ -42,7 +44,7 @@ const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'resume', label: 'Резюме' },
 ]
 
-const resumeSteps = ['Основная информация', 'Скиллы', 'Портфолио', 'Образование', 'Ссылки на соцсети']
+const resumeSteps = ['Основная информация', 'Скиллы', 'Опыт работы', 'Портфолио', 'Образование', 'Ссылки на соцсети']
 const subscriptionTabs: Array<{ id: SubscriptionTabId; label: string }> = [
   { id: 'seekers', label: 'Соискатели' },
   { id: 'employers', label: 'Работодатели' },
@@ -98,6 +100,7 @@ const initialResume = (userId = 0): SeekerResume => ({
   salaryTo: null,
   currencyCode: 'RUB',
   skills: [],
+  experiences: [],
   projects: [],
   education: [],
   links: [],
@@ -125,6 +128,16 @@ const initialLink = {
   kind: 'github',
   url: '',
   label: '',
+}
+
+const initialExperience = {
+  companyId: '',
+  companyName: '',
+  position: '',
+  description: '',
+  startDate: '',
+  endDate: '',
+  isCurrent: false,
 }
 
 function resolveAvatarUrl(value: string | null | undefined) {
@@ -226,6 +239,7 @@ export function SeekerDashboardPage() {
   const [step, setStep] = useState(0)
   const [profile, setProfile] = useState<SeekerProfile | null>(null)
   const [resume, setResume] = useState<SeekerResume>(initialResume())
+  const [resumeCompanies, setResumeCompanies] = useState<Company[]>([])
   const [tags, setTags] = useState<TagListItem[]>([])
   const [favoriteOpportunities, setFavoriteOpportunities] = useState<Opportunity[]>([])
   const [favoriteIds, setFavoriteIds] = useState<number[]>(() => getFavoriteOpportunityIds())
@@ -248,6 +262,7 @@ export function SeekerDashboardPage() {
     avatarUrl: '',
   })
   const [projectForm, setProjectForm] = useState(initialProject)
+  const [experienceForm, setExperienceForm] = useState(initialExperience)
   const [educationForm, setEducationForm] = useState(initialEducation)
   const [linkForm, setLinkForm] = useState(initialLink)
   const [skillTagId, setSkillTagId] = useState<number | null>(null)
@@ -288,10 +303,11 @@ export function SeekerDashboardPage() {
       setLoadingResume(true)
       setLoadingSubscriptions(true)
 
-      const [profileResult, resumeResult, tagsResult, followingResult, followersResult] = await Promise.allSettled([
+      const [profileResult, resumeResult, tagsResult, companiesResult, followingResult, followersResult] = await Promise.allSettled([
         fetchSeekerProfile(controller.signal),
         fetchSeekerResume(controller.signal),
         fetchTags(controller.signal),
+        fetchCompanies({ page: 1, pageSize: 100, verifiedOnly: true }, controller.signal),
         fetchMyFollowingSubscriptions(controller.signal),
         fetchMyFollowerSubscriptions(controller.signal),
       ])
@@ -323,6 +339,7 @@ export function SeekerDashboardPage() {
                 salaryTo: apiResume.salaryTo ?? local.salaryTo,
                 currencyCode: apiResume.currencyCode || local.currencyCode,
                 skills: apiResume.skills.length ? apiResume.skills : local.skills,
+                experiences: apiResume.experiences.length ? apiResume.experiences : Array.isArray(local.experiences) ? local.experiences : [],
                 projects: apiResume.projects.length ? apiResume.projects : local.projects,
                 education: apiResume.education.length ? apiResume.education : local.education,
                 links: apiResume.links.length ? apiResume.links : local.links,
@@ -335,6 +352,10 @@ export function SeekerDashboardPage() {
 
       if (tagsResult.status === 'fulfilled') {
         setTags(tagsResult.value)
+      }
+
+      if (companiesResult.status === 'fulfilled') {
+        setResumeCompanies(companiesResult.value.items)
       }
 
       if (followingResult.status === 'fulfilled') {
@@ -930,6 +951,110 @@ export function SeekerDashboardPage() {
                         {step === 2 ? (
                           <div className="resume-step-body">
                             <div className="form-grid form-grid--two">
+                              <label>
+                                Компания на платформе
+                                <select
+                                  value={experienceForm.companyId}
+                                  onChange={(e) => setExperienceForm((s) => ({ ...s, companyId: e.target.value }))}
+                                >
+                                  <option value="">Не выбрана</option>
+                                  {resumeCompanies.map((company) => (
+                                    <option key={company.id} value={company.id}>
+                                      {company.name || `Компания #${company.id}`}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label>
+                                Название компании (если нет в списке)
+                                <input
+                                  value={experienceForm.companyName}
+                                  onChange={(e) => setExperienceForm((s) => ({ ...s, companyName: e.target.value }))}
+                                />
+                              </label>
+                              <label>Должность<input value={experienceForm.position} onChange={(e) => setExperienceForm((s) => ({ ...s, position: e.target.value }))} /></label>
+                              <label>
+                                Сейчас работаю
+                                <select
+                                  value={experienceForm.isCurrent ? 'yes' : 'no'}
+                                  onChange={(e) => setExperienceForm((s) => ({ ...s, isCurrent: e.target.value === 'yes' }))}
+                                >
+                                  <option value="no">Нет</option>
+                                  <option value="yes">Да</option>
+                                </select>
+                              </label>
+                              <label>Дата начала<input type="date" value={experienceForm.startDate} onChange={(e) => setExperienceForm((s) => ({ ...s, startDate: e.target.value }))} /></label>
+                              <label>
+                                Дата окончания
+                                <input
+                                  type="date"
+                                  value={experienceForm.endDate}
+                                  disabled={experienceForm.isCurrent}
+                                  onChange={(e) => setExperienceForm((s) => ({ ...s, endDate: e.target.value }))}
+                                />
+                              </label>
+                              <label className="full-width">Описание<textarea rows={3} value={experienceForm.description} onChange={(e) => setExperienceForm((s) => ({ ...s, description: e.target.value }))} /></label>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn--ghost"
+                              onClick={() => {
+                                const selectedCompanyId = experienceForm.companyId ? Number(experienceForm.companyId) : null
+                                const selectedCompany = selectedCompanyId ? resumeCompanies.find((x) => x.id === selectedCompanyId) : null
+                                const companyName = selectedCompany?.name || experienceForm.companyName.trim()
+                                if (!companyName || !experienceForm.position.trim()) return
+                                setResume((s) => ({
+                                  ...s,
+                                  experiences: [
+                                    ...s.experiences,
+                                    {
+                                      id: Date.now(),
+                                      companyId: selectedCompanyId,
+                                      companyName,
+                                      position: experienceForm.position.trim(),
+                                      description: experienceForm.description.trim(),
+                                      startDate: experienceForm.startDate,
+                                      endDate: experienceForm.isCurrent ? '' : experienceForm.endDate,
+                                      isCurrent: experienceForm.isCurrent,
+                                    },
+                                  ],
+                                }))
+                                setExperienceForm(initialExperience)
+                              }}
+                            >
+                              Добавить опыт
+                            </button>
+                            <div className="resume-collection">
+                              {resume.experiences.length ? (
+                                resume.experiences.map((experience) => (
+                                  <article key={experience.id} className="resume-collection-card">
+                                    <div>
+                                      <strong>{experience.position}</strong>
+                                      <p>{experience.companyName}</p>
+                                      <p>
+                                        {experience.startDate || 'Дата начала не указана'} - {experience.isCurrent ? 'по настоящее время' : experience.endDate || 'Дата окончания не указана'}
+                                      </p>
+                                      {experience.description ? <p>{experience.description}</p> : null}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="btn btn--ghost"
+                                      onClick={() => setResume((s) => ({ ...s, experiences: s.experiences.filter((x) => x.id !== experience.id) }))}
+                                    >
+                                      Удалить
+                                    </button>
+                                  </article>
+                                ))
+                              ) : (
+                                <p>Опыт работы пока не добавлен.</p>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {step === 3 ? (
+                          <div className="resume-step-body">
+                            <div className="form-grid form-grid--two">
                               <label>Название проекта<input value={projectForm.title} onChange={(e) => setProjectForm((s) => ({ ...s, title: e.target.value }))} /></label>
                               <label>Роль<input value={projectForm.role} onChange={(e) => setProjectForm((s) => ({ ...s, role: e.target.value }))} /></label>
                               <label>Дата начала<input type="date" value={projectForm.startDate} onChange={(e) => setProjectForm((s) => ({ ...s, startDate: e.target.value }))} /></label>
@@ -947,7 +1072,7 @@ export function SeekerDashboardPage() {
                           </div>
                         ) : null}
 
-                        {step === 3 ? (
+                        {step === 4 ? (
                           <div className="resume-step-body">
                             <div className="form-grid form-grid--two">
                               <label>ВУЗ<input value={educationForm.university} onChange={(e) => setEducationForm((s) => ({ ...s, university: e.target.value }))} /></label>
@@ -965,7 +1090,7 @@ export function SeekerDashboardPage() {
                           </div>
                         ) : null}
 
-                        {step === 4 ? (
+                        {step === 5 ? (
                           <div className="resume-step-body">
                             <div className="form-grid form-grid--two">
                               <label>Тип<select value={linkForm.kind} onChange={(e) => setLinkForm((s) => ({ ...s, kind: e.target.value }))}><option value="github">GitHub</option><option value="linkedin">LinkedIn</option><option value="telegram">Telegram</option><option value="portfolio">Portfolio</option><option value="other">Другое</option></select></label>
@@ -992,6 +1117,7 @@ export function SeekerDashboardPage() {
                       <div className="resume-output-grid">
                         <article className="resume-output-block"><h3>Основная информация</h3><p><strong>{resume.headline || 'Заголовок не заполнен'}</strong></p><p>{resume.desiredPosition || 'Позиция не указана'}</p><p>{resume.summary || 'Описание отсутствует'}</p></article>
                         <article className="resume-output-block"><h3>Скиллы</h3>{resume.skills.length ? resume.skills.map((skill) => <p key={skill.tagId}>{skill.tagName}: {skill.level}/5, {skill.yearsExperience} лет</p>) : <p>Скиллы не заполнены.</p>}</article>
+                        <article className="resume-output-block"><h3>Опыт работы</h3>{resume.experiences.length ? resume.experiences.map((experience) => <p key={experience.id}><strong>{experience.position}</strong>{` — ${experience.companyName}`}</p>) : <p>Опыт работы не добавлен.</p>}</article>
                         <article className="resume-output-block"><h3>Портфолио</h3>{resume.projects.length ? resume.projects.map((project) => <p key={project.id}><strong>{project.title}</strong>{` — ${project.role}`}</p>) : <p>Проекты не добавлены.</p>}</article>
                         <article className="resume-output-block"><h3>Образование</h3>{resume.education.length ? resume.education.map((edu) => <p key={edu.id}><strong>{edu.university}</strong>{` — ${edu.specialty}`}</p>) : <p>Образование не добавлено.</p>}</article>
                         <article className="resume-output-block"><h3>Ссылки на соцсети</h3>{resume.links.length ? resume.links.map((link) => <a key={link.id} href={link.url} target="_blank" rel="noreferrer">{link.label || link.kind}</a>) : <p>Ссылки не добавлены.</p>}</article>

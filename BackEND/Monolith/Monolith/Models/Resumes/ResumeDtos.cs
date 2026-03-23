@@ -73,6 +73,7 @@ public record ResumeDetailDto(
     string? CurrencyCode,
     bool OpenToWork,
     IReadOnlyCollection<ResumeSkillDto> Skills,
+    IReadOnlyCollection<ResumeExperienceDto> Experiences,
     IReadOnlyCollection<ResumeProjectDto> Projects,
     IReadOnlyCollection<ResumeEducationDto> Education,
     IReadOnlyCollection<ResumeLinkDto> Links);
@@ -98,6 +99,16 @@ public record ResumeProjectDto(
     DateOnly? EndDate,
     string? RepoUrl,
     string? DemoUrl);
+
+public record ResumeExperienceDto(
+    long Id,
+    long? CompanyId,
+    string CompanyName,
+    string Position,
+    string? Description,
+    DateOnly? StartDate,
+    DateOnly? EndDate,
+    bool IsCurrent);
 
 /// <summary>
 /// Элемент образования в резюме.

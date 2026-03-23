@@ -12,6 +12,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CandidateResumeProfile> CandidateResumeProfiles => Set<CandidateResumeProfile>();
     public DbSet<CandidateResumeSkill> CandidateResumeSkills => Set<CandidateResumeSkill>();
     public DbSet<CandidateResumeProject> CandidateResumeProjects => Set<CandidateResumeProject>();
+    public DbSet<CandidateResumeExperience> CandidateResumeExperiences => Set<CandidateResumeExperience>();
     public DbSet<CandidateResumeProjectPhoto> CandidateResumeProjectPhotos => Set<CandidateResumeProjectPhoto>();
     public DbSet<CandidateResumeProjectParticipant> CandidateResumeProjectParticipants => Set<CandidateResumeProjectParticipant>();
     public DbSet<CandidateResumeProjectCollaboration> CandidateResumeProjectCollaborations => Set<CandidateResumeProjectCollaboration>();
@@ -153,6 +154,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasOne(x => x.Resume).WithMany(x => x.Projects).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CandidateResumeExperience>(entity =>
+        {
+            entity.ToTable("candidate_resume_experiences");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.CompanyId).HasColumnName("company_id");
+            entity.Property(x => x.CompanyName).HasColumnName("company_name").HasMaxLength(300);
+            entity.Property(x => x.Position).HasColumnName("position").HasMaxLength(200);
+            entity.Property(x => x.Description).HasColumnName("description");
+            entity.Property(x => x.StartDate).HasColumnName("start_date");
+            entity.Property(x => x.EndDate).HasColumnName("end_date");
+            entity.Property(x => x.IsCurrent).HasColumnName("is_current");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne(x => x.Resume).WithMany(x => x.Experiences).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Company).WithMany(x => x.ResumeExperiences).HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<CandidateResumeProjectPhoto>(entity =>

@@ -185,6 +185,28 @@ export function SeekerResumePrintPage() {
               </article>
 
               <article className="resume-print-card resume-print-card--wide">
+                <h3>Опыт работы</h3>
+                {resume.experiences.length ? (
+                  <div className="resume-print-stack">
+                    {resume.experiences.map((experience) => (
+                      <div key={experience.id} className="resume-print-stack__item">
+                        <div className="resume-print-stack__head">
+                          <strong>{experience.position}</strong>
+                          <span>{experience.companyName}</span>
+                        </div>
+                        {experience.description ? <p>{experience.description}</p> : null}
+                        <p className="resume-print-page__muted">
+                          {formatDate(experience.startDate)} - {experience.isCurrent ? 'по настоящее время' : experience.endDate ? formatDate(experience.endDate) : 'не указано'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p>Опыт работы не добавлен.</p>
+                )}
+              </article>
+
+              <article className="resume-print-card resume-print-card--wide">
                 <h3>Проекты</h3>
                 {resume.projects.length ? (
                   <div className="resume-print-stack">
