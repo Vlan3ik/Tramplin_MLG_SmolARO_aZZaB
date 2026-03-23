@@ -15,33 +15,31 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
 {
+    private sealed record SubscriptionBaseRow(
+        long UserId,
+        string Username,
+        string DisplayName,
+        string? AvatarUrl,
+        DateTimeOffset CreatedAt);
+
     [HttpGet("me/following")]
     [ProducesResponseType(typeof(IReadOnlyCollection<SubscriptionUserDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<SubscriptionUserDto>>> GetFollowing(CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
-        var items = await dbContext.UserSubscriptions
+        var rows = await dbContext.UserSubscriptions
             .AsNoTracking()
             .Where(x => x.FollowerUserId == userId)
             .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new SubscriptionUserDto(
+            .Select(x => new SubscriptionBaseRow(
                 x.FollowingUserId,
                 x.FollowingUser.Username,
                 x.FollowingUser.DisplayName,
                 x.FollowingUser.AvatarUrl,
-                dbContext.UserRoles
-                    .Where(r => r.UserId == x.FollowingUserId)
-                    .Select(r => r.Role)
-                    .OrderByDescending(r => r == PlatformRole.Employer ? 2 : r == PlatformRole.Curator ? 1 : 0)
-                    .DefaultIfEmpty(PlatformRole.Seeker)
-                    .First(),
-                dbContext.CompanyMembers
-                    .Where(m => m.UserId == x.FollowingUserId)
-                    .Select(m => m.Company.BrandName ?? m.Company.LegalName)
-                    .FirstOrDefault(),
                 x.CreatedAt))
             .ToListAsync(cancellationToken);
 
+        var items = await EnrichSubscriptionsAsync(rows, cancellationToken);
         return Ok(items);
     }
 
@@ -50,28 +48,19 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
     public async Task<ActionResult<IReadOnlyCollection<SubscriptionUserDto>>> GetFollowers(CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
-        var items = await dbContext.UserSubscriptions
+        var rows = await dbContext.UserSubscriptions
             .AsNoTracking()
             .Where(x => x.FollowingUserId == userId)
             .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new SubscriptionUserDto(
+            .Select(x => new SubscriptionBaseRow(
                 x.FollowerUserId,
                 x.FollowerUser.Username,
                 x.FollowerUser.DisplayName,
                 x.FollowerUser.AvatarUrl,
-                dbContext.UserRoles
-                    .Where(r => r.UserId == x.FollowerUserId)
-                    .Select(r => r.Role)
-                    .OrderByDescending(r => r == PlatformRole.Employer ? 2 : r == PlatformRole.Curator ? 1 : 0)
-                    .DefaultIfEmpty(PlatformRole.Seeker)
-                    .First(),
-                dbContext.CompanyMembers
-                    .Where(m => m.UserId == x.FollowerUserId)
-                    .Select(m => m.Company.BrandName ?? m.Company.LegalName)
-                    .FirstOrDefault(),
                 x.CreatedAt))
             .ToListAsync(cancellationToken);
 
+        var items = await EnrichSubscriptionsAsync(rows, cancellationToken);
         return Ok(items);
     }
 
@@ -152,5 +141,61 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
         dbContext.UserSubscriptions.Remove(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    private async Task<IReadOnlyCollection<SubscriptionUserDto>> EnrichSubscriptionsAsync(
+        IReadOnlyCollection<SubscriptionBaseRow> rows,
+        CancellationToken cancellationToken)
+    {
+        if (rows.Count == 0)
+        {
+            return [];
+        }
+
+        var userIds = rows.Select(x => x.UserId).Distinct().ToArray();
+
+        var roleRows = await dbContext.UserRoles
+            .AsNoTracking()
+            .Where(x => userIds.Contains(x.UserId))
+            .Select(x => new { x.UserId, x.Role })
+            .ToListAsync(cancellationToken);
+
+        var roleMap = roleRows
+            .GroupBy(x => x.UserId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(x => x.Role)
+                    .OrderByDescending(r => r == PlatformRole.Employer ? 2 : r == PlatformRole.Curator ? 1 : 0)
+                    .FirstOrDefault());
+
+        var companyRows = await dbContext.CompanyMembers
+            .AsNoTracking()
+            .Where(x => userIds.Contains(x.UserId))
+            .Select(x => new
+            {
+                x.UserId,
+                CompanyName = x.Company.BrandName ?? x.Company.LegalName
+            })
+            .ToListAsync(cancellationToken);
+
+        var companyMap = companyRows
+            .GroupBy(x => x.UserId)
+            .ToDictionary(x => x.Key, x => x.First().CompanyName);
+
+        return rows
+            .Select(x =>
+            {
+                var id = (long)x.UserId;
+                var accountType = roleMap.GetValueOrDefault(id, PlatformRole.Seeker);
+                return new SubscriptionUserDto(
+                    id,
+                    x.Username,
+                    x.DisplayName,
+                    x.AvatarUrl,
+                    accountType,
+                    companyMap.GetValueOrDefault(id),
+                    x.CreatedAt);
+            })
+            .ToArray();
     }
 }
