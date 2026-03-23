@@ -464,6 +464,15 @@ export function EmployerDashboardPage() {
     }
   }, [applicationChats, applications.length, companyStatusText, opportunities.length])
 
+  function onTabSelect(nextTab: EmployerTabId) {
+    if (nextTab === 'create') {
+      navigate('/vacancy-flow/1?type=vacancy')
+      return
+    }
+
+    setTab(nextTab)
+  }
+
   function onCreateFormChange(event: ChangeEvent<HTMLInputElement>) {
     const { name, value } = event.target
     setCreateForm((state) => ({ ...state, [name]: value }))
@@ -842,7 +851,7 @@ export function EmployerDashboardPage() {
         setEditingVacancyId(null)
       }
 
-      setTab('create')
+      navigate(`/vacancy-flow/1?type=${item.source === 'vacancy' ? 'vacancy' : 'event'}`)
     } catch (editError) {
       setError(editError instanceof Error ? editError.message : 'Не удалось загрузить данные для редактирования.')
     } finally {
@@ -1100,7 +1109,7 @@ export function EmployerDashboardPage() {
             <>
               <nav className="card seeker-profile-tabs">
                 {employerTabs.map((item) => (
-                  <button key={item.id} type="button" className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)}>
+                  <button key={item.id} type="button" className={tab === item.id ? 'is-active' : ''} onClick={() => onTabSelect(item.id)}>
                     {item.label}
                   </button>
                 ))}
