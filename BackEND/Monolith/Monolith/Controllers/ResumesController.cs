@@ -42,6 +42,7 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
             .Include(x => x.PrivacySettings)
             .Where(x =>
                 x.ResumeProfile != null &&
+                !string.IsNullOrEmpty(x.ResumeProfile.DesiredPosition) &&
                 x.PrivacySettings != null &&
                 x.PrivacySettings.ResumeVisibility == PrivacyScope.AuthorizedUsers);
 
