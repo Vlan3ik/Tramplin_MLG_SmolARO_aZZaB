@@ -14,6 +14,7 @@ import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { OpportunityDetailsPage } from './pages/OpportunityDetailsPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { ResumesPage } from './pages/ResumesPage'
 import { VacancyFlowPage } from './pages/VacancyFlowPage'
 import { CuratorDashboardPage } from './pages/dashboards/CuratorDashboardPage'
 import { EmployerDashboardPage } from './pages/dashboards/EmployerDashboardPage'
@@ -29,6 +30,7 @@ function App() {
           <Route index element={<HomePage />} />
           <Route path="about" element={<AboutPlatformPage />} />
           <Route path="events" element={<EventsPage />} />
+          <Route path="resumes" element={<ResumesPage />} />
           <Route path="opportunity/:id" element={<OpportunityDetailsPage />} />
           <Route path="companies" element={<CompaniesListPage />} />
           <Route path="company/:id" element={<CompanyPage />} />

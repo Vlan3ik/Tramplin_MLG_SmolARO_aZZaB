@@ -28,4 +28,6 @@ public class User
     public List<UserContact> Contacts { get; set; } = new();
     public List<UserContact> ContactOfUsers { get; set; } = new();
     public List<UserPublicLink> PublicLinks { get; set; } = new();
+    public List<UserSubscription> FollowingSubscriptions { get; set; } = new();
+    public List<UserSubscription> FollowerSubscriptions { get; set; } = new();
 }

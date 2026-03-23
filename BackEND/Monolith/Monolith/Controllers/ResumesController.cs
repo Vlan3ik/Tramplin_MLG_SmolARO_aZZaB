@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,21 +10,12 @@ using Monolith.Services.Common;
 
 namespace Monolith.Controllers;
 
-/// <summary>
-/// Публичные endpoints опубликованных резюме.
-/// </summary>
 [ApiController]
 [AllowAnonymous]
 [Route("resumes")]
 [Produces("application/json")]
 public class ResumesController(AppDbContext dbContext) : ControllerBase
 {
-    /// <summary>
-    /// Возвращает список опубликованных резюме.
-    /// </summary>
-    /// <remarks>
-    /// В выборку попадают только пользователи с ResumeVisibility = AuthorizedUsers.
-    /// </remarks>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<ResumeListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<ResumeListItemDto>>> GetList(
@@ -32,13 +24,26 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
     {
         var page = query.Page <= 0 ? 1 : query.Page;
         var pageSize = query.PageSize <= 0 ? 20 : Math.Min(query.PageSize, 100);
+        var viewerId = TryGetViewerId();
+        var tagIds = (query.TagIds ?? [])
+            .Where(x => x > 0)
+            .Distinct()
+            .ToArray();
+
+        if (query.OnlyFollowed && viewerId is null)
+        {
+            return Ok(new PagedResponse<ResumeListItemDto>([], 0, page, pageSize));
+        }
 
         var baseQuery = dbContext.CandidateProfiles
             .AsNoTracking()
             .Include(x => x.User)
             .Include(x => x.ResumeProfile)
             .Include(x => x.PrivacySettings)
-            .Where(x => x.PrivacySettings != null && x.PrivacySettings.ResumeVisibility == PrivacyScope.AuthorizedUsers);
+            .Where(x =>
+                x.ResumeProfile != null &&
+                x.PrivacySettings != null &&
+                x.PrivacySettings.ResumeVisibility == PrivacyScope.AuthorizedUsers);
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
@@ -46,38 +51,139 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
             baseQuery = baseQuery.Where(x =>
                 x.User.DisplayName.ToLower().Contains(term) ||
                 x.User.Username.ToLower().Contains(term) ||
-                (x.ResumeProfile.Headline != null && x.ResumeProfile.Headline.ToLower().Contains(term)) ||
-                (x.ResumeProfile.DesiredPosition != null && x.ResumeProfile.DesiredPosition.ToLower().Contains(term)));
+                (x.ResumeProfile!.Headline != null && x.ResumeProfile.Headline.ToLower().Contains(term)) ||
+                (x.ResumeProfile.DesiredPosition != null && x.ResumeProfile.DesiredPosition.ToLower().Contains(term)) ||
+                (x.ResumeProfile.Summary != null && x.ResumeProfile.Summary.ToLower().Contains(term)));
+        }
+
+        if (query.OpenToWork is not null)
+        {
+            baseQuery = baseQuery.Where(x => x.PrivacySettings!.OpenToWork == query.OpenToWork.Value);
+        }
+
+        if (query.SalaryFrom is not null)
+        {
+            var minSalary = query.SalaryFrom.Value;
+            baseQuery = baseQuery.Where(x =>
+                (x.ResumeProfile!.SalaryTo ?? x.ResumeProfile.SalaryFrom) != null &&
+                (x.ResumeProfile.SalaryTo ?? x.ResumeProfile.SalaryFrom) >= minSalary);
+        }
+
+        if (query.SalaryTo is not null)
+        {
+            var maxSalary = query.SalaryTo.Value;
+            baseQuery = baseQuery.Where(x =>
+                x.ResumeProfile!.SalaryFrom != null &&
+                x.ResumeProfile.SalaryFrom <= maxSalary);
+        }
+
+        if (tagIds.Length > 0)
+        {
+            baseQuery = baseQuery.Where(x =>
+                dbContext.CandidateResumeSkills.Any(s =>
+                    s.UserId == x.UserId &&
+                    tagIds.Contains(s.TagId)));
+        }
+
+        if (query.OnlyFollowed && viewerId is not null)
+        {
+            var currentUserId = viewerId.Value;
+            baseQuery = baseQuery.Where(x =>
+                dbContext.UserSubscriptions.Any(s =>
+                    s.FollowerUserId == currentUserId &&
+                    s.FollowingUserId == x.UserId));
         }
 
         var totalCount = await baseQuery.CountAsync(cancellationToken);
         var rows = await baseQuery
-            .OrderByDescending(x => x.ResumeProfile.UpdatedAt)
+            .OrderByDescending(x => x.ResumeProfile!.UpdatedAt)
             .ThenBy(x => x.User.DisplayName)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(x => new ResumeListItemDto(
+            .Select(x => new
+            {
                 x.UserId,
                 x.User.Username,
                 x.User.DisplayName,
                 x.User.AvatarUrl,
-                x.ResumeProfile.Headline,
+                x.ResumeProfile!.Headline,
                 x.ResumeProfile.DesiredPosition,
                 x.ResumeProfile.SalaryFrom,
                 x.ResumeProfile.SalaryTo,
                 x.ResumeProfile.CurrencyCode,
-                x.PrivacySettings != null && x.PrivacySettings.OpenToWork,
-                x.ResumeProfile.UpdatedAt))
+                x.ResumeProfile.UpdatedAt,
+                x.PrivacySettings!.OpenToWork
+            })
             .ToListAsync(cancellationToken);
 
-        return Ok(new PagedResponse<ResumeListItemDto>(rows, totalCount, page, pageSize));
+        if (rows.Count == 0)
+        {
+            return Ok(new PagedResponse<ResumeListItemDto>([], totalCount, page, pageSize));
+        }
+
+        var userIds = rows.Select(x => x.UserId).ToArray();
+
+        var skillRows = await dbContext.CandidateResumeSkills
+            .AsNoTracking()
+            .Include(x => x.Tag)
+            .Where(x => userIds.Contains(x.UserId))
+            .OrderByDescending(x => x.YearsExperience)
+            .ThenBy(x => x.Tag.Name)
+            .Select(x => new { x.UserId, x.TagId, x.Tag.Name })
+            .ToListAsync(cancellationToken);
+
+        var skillMap = skillRows
+            .GroupBy(x => x.UserId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyCollection<ResumeSkillShortDto>)g
+                    .Take(8)
+                    .Select(x => new ResumeSkillShortDto(x.TagId, x.Name))
+                    .ToArray());
+
+        var followerRows = await dbContext.UserSubscriptions
+            .AsNoTracking()
+            .Where(x => userIds.Contains(x.FollowingUserId))
+            .GroupBy(x => x.FollowingUserId)
+            .Select(x => new { UserId = x.Key, Count = x.Count() })
+            .ToListAsync(cancellationToken);
+
+        var followerMap = followerRows.ToDictionary(x => x.UserId, x => x.Count);
+
+        HashSet<long> followedByViewer = [];
+        if (viewerId is not null)
+        {
+            var currentUserId = viewerId.Value;
+            var followedIds = await dbContext.UserSubscriptions
+                .AsNoTracking()
+                .Where(x => x.FollowerUserId == currentUserId && userIds.Contains(x.FollowingUserId))
+                .Select(x => x.FollowingUserId)
+                .ToListAsync(cancellationToken);
+
+            followedByViewer = followedIds.ToHashSet();
+        }
+
+        var items = rows
+            .Select(x => new ResumeListItemDto(
+                x.UserId,
+                x.Username,
+                x.DisplayName,
+                x.AvatarUrl,
+                x.Headline,
+                x.DesiredPosition,
+                x.SalaryFrom,
+                x.SalaryTo,
+                x.CurrencyCode,
+                x.OpenToWork,
+                x.UpdatedAt,
+                skillMap.GetValueOrDefault(x.UserId, []),
+                followedByViewer.Contains(x.UserId),
+                followerMap.GetValueOrDefault(x.UserId)))
+            .ToArray();
+
+        return Ok(new PagedResponse<ResumeListItemDto>(items, totalCount, page, pageSize));
     }
 
-    /// <summary>
-    /// Возвращает подробные данные одного опубликованного резюме.
-    /// </summary>
-    /// <param name="id">Идентификатор пользователя-владельца резюме.</param>
-    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(ResumeDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -95,7 +201,7 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
         }
 
         var privacy = profile.PrivacySettings;
-        if (privacy is null || privacy.ResumeVisibility != PrivacyScope.AuthorizedUsers)
+        if (privacy is null || privacy.ResumeVisibility != PrivacyScope.AuthorizedUsers || profile.ResumeProfile is null)
         {
             return this.ToNotFoundError("resumes.not_found", "Резюме не найдено.");
         }
@@ -137,7 +243,7 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
             profile.MiddleName,
             profile.BirthDate,
             profile.Gender,
-            privacy?.ShowContactsInResume == true ? profile.Phone : null,
+            privacy.ShowContactsInResume ? profile.Phone : null,
             profile.About,
             profile.User.AvatarUrl,
             profile.ResumeProfile.Headline,
@@ -146,12 +252,18 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
             profile.ResumeProfile.SalaryFrom,
             profile.ResumeProfile.SalaryTo,
             profile.ResumeProfile.CurrencyCode,
-            privacy?.OpenToWork == true,
+            privacy.OpenToWork,
             skills,
             projects,
             education,
             links);
 
         return Ok(dto);
+    }
+
+    private long? TryGetViewerId()
+    {
+        var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        return long.TryParse(id, out var value) ? value : null;
     }
 }
