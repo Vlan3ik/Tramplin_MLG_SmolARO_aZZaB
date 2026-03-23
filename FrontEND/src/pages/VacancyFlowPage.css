@@ -40,6 +40,30 @@ main:has(.vf-page) {
   animation: vf-stage-enter 460ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.vf-note {
+  margin: 14px 0 0;
+  color: var(--vf-muted);
+}
+
+.vf-message {
+  margin: 14px 0 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 500;
+}
+
+.vf-message--error {
+  color: #8a1f1f;
+  background: #ffe8e8;
+  border: 1px solid #ffc7c7;
+}
+
+.vf-message--success {
+  color: #165d32;
+  background: #e7f8ed;
+  border: 1px solid #c7ebd4;
+}
+
 @keyframes vf-stage-enter {
   from {
     opacity: 0;
@@ -142,6 +166,12 @@ main:has(.vf-page) {
   padding: 0 16px;
   font-size: 16px;
   outline: none;
+}
+
+.vf-select-multiple {
+  border-radius: 12px;
+  min-height: 110px;
+  padding: 10px 12px;
 }
 
 .vf-field input[type='date'] {

@@ -1150,6 +1150,21 @@
   flex-wrap: wrap;
 }
 
+.employer-flow-entry {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.8rem;
+  margin-bottom: 0.9rem;
+  display: grid;
+  gap: 0.7rem;
+
+  p {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+}
+
 .employer-analytics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
