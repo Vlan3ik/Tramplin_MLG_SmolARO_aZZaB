@@ -1,4 +1,5 @@
 using Monolith.Entities;
+using Monolith.Models.Resumes;
 
 namespace Monolith.Models.Employer;
 
@@ -42,6 +43,7 @@ public record EmployerApplicationDetailDto(
     PlatformRole InitiatorRole,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    long? ChatId);
+    long? ChatId,
+    ResumeDetailDto? CandidateResume);
 
 public record EmployerApplicationStatusUpdateRequest(ApplicationStatus Status);

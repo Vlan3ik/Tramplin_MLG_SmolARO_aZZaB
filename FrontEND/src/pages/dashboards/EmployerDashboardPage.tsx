@@ -201,6 +201,63 @@ function opportunityTypeLabel(value: EmployerOpportunity['type']) {
   return 'Вакансия'
 }
 
+function genderLabel(value: number) {
+  if (value === 1) return 'Мужской'
+  if (value === 2) return 'Женский'
+  return 'Не указан'
+}
+
+function formatDateOnly(value: string) {
+  if (!value) {
+    return 'Не указана'
+  }
+
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) {
+    return value
+  }
+
+  const [, year, month, day] = match
+  return new Date(Number(year), Number(month) - 1, Number(day)).toLocaleDateString('ru-RU')
+}
+
+function formatSkillLevel(value: number) {
+  if (!value) {
+    return 'Уровень не указан'
+  }
+
+  return `Уровень ${value}`
+}
+
+function formatYearsExperience(value: number) {
+  if (!value) {
+    return 'Опыт не указан'
+  }
+
+  const suffix = value === 1 ? 'год' : value >= 2 && value <= 4 ? 'года' : 'лет'
+  return `${value} ${suffix}`
+}
+
+function formatLinkLabel(kind: string, label: string) {
+  const normalizedLabel = label.trim()
+  if (normalizedLabel) {
+    return normalizedLabel
+  }
+
+  const normalizedKind = kind.trim()
+  if (!normalizedKind) {
+    return 'Ссылка'
+  }
+
+  return normalizedKind.charAt(0).toUpperCase() + normalizedKind.slice(1)
+}
+
+function formatProjectPeriod(startDate: string, endDate: string) {
+  const start = startDate ? formatDateOnly(startDate) : 'не указано'
+  const end = endDate ? formatDateOnly(endDate) : 'по настоящее время'
+  return `${start} — ${end}`
+}
+
 export function EmployerDashboardPage() {
   const navigate = useNavigate()
   const [tab, setTab] = useState<EmployerTabId>('overview')
@@ -463,6 +520,8 @@ export function EmployerDashboardPage() {
       status: companyStatusText,
     }
   }, [applicationChats, applications.length, companyStatusText, opportunities.length])
+
+  const selectedCandidateResume = selectedApplicationDetail?.candidateResume ?? null
 
   function onTabSelect(nextTab: EmployerTabId) {
     if (nextTab === 'create') {
@@ -1591,24 +1650,194 @@ export function EmployerDashboardPage() {
         {selectedApplicationDetail ? (
           <article className="card employer-candidate-profile">
             <div className="employer-candidate-profile__head">
-              <h3>{selectedApplicationDetail.candidateName}</h3>
+              <div>
+                <h3>{selectedApplicationDetail.candidateName}</h3>
+                <p className="employer-candidate-profile__subtitle">Отклик на: {selectedApplicationDetail.vacancyTitle}</p>
+              </div>
               <span className="status-chip">{applicationStatusLabel[selectedApplicationDetail.status] ?? `Статус ${selectedApplicationDetail.status}`}</span>
             </div>
-            <p>Отклик на: {selectedApplicationDetail.vacancyTitle}</p>
-            <div className="employer-candidate-profile__grid">
-              <div>
-                <strong>Кандидат</strong>
-                <p>ID: {selectedApplicationDetail.candidateUserId}</p>
-                <p>{selectedApplicationDetail.candidateHeadline || 'Заголовок резюме не указан'}</p>
-                <p>{selectedApplicationDetail.candidateDesiredPosition || 'Желаемая позиция не указана'}</p>
+
+            {selectedCandidateResume ? (
+              <div className="employer-candidate-profile__grid employer-candidate-profile__grid--resume">
+                <div className="employer-candidate-profile__section employer-candidate-profile__section--wide">
+                  <div className="employer-candidate-profile__summary">
+                    <div className="employer-candidate-profile__avatar">
+                      {selectedCandidateResume.avatarUrl ? (
+                        <img src={selectedCandidateResume.avatarUrl} alt={selectedApplicationDetail.candidateName} />
+                      ) : (
+                        <span>{selectedApplicationDetail.candidateName.charAt(0)}</span>
+                      )}
+                    </div>
+                    <div className="employer-candidate-profile__summary-copy">
+                      <strong>{selectedApplicationDetail.candidateName}</strong>
+                      <p>@{selectedCandidateResume.username}</p>
+                      <p>{selectedCandidateResume.headline || 'Заголовок резюме не указан'}</p>
+                      <div className="employer-candidate-profile__chips">
+                        <span className={`status-chip status-chip--${selectedCandidateResume.openToWork ? 'success' : 'warning'}`}>
+                          {selectedCandidateResume.openToWork ? 'Открыт к работе' : 'Не ищет работу'}
+                        </span>
+                        <span className="status-chip">ID: {selectedCandidateResume.userId}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="employer-candidate-profile__section">
+                  <strong>Личные данные</strong>
+                  <div className="employer-candidate-profile__facts">
+                    <p>
+                      <span>ФИО</span>
+                      <strong>
+                        {selectedCandidateResume.lastName} {selectedCandidateResume.firstName} {selectedCandidateResume.middleName || ''}
+                      </strong>
+                    </p>
+                    <p>
+                      <span>Дата рождения</span>
+                      <strong>{formatDateOnly(selectedCandidateResume.birthDate)}</strong>
+                    </p>
+                    <p>
+                      <span>Пол</span>
+                      <strong>{genderLabel(selectedCandidateResume.gender)}</strong>
+                    </p>
+                    <p>
+                      <span>Телефон</span>
+                      <strong>{selectedCandidateResume.phone || 'Не указан'}</strong>
+                    </p>
+                    <p>
+                      <span>О себе</span>
+                      <strong>{selectedCandidateResume.about || 'Не заполнено'}</strong>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="employer-candidate-profile__section">
+                  <strong>Резюме</strong>
+                  <div className="employer-candidate-profile__facts">
+                    <p>
+                      <span>Желаемая должность</span>
+                      <strong>{selectedCandidateResume.desiredPosition || 'Не указана'}</strong>
+                    </p>
+                    <p>
+                      <span>Суммарный заголовок</span>
+                      <strong>{selectedCandidateResume.headline || 'Не указан'}</strong>
+                    </p>
+                    <p>
+                      <span>Краткое описание</span>
+                      <strong>{selectedCandidateResume.summary || 'Не заполнено'}</strong>
+                    </p>
+                    <p>
+                      <span>Ожидания по доходу</span>
+                      <strong>{formatMoneyRange(selectedCandidateResume.salaryFrom, selectedCandidateResume.salaryTo, selectedCandidateResume.currencyCode)}</strong>
+                    </p>
+                    <p>
+                      <span>Дата отклика</span>
+                      <strong>{formatDate(selectedApplicationDetail.createdAt)}</strong>
+                    </p>
+                    <p>
+                      <span>Обновлено</span>
+                      <strong>{formatDate(selectedApplicationDetail.updatedAt)}</strong>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="employer-candidate-profile__section employer-candidate-profile__section--wide">
+                  <strong>Навыки</strong>
+                  {selectedCandidateResume.skills.length ? (
+                    <div className="employer-candidate-profile__list">
+                      {selectedCandidateResume.skills.map((skill) => (
+                        <article key={skill.tagId} className="employer-candidate-profile__list-item">
+                          <div className="employer-candidate-profile__list-item-head">
+                            <strong>{skill.tagName}</strong>
+                            <span>{formatSkillLevel(skill.level)}</span>
+                          </div>
+                          <p>{formatYearsExperience(skill.yearsExperience)}</p>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Навыки не указаны.</p>
+                  )}
+                </div>
+
+                <div className="employer-candidate-profile__section employer-candidate-profile__section--wide">
+                  <strong>Проекты</strong>
+                  {selectedCandidateResume.projects.length ? (
+                    <div className="employer-candidate-profile__list">
+                      {selectedCandidateResume.projects.map((project) => (
+                        <article key={project.id} className="employer-candidate-profile__list-item">
+                          <div className="employer-candidate-profile__list-item-head">
+                            <strong>{project.title}</strong>
+                            <span>{formatProjectPeriod(project.startDate, project.endDate)}</span>
+                          </div>
+                          <p>{project.role || 'Роль не указана'}</p>
+                          <p>{project.description || 'Описание не заполнено'}</p>
+                          <div className="employer-candidate-profile__links">
+                            {project.repoUrl ? (
+                              <a href={project.repoUrl} target="_blank" rel="noreferrer">
+                                Репозиторий
+                              </a>
+                            ) : null}
+                            {project.demoUrl ? (
+                              <a href={project.demoUrl} target="_blank" rel="noreferrer">
+                                Демо
+                              </a>
+                            ) : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Проекты не указаны.</p>
+                  )}
+                </div>
+
+                <div className="employer-candidate-profile__section employer-candidate-profile__section--wide">
+                  <strong>Образование</strong>
+                  {selectedCandidateResume.education.length ? (
+                    <div className="employer-candidate-profile__list">
+                      {selectedCandidateResume.education.map((item) => (
+                        <article key={item.id} className="employer-candidate-profile__list-item">
+                          <div className="employer-candidate-profile__list-item-head">
+                            <strong>{item.university}</strong>
+                            <span>{item.graduationYear || 'Год выпуска не указан'}</span>
+                          </div>
+                          <p>{item.faculty || 'Факультет не указан'}</p>
+                          <p>{item.specialty || 'Специальность не указана'}</p>
+                          <p>Курс: {item.course || 'Не указан'}</p>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Образование не указано.</p>
+                  )}
+                </div>
+
+                <div className="employer-candidate-profile__section employer-candidate-profile__section--wide">
+                  <strong>Ссылки</strong>
+                  {selectedCandidateResume.links.length ? (
+                    <div className="employer-candidate-profile__links-list">
+                      {selectedCandidateResume.links.map((link) => (
+                        <a
+                          key={link.id}
+                          className="employer-candidate-profile__link"
+                          href={link.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <span>{formatLinkLabel(link.kind, link.label)}</span>
+                          <small>{link.url}</small>
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Ссылки не указаны.</p>
+                  )}
+                </div>
               </div>
-              <div>
-                <strong>Резюме</strong>
-                <p>Ожидания по доходу: {formatMoneyRange(selectedApplicationDetail.candidateSalaryFrom, selectedApplicationDetail.candidateSalaryTo, selectedApplicationDetail.candidateCurrencyCode)}</p>
-                <p>Дата отклика: {formatDate(selectedApplicationDetail.createdAt)}</p>
-                <p>Обновлено: {formatDate(selectedApplicationDetail.updatedAt)}</p>
-              </div>
-            </div>
+            ) : (
+              <p>У кандидата пока нет заполненного резюме.</p>
+            )}
+
             <div className="employer-candidate-profile__actions">
               <button type="button" className="btn btn--ghost" onClick={() => setSelectedApplicationDetail(null)}>
                 Закрыть профиль

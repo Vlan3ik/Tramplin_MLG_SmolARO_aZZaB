@@ -1,5 +1,6 @@
 import { deleteJson, getJson, patchJson, postJson } from './client'
 import type { OpportunityType } from '../types/opportunity'
+import type { ResumeEducation, ResumeLink, ResumeProject, ResumeSkill } from '../types/resume'
 
 type PagedResponse<TItem> = {
   items?: TItem[] | null
@@ -102,6 +103,57 @@ type EmployerApplicationDetailApi = {
   createdAt: string
   updatedAt: string
   chatId: number | null
+  candidateResume: EmployerCandidateResumeApi | null
+}
+
+type EmployerCandidateResumeApi = {
+  userId: number
+  username: string
+  firstName: string
+  lastName: string
+  middleName: string | null
+  birthDate: string | null
+  gender: number
+  phone: string | null
+  about: string | null
+  avatarUrl: string | null
+  headline: string | null
+  desiredPosition: string | null
+  summary: string | null
+  salaryFrom: number | null
+  salaryTo: number | null
+  currencyCode: string | null
+  openToWork: boolean
+  skills: Array<{
+    tagId: number
+    tagName: string
+    level: number | null
+    yearsExperience: number | null
+  }> | null
+  projects: Array<{
+    id: number
+    title: string
+    role: string | null
+    description: string | null
+    startDate: string | null
+    endDate: string | null
+    repoUrl: string | null
+    demoUrl: string | null
+  }> | null
+  education: Array<{
+    id: number
+    university: string
+    faculty: string | null
+    specialty: string | null
+    course: number | null
+    graduationYear: number | null
+  }> | null
+  links: Array<{
+    id: number
+    kind: string
+    url: string
+    label: string | null
+  }> | null
 }
 
 type CreateEmployerCompanyApiRequest = {
@@ -315,6 +367,31 @@ export type EmployerApplicationDetail = {
   createdAt: string
   updatedAt: string
   chatId: number | null
+  candidateResume: EmployerCandidateResume | null
+}
+
+export type EmployerCandidateResume = {
+  userId: number
+  username: string
+  firstName: string
+  lastName: string
+  middleName: string
+  birthDate: string
+  gender: number
+  phone: string
+  about: string
+  avatarUrl: string | null
+  headline: string
+  desiredPosition: string
+  summary: string
+  salaryFrom: number | null
+  salaryTo: number | null
+  currencyCode: string
+  openToWork: boolean
+  skills: ResumeSkill[]
+  projects: ResumeProject[]
+  education: ResumeEducation[]
+  links: ResumeLink[]
 }
 
 export type CreateEmployerVacancyRequest = {
@@ -756,6 +833,66 @@ export async function fetchEmployerApplications(signal?: AbortSignal) {
 export async function fetchEmployerApplicationDetail(applicationId: number, signal?: AbortSignal) {
   const response = await getJson<EmployerApplicationDetailApi>(`/employer/applications/${applicationId}`, { signal })
 
+  const candidateResume = response.candidateResume
+    ? {
+        userId: response.candidateResume.userId,
+        username: response.candidateResume.username,
+        firstName: response.candidateResume.firstName,
+        lastName: response.candidateResume.lastName,
+        middleName: response.candidateResume.middleName ?? '',
+        birthDate: response.candidateResume.birthDate ?? '',
+        gender: response.candidateResume.gender ?? 0,
+        phone: response.candidateResume.phone ?? '',
+        about: response.candidateResume.about ?? '',
+        avatarUrl: response.candidateResume.avatarUrl ?? null,
+        headline: response.candidateResume.headline ?? '',
+        desiredPosition: response.candidateResume.desiredPosition ?? '',
+        summary: response.candidateResume.summary ?? '',
+        salaryFrom: response.candidateResume.salaryFrom ?? null,
+        salaryTo: response.candidateResume.salaryTo ?? null,
+        currencyCode: response.candidateResume.currencyCode ?? 'RUB',
+        openToWork: response.candidateResume.openToWork,
+        skills: Array.isArray(response.candidateResume.skills)
+          ? response.candidateResume.skills.map((skill) => ({
+              tagId: skill.tagId,
+              tagName: skill.tagName,
+              level: skill.level ?? 0,
+              yearsExperience: skill.yearsExperience ?? 0,
+            }))
+          : [],
+        projects: Array.isArray(response.candidateResume.projects)
+          ? response.candidateResume.projects.map((project) => ({
+              id: project.id,
+              title: project.title,
+              role: project.role ?? '',
+              description: project.description ?? '',
+              startDate: project.startDate ?? '',
+              endDate: project.endDate ?? '',
+              repoUrl: project.repoUrl ?? '',
+              demoUrl: project.demoUrl ?? '',
+            }))
+          : [],
+        education: Array.isArray(response.candidateResume.education)
+          ? response.candidateResume.education.map((education) => ({
+              id: education.id,
+              university: education.university,
+              faculty: education.faculty ?? '',
+              specialty: education.specialty ?? '',
+              course: education.course ?? 0,
+              graduationYear: education.graduationYear ?? 0,
+            }))
+          : [],
+        links: Array.isArray(response.candidateResume.links)
+          ? response.candidateResume.links.map((link) => ({
+              id: link.id,
+              kind: link.kind,
+              url: link.url,
+              label: link.label ?? '',
+            }))
+          : [],
+      }
+    : null
+
   return {
     id: response.id,
     companyId: response.companyId,
@@ -774,6 +911,7 @@ export async function fetchEmployerApplicationDetail(applicationId: number, sign
     createdAt: response.createdAt,
     updatedAt: response.updatedAt,
     chatId: response.chatId ?? null,
+    candidateResume,
   } satisfies EmployerApplicationDetail
 }
 

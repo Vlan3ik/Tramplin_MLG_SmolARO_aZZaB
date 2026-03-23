@@ -5,6 +5,7 @@ using Monolith.Contexts;
 using Monolith.Entities;
 using Monolith.Models.Common;
 using Monolith.Models.Employer;
+using Monolith.Models.Resumes;
 using Monolith.Services.Common;
 
 namespace Monolith.Controllers;
@@ -116,6 +117,9 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
             .Include(x => x.CandidateUser)
                 .ThenInclude(x => x.CandidateProfile!)
                     .ThenInclude(x => x.ResumeProfile)
+            .Include(x => x.CandidateUser)
+                .ThenInclude(x => x.CandidateProfile!)
+                    .ThenInclude(x => x.PrivacySettings)
             .Include(x => x.Chat)
             .FirstOrDefaultAsync(x => x.Id == id && x.CompanyId == membership.CompanyId, cancellationToken);
 
@@ -124,7 +128,64 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
             return this.ToNotFoundError("employer.applications.not_found", "Application not found.");
         }
 
-        var resume = application.CandidateUser.CandidateProfile?.ResumeProfile;
+        var candidateProfile = application.CandidateUser.CandidateProfile;
+        var resume = candidateProfile?.ResumeProfile;
+        var privacy = candidateProfile?.PrivacySettings;
+
+        var skills = await dbContext.CandidateResumeSkills
+            .AsNoTracking()
+            .Include(x => x.Tag)
+            .Where(x => x.UserId == application.CandidateUserId)
+            .OrderBy(x => x.Tag.Name)
+            .Select(x => new ResumeSkillDto(x.TagId, x.Tag.Name, x.Level, x.YearsExperience))
+            .ToListAsync(cancellationToken);
+
+        var projects = await dbContext.CandidateResumeProjects
+            .AsNoTracking()
+            .Where(x => x.UserId == application.CandidateUserId)
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new ResumeProjectDto(x.Id, x.Title, x.Role, x.Description, x.StartDate, x.EndDate, x.RepoUrl, x.DemoUrl))
+            .ToListAsync(cancellationToken);
+
+        var education = await dbContext.CandidateResumeEducation
+            .AsNoTracking()
+            .Where(x => x.UserId == application.CandidateUserId)
+            .OrderByDescending(x => x.GraduationYear)
+            .Select(x => new ResumeEducationDto(x.Id, x.University, x.Faculty, x.Specialty, x.Course, x.GraduationYear))
+            .ToListAsync(cancellationToken);
+
+        var links = await dbContext.CandidateResumeLinks
+            .AsNoTracking()
+            .Where(x => x.UserId == application.CandidateUserId)
+            .OrderBy(x => x.Id)
+            .Select(x => new ResumeLinkDto(x.Id, x.Kind, x.Url, x.Label))
+            .ToListAsync(cancellationToken);
+
+        var candidateResume = candidateProfile is null
+            ? null
+            : new ResumeDetailDto(
+                candidateProfile.UserId,
+                application.CandidateUser.Username,
+                candidateProfile.FirstName,
+                candidateProfile.LastName,
+                candidateProfile.MiddleName,
+                candidateProfile.BirthDate,
+                candidateProfile.Gender,
+                candidateProfile.Phone,
+                candidateProfile.About,
+                application.CandidateUser.AvatarUrl,
+                resume?.Headline,
+                resume?.DesiredPosition,
+                resume?.Summary,
+                resume?.SalaryFrom,
+                resume?.SalaryTo,
+                resume?.CurrencyCode,
+                privacy?.OpenToWork ?? true,
+                skills,
+                projects,
+                education,
+                links);
+
         var dto = new EmployerApplicationDetailDto(
             application.Id,
             application.CompanyId,
@@ -142,7 +203,8 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
             application.InitiatorRole,
             application.CreatedAt,
             application.UpdatedAt,
-            application.Chat?.Id);
+            application.Chat?.Id,
+            candidateResume);
 
         return Ok(dto);
     }
