@@ -126,6 +126,7 @@ export function ChatWidget() {
   const lastReadMessageIdByChatRef = useRef<Record<number, number>>({})
 
   const activeChatIdRef = useRef<number | null>(activeChatId)
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     activeChatIdRef.current = activeChatId
@@ -133,6 +134,19 @@ export function ChatWidget() {
 
   const activeChat = useMemo(() => chats.find((chat) => chat.id === activeChatId) ?? null, [activeChatId, chats])
   const activeMessages = useMemo(() => (activeChatId ? messagesByChat[activeChatId] ?? [] : []), [activeChatId, messagesByChat])
+
+  useEffect(() => {
+    if (!isOpen || !activeChatId) {
+      return
+    }
+
+    const container = messagesContainerRef.current
+    if (!container) {
+      return
+    }
+
+    container.scrollTop = container.scrollHeight
+  }, [activeChatId, activeMessages.length, isOpen])
 
   const getChatTitle = useCallback(
     (chat: ChatListItem) => {
@@ -437,7 +451,7 @@ export function ChatWidget() {
                   <div className="chat-widget__thread-head">
                     <strong>{getChatTitle(activeChat)}</strong>
                   </div>
-                  <div className="chat-widget__messages">
+                  <div className="chat-widget__messages" ref={messagesContainerRef}>
                     {isLoadingMessages ? <p>Загружаем сообщения...</p> : null}
                     {!isLoadingMessages && !activeMessages.length ? <p>Сообщений пока нет.</p> : null}
                     {activeMessages.map((message) => {

@@ -951,6 +951,7 @@
 
 .chat-widget__thread {
   min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-rows: auto 1fr auto;
 }
@@ -965,6 +966,7 @@
 
 .chat-widget__messages {
   overflow: auto;
+  min-height: 0;
   padding: 0.75rem;
   display: grid;
   gap: 0.5rem;
