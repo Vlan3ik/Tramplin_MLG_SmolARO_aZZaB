@@ -652,6 +652,26 @@ export async function fetchHomeListOpportunities(query: HomeSearchQuery, signal?
   }
 }
 
+export async function fetchEventsListOpportunities(query: HomeSearchQuery, signal?: AbortSignal) {
+  const opportunitiesQueryString = buildOpportunitiesQueryString(query)
+  const opportunitiesResponse = await getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal, withAuth: false })
+
+  const items = (opportunitiesResponse.items ?? [])
+    .map((item) =>
+      toOpportunityFromOpportunity(item, {
+        latitude: null,
+        longitude: null,
+      }),
+    )
+    .filter((item) => item.type === 'event')
+    .sort((a, b) => b.id - a.id)
+
+  return {
+    items,
+    total: opportunitiesResponse.totalCount ?? opportunitiesResponse.total ?? items.length,
+  }
+}
+
 export async function fetchMapOpportunities(query: MapSearchQuery, signal?: AbortSignal) {
   const mapQueryString = buildMapSearchQueryString(query)
   const mapResponse = await getJson<MapOpportunityResponseApi>(`/map/opportunities?${mapQueryString}`, { signal, withAuth: false })
