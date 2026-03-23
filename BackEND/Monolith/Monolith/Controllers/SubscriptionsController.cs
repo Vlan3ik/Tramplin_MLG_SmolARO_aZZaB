@@ -90,6 +90,14 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
             return this.ToNotFoundError("subscriptions.target.not_found", "Пользователь не найден.");
         }
 
+        var isAdminTarget = await dbContext.UserRoles.AnyAsync(
+            x => x.UserId == targetUserId && x.Role == PlatformRole.Curator,
+            cancellationToken);
+        if (isAdminTarget)
+        {
+            return this.ToBadRequestError("subscriptions.follow.admin_forbidden", "Нельзя подписаться на администратора.");
+        }
+
         if (await dbContext.UserSubscriptions.AnyAsync(
                 x => x.FollowerUserId == userId && x.FollowingUserId == targetUserId,
                 cancellationToken))

@@ -44,7 +44,7 @@ function toNullableNumber(value: string) {
 }
 
 export function ResumesPage() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, session } = useAuth()
 
   const [searchDraft, setSearchDraft] = useState('')
   const [searchApplied, setSearchApplied] = useState('')
@@ -144,6 +144,11 @@ export function ResumesPage() {
   }
 
   async function toggleFollow(item: ResumeDiscoveryItem) {
+    if (session?.user?.id === item.userId) {
+      setErrorMessage('Нельзя подписаться на самого себя.')
+      return
+    }
+
     if (!isAuthenticated) {
       setErrorMessage('Чтобы подписываться, нужно войти в аккаунт.')
       return
@@ -337,6 +342,11 @@ export function ResumesPage() {
                 {item.skills.length ? item.skills.map((skill) => <span className="tag" key={`${item.userId}-${skill.tagId}`}>{skill.tagName}</span>) : <span className="tag">Навыки не добавлены</span>}
               </div>
 
+              {session?.user?.id === item.userId ? (
+                <button type="button" className="btn btn--ghost" disabled>
+                  Это вы
+                </button>
+              ) : (
               <button
                 type="button"
                 className={`btn ${item.isFollowedByMe ? 'btn--ghost' : 'btn--primary'}`}
@@ -347,6 +357,7 @@ export function ResumesPage() {
               >
                 {item.isFollowedByMe ? 'Отписаться' : 'Подписаться'}
               </button>
+              )}
             </article>
           ))}
         </div>

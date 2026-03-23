@@ -5,17 +5,16 @@ import { Link } from 'react-router-dom'
 import { createApplication } from '../../api/applications'
 import { fetchTags } from '../../api/catalog'
 import { fetchMyChats } from '../../api/chats'
-import { createContactRequest, deleteContact, fetchIncomingContactRequests, fetchMyContacts, fetchOutgoingContactRequests } from '../../api/contacts'
 import { fetchSeekerProfile, fetchSeekerResume, updateSeekerProfile, updateSeekerResume } from '../../api/me'
 import { uploadMyAvatar } from '../../api/media'
 import { fetchOpportunityById, fetchOpportunityDetailById, participateInOpportunity } from '../../api/opportunities'
+import { fetchMyFollowerSubscriptions, fetchMyFollowingSubscriptions, followUser, type SubscriptionUser, unfollowUser } from '../../api/subscriptions'
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
 import { useApplications } from '../../hooks/useApplications'
 import { useAuth } from '../../hooks/useAuth'
 import type { TagListItem } from '../../types/catalog'
-import type { ContactRequest, ContactUser } from '../../types/contact'
 import type { CandidateGender, SeekerProfile } from '../../types/me'
 import type { Opportunity } from '../../types/opportunity'
 import type { SeekerResume } from '../../types/resume'
@@ -232,10 +231,9 @@ export function SeekerDashboardPage() {
   const [favoriteOpportunities, setFavoriteOpportunities] = useState<Opportunity[]>([])
   const [favoriteIds, setFavoriteIds] = useState<number[]>(() => getFavoriteOpportunityIds())
   const [applyingIds, setApplyingIds] = useState<Record<number, boolean>>({})
-  const [contacts, setContacts] = useState<ContactUser[]>([])
+  const [followingUsers, setFollowingUsers] = useState<SubscriptionUser[]>([])
+  const [followerUsers, setFollowerUsers] = useState<SubscriptionUser[]>([])
   const [applicationChatTitles, setApplicationChatTitles] = useState<string[]>([])
-  const [incomingRequests, setIncomingRequests] = useState<ContactRequest[]>([])
-  const [outgoingRequests, setOutgoingRequests] = useState<ContactRequest[]>([])
   const [subscriptionsTab, setSubscriptionsTab] = useState<SubscriptionTabId>('seekers')
   const [subscriptionActionLoading, setSubscriptionActionLoading] = useState<Record<number, boolean>>({})
   const [profilePanel, setProfilePanel] = useState<ProfilePanelId>('portfolio')
@@ -292,13 +290,12 @@ export function SeekerDashboardPage() {
       setLoadingResume(true)
       setLoadingSubscriptions(true)
 
-      const [profileResult, resumeResult, tagsResult, contactsResult, incomingRequestsResult, outgoingRequestsResult, chatsResult] = await Promise.allSettled([
+      const [profileResult, resumeResult, tagsResult, followingResult, followersResult, chatsResult] = await Promise.allSettled([
         fetchSeekerProfile(controller.signal),
         fetchSeekerResume(controller.signal),
         fetchTags(controller.signal),
-        fetchMyContacts(controller.signal),
-        fetchIncomingContactRequests(controller.signal),
-        fetchOutgoingContactRequests(controller.signal),
+        fetchMyFollowingSubscriptions(controller.signal),
+        fetchMyFollowerSubscriptions(controller.signal),
         fetchMyChats(controller.signal),
       ])
 
@@ -343,18 +340,14 @@ export function SeekerDashboardPage() {
         setTags(tagsResult.value)
       }
 
-      if (contactsResult.status === 'fulfilled') {
-        setContacts(contactsResult.value)
-      } else if (!isAbortError(contactsResult.reason)) {
-        setSubscriptionsError(contactsResult.reason instanceof Error ? contactsResult.reason.message : 'Ошибка загрузки подписок.')
+      if (followingResult.status === 'fulfilled') {
+        setFollowingUsers(followingResult.value)
+      } else if (!isAbortError(followingResult.reason)) {
+        setSubscriptionsError(followingResult.reason instanceof Error ? followingResult.reason.message : 'Ошибка загрузки подписок.')
       }
 
-      if (incomingRequestsResult.status === 'fulfilled') {
-        setIncomingRequests(incomingRequestsResult.value)
-      }
-
-      if (outgoingRequestsResult.status === 'fulfilled') {
-        setOutgoingRequests(outgoingRequestsResult.value)
+      if (followersResult.status === 'fulfilled') {
+        setFollowerUsers(followersResult.value)
       }
 
       if (chatsResult.status === 'fulfilled') {
@@ -430,11 +423,9 @@ export function SeekerDashboardPage() {
   const avatarFormUrl = useMemo(() => resolveAvatarUrl(profileForm.avatarUrl), [profileForm.avatarUrl])
   const displayName = useMemo(() => [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || 'Профиль соискателя', [profile])
   const avatarFallback = useMemo(() => (profile?.firstName?.charAt(0) || profile?.lastName?.charAt(0) || 'P').toUpperCase(), [profile])
-  const contactUserIds = useMemo(() => new Set(contacts.map((item) => item.userId)), [contacts])
-  const outgoingRequestIds = useMemo(() => outgoingRequests.map((item) => item.receiver.userId), [outgoingRequests])
-  const incomingRequestIds = useMemo(() => incomingRequests.map((item) => item.sender.userId), [incomingRequests])
-  const subscriptionsCount = contacts.length + outgoingRequests.length
-  const subscribersCount = contacts.length + incomingRequests.length
+  const followingUserIds = useMemo(() => new Set(followingUsers.map((item) => item.userId)), [followingUsers])
+  const subscriptionsCount = followingUsers.length
+  const subscribersCount = followerUsers.length
   const isForeignProfile = useMemo(() => {
     const currentUsername = session?.user?.username?.trim().toLowerCase()
     const profileUsername = profile?.username?.trim().toLowerCase()
@@ -458,46 +449,21 @@ export function SeekerDashboardPage() {
 
   const seekerSubscriptions = useMemo(
     () => {
-      const base = contacts.map((contact, index) => {
+      const source = followMode === 'subscriptions' ? followingUsers : followerUsers
+      return source.map((user, index) => {
         const previews = subscriptionPreviewPhotos.slice(index % 3, (index % 3) + 3)
         return {
-          id: String(contact.userId),
-          userId: contact.userId,
-          title: contact.username?.trim() || `Пользователь #${contact.userId}`,
+          id: `${followMode}-${user.userId}`,
+          userId: user.userId,
+          title: user.displayName?.trim() || user.username?.trim() || `Пользователь #${user.userId}`,
           subtitle: 'Соискатель',
-          description: 'Контакт из вашей сети.',
-          avatarUrl: resolveAvatarUrl(contact.avatarUrl),
+          description: followMode === 'subscriptions' ? 'Вы подписаны на этого пользователя.' : 'Подписан на вас.',
+          avatarUrl: resolveAvatarUrl(user.avatarUrl),
           previews,
         }
-      }),
-      pending =
-        followMode === 'subscriptions'
-          ? outgoingRequests
-              .filter((item) => !contactUserIds.has(item.receiver.userId))
-              .map((item, index) => ({
-                id: `pending-out-${item.id}`,
-                userId: item.receiver.userId,
-                title: item.receiver.username?.trim() || `Пользователь #${item.receiver.userId}`,
-                subtitle: 'Соискатель',
-                description: 'Исходящая заявка на контакт.',
-                avatarUrl: resolveAvatarUrl(item.receiver.avatarUrl),
-                previews: subscriptionPreviewPhotos.slice(index % 3, (index % 3) + 3),
-              }))
-          : incomingRequests
-              .filter((item) => !contactUserIds.has(item.sender.userId))
-              .map((item, index) => ({
-                id: `pending-in-${item.id}`,
-                userId: item.sender.userId,
-                title: item.sender.username?.trim() || `Пользователь #${item.sender.userId}`,
-                subtitle: 'Соискатель',
-                description: 'Входящая заявка на контакт.',
-                avatarUrl: resolveAvatarUrl(item.sender.avatarUrl),
-                previews: subscriptionPreviewPhotos.slice(index % 3, (index % 3) + 3),
-              }))
-
-      return [...base, ...pending]
+      })
     },
-    [contactUserIds, contacts, followMode, incomingRequests, outgoingRequests],
+    [followMode, followerUsers, followingUsers],
   )
 
   const employerSubscriptions = useMemo(() => {
@@ -677,23 +643,20 @@ export function SeekerDashboardPage() {
     setSubscriptionActionLoading((current) => ({ ...current, [userId]: true }))
 
     try {
-      const isContact = contactUserIds.has(userId)
-      const hasPendingOutgoing = outgoingRequestIds.includes(userId)
+      const isFollowing = followingUserIds.has(userId)
 
-      if (isContact) {
-        await deleteContact(userId)
-      } else if (!hasPendingOutgoing) {
-        await createContactRequest(userId)
+      if (isFollowing) {
+        await unfollowUser(userId)
+      } else {
+        await followUser(userId)
       }
 
-      const [contactsList, outgoingRequestsList, incomingRequestsList] = await Promise.all([
-        fetchMyContacts(),
-        fetchOutgoingContactRequests(),
-        fetchIncomingContactRequests(),
+      const [followingList, followersList] = await Promise.all([
+        fetchMyFollowingSubscriptions(),
+        fetchMyFollowerSubscriptions(),
       ])
-      setContacts(contactsList)
-      setOutgoingRequests(outgoingRequestsList)
-      setIncomingRequests(incomingRequestsList)
+      setFollowingUsers(followingList)
+      setFollowerUsers(followersList)
     } catch (error) {
       setSubscriptionsError(error instanceof Error ? error.message : 'Не удалось обновить подписку.')
     } finally {
@@ -827,21 +790,15 @@ export function SeekerDashboardPage() {
                         {(() => {
                           const isSeeker = subscriptionsTab === 'seekers'
                           const userId = item.userId
-                          const isContact = typeof userId === 'number' ? contactUserIds.has(userId) : false
-                          const hasPendingOutgoing = typeof userId === 'number' ? outgoingRequestIds.includes(userId) : false
-                          const hasPendingIncoming = typeof userId === 'number' ? incomingRequestIds.includes(userId) : false
+                          const isFollowing = typeof userId === 'number' ? followingUserIds.has(userId) : false
                           const isLoading = typeof userId === 'number' ? Boolean(subscriptionActionLoading[userId]) : false
-                          const isDisabled = !isSeeker || userId == null || hasPendingOutgoing || hasPendingIncoming || isLoading
+                          const isDisabled = !isSeeker || userId == null || isLoading
 
                           const label = isLoading
                             ? 'Обновляем...'
-                            : hasPendingOutgoing
-                              ? 'Запрос отправлен'
-                              : hasPendingIncoming
-                                ? 'Входящая заявка'
-                              : isContact
-                                ? 'Вы подписаны'
-                                : 'Подписаться'
+                            : isFollowing
+                              ? 'Вы подписаны'
+                              : 'Подписаться'
 
                           return (
                             <button type="button" className="subscription-follow-btn" disabled={isDisabled} onClick={() => void onToggleSubscription(userId)}>
