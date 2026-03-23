@@ -395,13 +395,11 @@ public class MeController(AppDbContext dbContext) : ControllerBase
 
         var oldSkills = await dbContext.CandidateResumeSkills.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
         var oldExperiences = await dbContext.CandidateResumeExperiences.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
-        var oldProjects = await dbContext.CandidateResumeProjects.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
         var oldEducation = await dbContext.CandidateResumeEducation.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
         var oldLinks = await dbContext.CandidateResumeLinks.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
 
         dbContext.CandidateResumeSkills.RemoveRange(oldSkills);
         dbContext.CandidateResumeExperiences.RemoveRange(oldExperiences);
-        dbContext.CandidateResumeProjects.RemoveRange(oldProjects);
         dbContext.CandidateResumeEducation.RemoveRange(oldEducation);
         dbContext.CandidateResumeLinks.RemoveRange(oldLinks);
 
@@ -427,17 +425,11 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             IsCurrent = x.IsCurrent
         }));
 
-        dbContext.CandidateResumeProjects.AddRange(request.Projects.Select(x => new CandidateResumeProject
+        var projectValidation = await UpsertResumeProjects(userId, request.Projects, cancellationToken);
+        if (projectValidation is not null)
         {
-            UserId = userId,
-            Title = x.Title.Trim(),
-            Role = x.Role?.Trim(),
-            Description = x.Description?.Trim(),
-            StartDate = x.StartDate,
-            EndDate = x.EndDate,
-            RepoUrl = x.RepoUrl?.Trim(),
-            DemoUrl = x.DemoUrl?.Trim()
-        }));
+            return projectValidation;
+        }
 
         dbContext.CandidateResumeEducation.AddRange(request.Education.Select(x => new CandidateResumeEducation
         {
@@ -461,6 +453,68 @@ public class MeController(AppDbContext dbContext) : ControllerBase
         await tx.CommitAsync(cancellationToken);
 
         return Ok(await BuildResumeDetails(userId, cancellationToken));
+    }
+
+    private async Task<ActionResult?> UpsertResumeProjects(
+        long userId,
+        IReadOnlyCollection<ResumeProjectUpsertDto> projects,
+        CancellationToken cancellationToken)
+    {
+        var existingProjects = await dbContext.CandidateResumeProjects
+            .Where(x => x.UserId == userId)
+            .ToListAsync(cancellationToken);
+        var existingById = existingProjects.ToDictionary(x => x.Id);
+        var preservedProjectIds = new HashSet<long>();
+
+        foreach (var projectRequest in projects)
+        {
+            if (string.IsNullOrWhiteSpace(projectRequest.Title))
+            {
+                return this.ToBadRequestError("me.resume.projects.title_required", "Для каждого проекта нужно указать название.");
+            }
+
+            if (projectRequest.StartDate is not null && projectRequest.EndDate is not null && projectRequest.EndDate < projectRequest.StartDate)
+            {
+                return this.ToBadRequestError("me.resume.projects.period_invalid", "Дата окончания проекта не может быть раньше даты начала.");
+            }
+
+            CandidateResumeProject project;
+            if (projectRequest.Id.HasValue && projectRequest.Id.Value > 0)
+            {
+                if (!existingById.TryGetValue(projectRequest.Id.Value, out var existingProject))
+                {
+                    return this.ToBadRequestError("me.resume.projects.not_found", "Один или несколько проектов не найдены.");
+                }
+
+                if (!preservedProjectIds.Add(existingProject.Id))
+                {
+                    return this.ToBadRequestError("me.resume.projects.duplicate", "Один или несколько проектов переданы повторно.");
+                }
+
+                project = existingProject;
+            }
+            else
+            {
+                project = new CandidateResumeProject { UserId = userId };
+                dbContext.CandidateResumeProjects.Add(project);
+            }
+
+            project.Title = projectRequest.Title.Trim();
+            project.Role = string.IsNullOrWhiteSpace(projectRequest.Role) ? null : projectRequest.Role.Trim();
+            project.Description = string.IsNullOrWhiteSpace(projectRequest.Description) ? null : projectRequest.Description.Trim();
+            project.StartDate = projectRequest.StartDate;
+            project.EndDate = projectRequest.EndDate;
+            project.RepoUrl = string.IsNullOrWhiteSpace(projectRequest.RepoUrl) ? null : projectRequest.RepoUrl.Trim();
+            project.DemoUrl = string.IsNullOrWhiteSpace(projectRequest.DemoUrl) ? null : projectRequest.DemoUrl.Trim();
+        }
+
+        var projectsToRemove = existingProjects.Where(x => !preservedProjectIds.Contains(x.Id)).ToList();
+        if (projectsToRemove.Count > 0)
+        {
+            dbContext.CandidateResumeProjects.RemoveRange(projectsToRemove);
+        }
+
+        return null;
     }
 
     private async Task<CandidateResumeProfile> EnsureResumeExists(long userId, CancellationToken cancellationToken)

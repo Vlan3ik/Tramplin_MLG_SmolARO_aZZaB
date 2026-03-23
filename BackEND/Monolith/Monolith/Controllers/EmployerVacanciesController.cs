@@ -232,6 +232,7 @@ public class EmployerVacanciesController(
         }
 
         var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+        var resolvedStatus = await ResolvePublicationStatusAsync(membership.CompanyId, request.Status, cancellationToken);
         var vacancy = new Vacancy
         {
             CompanyId = membership.CompanyId,
@@ -241,7 +242,7 @@ public class EmployerVacanciesController(
             FullDescription = request.FullDescription.Trim(),
             Kind = request.Kind,
             Format = request.Format,
-            Status = request.Status,
+            Status = resolvedStatus,
             CityId = request.CityId,
             LocationId = request.LocationId,
             SalaryFrom = request.SalaryFrom,
@@ -296,13 +297,14 @@ public class EmployerVacanciesController(
         }
 
         var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+        var resolvedStatus = await ResolvePublicationStatusAsync(membership.CompanyId, request.Status, cancellationToken);
 
         vacancy.Title = request.Title.Trim();
         vacancy.ShortDescription = request.ShortDescription.Trim();
         vacancy.FullDescription = request.FullDescription.Trim();
         vacancy.Kind = request.Kind;
         vacancy.Format = request.Format;
-        vacancy.Status = request.Status;
+        vacancy.Status = resolvedStatus;
         vacancy.CityId = request.CityId;
         vacancy.LocationId = request.LocationId;
         vacancy.SalaryFrom = request.SalaryFrom;
@@ -469,9 +471,28 @@ public class EmployerVacanciesController(
             return this.ToNotFoundError("employer.vacancies.not_found", "Vacancy not found.");
         }
 
-        vacancy.Status = request.Status;
+        vacancy.Status = await ResolvePublicationStatusAsync(membership.CompanyId, request.Status, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    private async Task<OpportunityStatus> ResolvePublicationStatusAsync(
+        long companyId,
+        OpportunityStatus requestedStatus,
+        CancellationToken cancellationToken)
+    {
+        if (requestedStatus is not OpportunityStatus.Active and not OpportunityStatus.PendingModeration)
+        {
+            return requestedStatus;
+        }
+
+        var isVerified = await dbContext.Companies
+            .AsNoTracking()
+            .Where(x => x.Id == companyId)
+            .Select(x => x.Status == CompanyStatus.Verified)
+            .FirstAsync(cancellationToken);
+
+        return isVerified ? OpportunityStatus.Active : OpportunityStatus.PendingModeration;
     }
 
     private async Task ReplaceVacancyTags(long vacancyId, IReadOnlyCollection<long>? tagIds, CancellationToken cancellationToken)

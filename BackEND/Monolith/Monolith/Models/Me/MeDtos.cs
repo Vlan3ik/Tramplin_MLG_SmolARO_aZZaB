@@ -137,7 +137,15 @@ public record ResumeExperienceUpsertDto(
     DateOnly? StartDate,
     DateOnly? EndDate,
     bool IsCurrent);
-public record ResumeProjectUpsertDto(string Title, string? Role, string? Description, DateOnly? StartDate, DateOnly? EndDate, string? RepoUrl, string? DemoUrl);
+public record ResumeProjectUpsertDto(
+    long? Id,
+    string Title,
+    string? Role,
+    string? Description,
+    DateOnly? StartDate,
+    DateOnly? EndDate,
+    string? RepoUrl,
+    string? DemoUrl);
 public record ResumeEducationUpsertDto(string University, string? Faculty, string? Specialty, int? Course, int? GraduationYear);
 public record ResumeLinkUpsertDto(string Kind, string Url, string? Label);
 

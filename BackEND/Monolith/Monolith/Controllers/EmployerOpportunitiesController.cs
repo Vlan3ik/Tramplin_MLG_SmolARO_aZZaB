@@ -216,6 +216,7 @@ public class EmployerOpportunitiesController(
         }
 
         var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+        var resolvedStatus = await ResolvePublicationStatusAsync(membership.CompanyId, request.Status, cancellationToken);
         var opportunity = new Opportunity
         {
             CompanyId = membership.CompanyId,
@@ -225,7 +226,7 @@ public class EmployerOpportunitiesController(
             FullDescription = request.FullDescription.Trim(),
             Kind = request.Kind,
             Format = request.Format,
-            Status = request.Status,
+            Status = resolvedStatus,
             CityId = request.CityId,
             LocationId = request.LocationId,
             PriceType = request.PriceType,
@@ -280,13 +281,14 @@ public class EmployerOpportunitiesController(
         }
 
         var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+        var resolvedStatus = await ResolvePublicationStatusAsync(membership.CompanyId, request.Status, cancellationToken);
 
         opportunity.Title = request.Title.Trim();
         opportunity.ShortDescription = request.ShortDescription.Trim();
         opportunity.FullDescription = request.FullDescription.Trim();
         opportunity.Kind = request.Kind;
         opportunity.Format = request.Format;
-        opportunity.Status = request.Status;
+        opportunity.Status = resolvedStatus;
         opportunity.CityId = request.CityId;
         opportunity.LocationId = request.LocationId;
         opportunity.PriceType = request.PriceType;
@@ -352,9 +354,28 @@ public class EmployerOpportunitiesController(
             return this.ToNotFoundError("employer.opportunities.not_found", "Opportunity not found.");
         }
 
-        opportunity.Status = request.Status;
+        opportunity.Status = await ResolvePublicationStatusAsync(membership.CompanyId, request.Status, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    private async Task<OpportunityStatus> ResolvePublicationStatusAsync(
+        long companyId,
+        OpportunityStatus requestedStatus,
+        CancellationToken cancellationToken)
+    {
+        if (requestedStatus is not OpportunityStatus.Active and not OpportunityStatus.PendingModeration)
+        {
+            return requestedStatus;
+        }
+
+        var isVerified = await dbContext.Companies
+            .AsNoTracking()
+            .Where(x => x.Id == companyId)
+            .Select(x => x.Status == CompanyStatus.Verified)
+            .FirstAsync(cancellationToken);
+
+        return isVerified ? OpportunityStatus.Active : OpportunityStatus.PendingModeration;
     }
 
     private async Task ReplaceOpportunityTags(long opportunityId, IReadOnlyCollection<long>? tagIds, CancellationToken cancellationToken)

@@ -35,6 +35,7 @@ type ResumeApiResponse = {
     endDate: string | null
     repoUrl: string | null
     demoUrl: string | null
+    mainPhotoUrl?: string | null
   }> | null
   education?: Array<{
     id: number
@@ -78,6 +79,7 @@ type UpdateResumeDetailsRequest = {
     isCurrent: boolean
   }>
   projects: Array<{
+    id: number | null
     title: string
     role: string | null
     description: string | null
@@ -149,6 +151,7 @@ export async function fetchSeekerResume(signal?: AbortSignal): Promise<SeekerRes
           endDate: project.endDate ?? '',
           repoUrl: project.repoUrl ?? '',
           demoUrl: project.demoUrl ?? '',
+          mainPhotoUrl: project.mainPhotoUrl ?? null,
         }))
       : [],
     education: Array.isArray(response.education)
@@ -195,6 +198,7 @@ export async function updateSeekerResume(payload: SeekerResume) {
       isCurrent: experience.isCurrent,
     })),
     projects: payload.projects.map((project) => ({
+      id: project.id > 0 ? project.id : null,
       title: project.title,
       role: project.role || null,
       description: project.description || null,

@@ -7,6 +7,7 @@ import { fetchTags } from '../../api/catalog'
 import { fetchCompanies } from '../../api/companies'
 import { fetchSeekerProfile, fetchSeekerResume, updateSeekerProfile, updateSeekerResume } from '../../api/me'
 import { uploadMyAvatar } from '../../api/media'
+import { createMyPortfolioProject, deleteMyPortfolioProject, fetchPublicPortfolioProjects, uploadMyPortfolioProjectPhoto } from '../../api/portfolio'
 import { fetchOpportunityById, fetchOpportunityDetailById, participateInOpportunity } from '../../api/opportunities'
 import { fetchMyFollowerSubscriptions, fetchMyFollowingSubscriptions, followUser, type SubscriptionUser, unfollowUser } from '../../api/subscriptions'
 import { Footer } from '../../components/layout/Footer'
@@ -198,6 +199,32 @@ function normalizeUrl(value: string) {
   return `https://${trimmed}`
 }
 
+function mergeProjectPhotos(
+  projects: SeekerResume['projects'],
+  photoItems: Array<{ projectId: number; mainPhotoUrl: string | null }>,
+) {
+  const photoMap = new Map(photoItems.map((item) => [item.projectId, item.mainPhotoUrl] as const))
+
+  return projects.map((project) => ({
+    ...project,
+    mainPhotoUrl: photoMap.get(project.id) ?? project.mainPhotoUrl ?? null,
+  }))
+}
+
+function normalizeProjectPayload(project: typeof initialProject) {
+  return {
+    title: project.title.trim(),
+    role: project.role.trim() || null,
+    description: project.description.trim() || null,
+    startDate: project.startDate || null,
+    endDate: project.endDate || null,
+    repoUrl: normalizeUrl(project.repoUrl) || null,
+    demoUrl: normalizeUrl(project.demoUrl) || null,
+    participants: [],
+    collaborations: [],
+  }
+}
+
 function isAbortError(error: unknown) {
   if (error instanceof DOMException && error.name === 'AbortError') {
     return true
@@ -262,6 +289,7 @@ export function SeekerDashboardPage() {
     avatarUrl: '',
   })
   const [projectForm, setProjectForm] = useState(initialProject)
+  const [projectPhotoFiles, setProjectPhotoFiles] = useState<File[]>([])
   const [experienceForm, setExperienceForm] = useState(initialExperience)
   const [educationForm, setEducationForm] = useState(initialEducation)
   const [linkForm, setLinkForm] = useState(initialLink)
@@ -275,11 +303,13 @@ export function SeekerDashboardPage() {
   const [loadingSubscriptions, setLoadingSubscriptions] = useState(true)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingResume, setSavingResume] = useState(false)
+  const [savingPortfolio, setSavingPortfolio] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const [profileError, setProfileError] = useState('')
   const [resumeError, setResumeError] = useState('')
+  const [portfolioError, setPortfolioError] = useState('')
   const [favoritesError, setFavoritesError] = useState('')
   const [subscriptionsError, setSubscriptionsError] = useState('')
   const [success, setSuccess] = useState('')
@@ -298,18 +328,24 @@ export function SeekerDashboardPage() {
     async function loadData() {
       setProfileError('')
       setResumeError('')
+      setPortfolioError('')
       setSubscriptionsError('')
       setLoadingProfile(true)
       setLoadingResume(true)
       setLoadingSubscriptions(true)
 
-      const [profileResult, resumeResult, tagsResult, companiesResult, followingResult, followersResult] = await Promise.allSettled([
+      const portfolioPromise = session?.user?.username
+        ? fetchPublicPortfolioProjects(session.user.username, controller.signal)
+        : Promise.resolve([] as Array<{ projectId: number; mainPhotoUrl: string | null }>)
+
+      const [profileResult, resumeResult, tagsResult, companiesResult, followingResult, followersResult, portfolioResult] = await Promise.allSettled([
         fetchSeekerProfile(controller.signal),
         fetchSeekerResume(controller.signal),
         fetchTags(controller.signal),
         fetchCompanies({ page: 1, pageSize: 100, verifiedOnly: true }, controller.signal),
         fetchMyFollowingSubscriptions(controller.signal),
         fetchMyFollowerSubscriptions(controller.signal),
+        portfolioPromise,
       ])
 
       if (controller.signal.aborted) {
@@ -328,26 +364,37 @@ export function SeekerDashboardPage() {
       if (resumeResult.status === 'fulfilled') {
         const apiResume = resumeResult.value
         const local = loadResumeLocal(apiResume.userId)
+        const sourceResume = local
+          ? {
+              ...apiResume,
+              headline: apiResume.headline || local.headline,
+              desiredPosition: apiResume.desiredPosition || local.desiredPosition,
+              summary: apiResume.summary || local.summary,
+              salaryFrom: apiResume.salaryFrom ?? local.salaryFrom,
+              salaryTo: apiResume.salaryTo ?? local.salaryTo,
+              currencyCode: apiResume.currencyCode || local.currencyCode,
+              skills: apiResume.skills.length ? apiResume.skills : local.skills,
+              experiences: apiResume.experiences.length ? apiResume.experiences : Array.isArray(local.experiences) ? local.experiences : [],
+              projects: apiResume.projects.length ? apiResume.projects : local.projects,
+              education: apiResume.education.length ? apiResume.education : local.education,
+              links: apiResume.links.length ? apiResume.links : local.links,
+            }
+          : apiResume
+        const portfolioProjects = portfolioResult.status === 'fulfilled' ? portfolioResult.value : []
         setResume(
-          local
+          sourceResume.projects.length
             ? {
-                ...apiResume,
-                headline: apiResume.headline || local.headline,
-                desiredPosition: apiResume.desiredPosition || local.desiredPosition,
-                summary: apiResume.summary || local.summary,
-                salaryFrom: apiResume.salaryFrom ?? local.salaryFrom,
-                salaryTo: apiResume.salaryTo ?? local.salaryTo,
-                currencyCode: apiResume.currencyCode || local.currencyCode,
-                skills: apiResume.skills.length ? apiResume.skills : local.skills,
-                experiences: apiResume.experiences.length ? apiResume.experiences : Array.isArray(local.experiences) ? local.experiences : [],
-                projects: apiResume.projects.length ? apiResume.projects : local.projects,
-                education: apiResume.education.length ? apiResume.education : local.education,
-                links: apiResume.links.length ? apiResume.links : local.links,
+                ...sourceResume,
+                projects: mergeProjectPhotos(sourceResume.projects, portfolioProjects),
               }
-            : apiResume,
+            : sourceResume,
         )
       } else if (!isAbortError(resumeResult.reason)) {
         setResumeError(resumeResult.reason instanceof Error ? resumeResult.reason.message : 'Ошибка загрузки резюме.')
+      }
+
+      if (portfolioResult.status === 'rejected' && !isAbortError(portfolioResult.reason)) {
+        setPortfolioError(portfolioResult.reason instanceof Error ? portfolioResult.reason.message : 'Не удалось загрузить портфолио.')
       }
 
       if (tagsResult.status === 'fulfilled') {
@@ -486,7 +533,8 @@ export function SeekerDashboardPage() {
   const portfolioItems = useMemo(() => {
     return resume.projects.map((project, index) => ({
       id: `resume-${project.id}`,
-      image: portfolioMockPhotos[index % portfolioMockPhotos.length],
+      projectId: project.id,
+      image: resolveAvatarUrl(project.mainPhotoUrl) ?? portfolioMockPhotos[index % portfolioMockPhotos.length],
       title: project.title || 'Проект без названия',
       author: displayName,
       role: project.role || resume.desiredPosition || 'Соискатель',
@@ -604,6 +652,91 @@ export function SeekerDashboardPage() {
     }
   }
 
+  async function onCreatePortfolioProject() {
+    const payload = normalizeProjectPayload(projectForm)
+    if (!payload.title) {
+      setPortfolioError('Укажите название проекта.')
+      return
+    }
+
+    if (payload.startDate && payload.endDate && payload.endDate < payload.startDate) {
+      setPortfolioError('Дата окончания проекта не может быть раньше даты начала.')
+      return
+    }
+
+    if (typeof session?.accessToken !== 'string' || !session.accessToken) return
+
+    setSavingPortfolio(true)
+    setPortfolioError('')
+
+    try {
+      const created = await createMyPortfolioProject(payload)
+      let uploadedPhotoUrl: string | null = null
+
+      if (projectPhotoFiles.length > 0) {
+        for (let index = 0; index < projectPhotoFiles.length; index += 1) {
+          const file = projectPhotoFiles[index]
+          try {
+            const photo = await uploadMyPortfolioProjectPhoto(created.projectId, file, {
+              isMain: index === 0,
+              sortOrder: index,
+            })
+            if (index === 0) {
+              uploadedPhotoUrl = photo.url
+            }
+          } catch (photoError) {
+            setPortfolioError(photoError instanceof Error ? photoError.message : 'Проект сохранен, но часть фото не удалось загрузить.')
+            break
+          }
+        }
+      }
+
+      const nextProject = {
+        id: created.projectId,
+        title: payload.title,
+        role: payload.role ?? '',
+        description: payload.description ?? '',
+        startDate: payload.startDate ?? '',
+        endDate: payload.endDate ?? '',
+        repoUrl: payload.repoUrl ?? '',
+        demoUrl: payload.demoUrl ?? '',
+        mainPhotoUrl: uploadedPhotoUrl,
+      }
+
+      setResume((state) => ({
+        ...state,
+        projects: [...state.projects, nextProject],
+      }))
+      setProjectForm(initialProject)
+      setProjectPhotoFiles([])
+      setSuccess('Проект портфолио сохранен.')
+    } catch (error) {
+      setPortfolioError(error instanceof Error ? error.message : 'Не удалось сохранить проект портфолио.')
+    } finally {
+      setSavingPortfolio(false)
+    }
+  }
+
+  async function onDeletePortfolioProject(projectId: number) {
+    if (typeof session?.accessToken !== 'string' || !session.accessToken) return
+
+    setSavingPortfolio(true)
+    setPortfolioError('')
+
+    try {
+      await deleteMyPortfolioProject(projectId)
+      setResume((state) => ({
+        ...state,
+        projects: state.projects.filter((project) => project.id !== projectId),
+      }))
+      setSuccess('Проект удалён.')
+    } catch (error) {
+      setPortfolioError(error instanceof Error ? error.message : 'Не удалось удалить проект.')
+    } finally {
+      setSavingPortfolio(false)
+    }
+  }
+
   async function onResumeStepAction() {
     if (step === 0 && (!resume.headline.trim() || !resume.desiredPosition.trim() || !resume.summary.trim())) {
       setResumeError('Заполните базовую информацию резюме.')
@@ -704,6 +837,7 @@ export function SeekerDashboardPage() {
           {success ? <div className="auth-feedback seeker-profile-feedback">{success}</div> : null}
           {profileError ? <div className="auth-feedback auth-feedback--error">{profileError}</div> : null}
           {subscriptionsError ? <div className="auth-feedback auth-feedback--error">{subscriptionsError}</div> : null}
+          {portfolioError ? <div className="auth-feedback auth-feedback--error">{portfolioError}</div> : null}
           {applicationsError ? <div className="auth-feedback auth-feedback--error">{applicationsError}</div> : null}
 
           <nav className="seeker-profile-mode-switch">
@@ -715,22 +849,40 @@ export function SeekerDashboardPage() {
           </nav>
 
           {profilePanel === 'portfolio' ? (
-            <section className="portfolio-grid">
-              {!portfolioItems.length ? <p>Портфолио пока пусто. Добавьте проекты в резюме.</p> : null}
-              {portfolioItems.map((item) => (
-                <article key={item.id} className="portfolio-card">
-                  <img src={item.image} alt={item.title} />
-                  <p className="portfolio-card__description">{item.title}</p>
-                  <div className="portfolio-card__author">
-                    <div className="portfolio-card__avatar">{avatarUrl ? <img src={avatarUrl} alt={item.author} /> : <span>{avatarFallback}</span>}</div>
-                    <div>
-                      <strong>{item.author}</strong>
-                      <span>{item.role}</span>
+            <section className="portfolio-panel">
+              <div className="portfolio-panel__header">
+                <div>
+                  <h3>Портфолио</h3>
+                  <p>Проекты сохраняются на backend. Фото добавляются на этапе создания проекта.</p>
+                </div>
+                {session?.user?.username ? (
+                  <Link className="btn btn--ghost" to={`/portfolio/${encodeURIComponent(session.user.username)}`}>
+                    Публичная страница
+                  </Link>
+                ) : null}
+              </div>
+              <div className="portfolio-grid">
+                {!portfolioItems.length ? <p>Портфолио пока пусто. Добавьте проект в шаге «Портфолио» резюме.</p> : null}
+                {portfolioItems.map((item) => (
+                  <article key={item.id} className="portfolio-card">
+                    <img src={item.image} alt={item.title} />
+                    <p className="portfolio-card__description">{item.title}</p>
+                    <div className="portfolio-card__author">
+                      <div className="portfolio-card__avatar">{avatarUrl ? <img src={avatarUrl} alt={item.author} /> : <span>{avatarFallback}</span>}</div>
+                      <div>
+                        <strong>{item.author}</strong>
+                        <span>{item.role}</span>
+                      </div>
                     </div>
-                  </div>
-                  <p>{item.description}</p>
-                </article>
-              ))}
+                    <p>{item.description}</p>
+                    <div className="portfolio-card__actions">
+                      <button type="button" className="btn btn--ghost" disabled={savingPortfolio} onClick={() => void onDeletePortfolioProject(item.projectId)}>
+                        Удалить
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
             </section>
           ) : null}
 
@@ -1062,13 +1214,40 @@ export function SeekerDashboardPage() {
                               <label>Repo URL<input value={projectForm.repoUrl} onChange={(e) => setProjectForm((s) => ({ ...s, repoUrl: e.target.value }))} /></label>
                               <label>Demo URL<input value={projectForm.demoUrl} onChange={(e) => setProjectForm((s) => ({ ...s, demoUrl: e.target.value }))} /></label>
                               <label className="full-width">Описание<textarea rows={3} value={projectForm.description} onChange={(e) => setProjectForm((s) => ({ ...s, description: e.target.value }))} /></label>
+                              <label className="full-width portfolio-upload">
+                                Фото проекта
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                                  multiple
+                                  onChange={(event) => setProjectPhotoFiles(Array.from(event.target.files ?? []))}
+                                />
+                                <span className="portfolio-upload__hint">Можно выбрать несколько фото. Первое станет главным. JPG, PNG, WEBP, GIF или SVG (до 10 МБ каждое).</span>
+                              </label>
                             </div>
-                            <button type="button" className="btn btn--ghost" onClick={() => {
-                              if (!projectForm.title.trim() || !projectForm.role.trim()) return
-                              setResume((s) => ({ ...s, projects: [...s.projects, { id: Date.now(), ...projectForm, title: projectForm.title.trim(), role: projectForm.role.trim(), description: projectForm.description.trim(), repoUrl: normalizeUrl(projectForm.repoUrl), demoUrl: normalizeUrl(projectForm.demoUrl) }] }))
-                              setProjectForm(initialProject)
-                            }}>Добавить проект</button>
-                            <div className="resume-collection">{resume.projects.length ? resume.projects.map((project) => <article key={project.id} className="resume-collection-card"><div><strong>{project.title}</strong><p>{project.role}</p><p>{project.description}</p></div><button type="button" className="btn btn--ghost" onClick={() => setResume((s) => ({ ...s, projects: s.projects.filter((x) => x.id !== project.id) }))}>Удалить</button></article>) : <p>Проекты пока не добавлены.</p>}</div>
+                            <div className="resume-step-actions resume-step-actions--start">
+                              <button type="button" className="btn btn--primary" disabled={savingPortfolio} onClick={() => void onCreatePortfolioProject()}>
+                                {savingPortfolio ? 'Сохраняем...' : 'Сохранить проект'}
+                              </button>
+                            </div>
+                            <div className="resume-collection">
+                              {resume.projects.length ? (
+                                resume.projects.map((project) => (
+                                  <article key={project.id} className="resume-collection-card">
+                                    <div>
+                                      <strong>{project.title}</strong>
+                                      <p>{project.role || 'Роль не указана'}</p>
+                                      <p>{project.description || 'Описание не заполнено'}</p>
+                                    </div>
+                                    <button type="button" className="btn btn--ghost" onClick={() => void onDeletePortfolioProject(project.id)} disabled={savingPortfolio}>
+                                      Удалить
+                                    </button>
+                                  </article>
+                                ))
+                              ) : (
+                                <p>Проекты пока не добавлены.</p>
+                              )}
+                            </div>
                           </div>
                         ) : null}
 

@@ -14,6 +14,7 @@ export type ResumeProject = {
   endDate: string
   repoUrl: string
   demoUrl: string
+  mainPhotoUrl?: string | null
 }
 
 export type ResumeExperience = {

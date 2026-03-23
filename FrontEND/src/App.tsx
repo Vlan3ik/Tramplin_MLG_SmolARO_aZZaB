@@ -13,6 +13,7 @@ import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { OpportunityDetailsPage } from './pages/OpportunityDetailsPage'
+import { PortfolioPage } from './pages/PortfolioPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ResumesPage } from './pages/ResumesPage'
 import { VacancyFlowPage } from './pages/VacancyFlowPage'
@@ -31,6 +32,7 @@ function App() {
           <Route path="about" element={<AboutPlatformPage />} />
           <Route path="events" element={<EventsPage />} />
           <Route path="resumes" element={<ResumesPage />} />
+          <Route path="portfolio/:username" element={<PortfolioPage />} />
           <Route path="opportunity/:id" element={<OpportunityDetailsPage />} />
           <Route path="companies" element={<CompaniesListPage />} />
           <Route path="company/:id" element={<CompanyPage />} />

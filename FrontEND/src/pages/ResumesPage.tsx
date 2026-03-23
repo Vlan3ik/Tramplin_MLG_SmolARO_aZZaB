@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { fetchTags } from '../api/catalog'
 import { fetchResumeDiscovery } from '../api/resumes'
 import { followUser, unfollowUser } from '../api/subscriptions'
@@ -341,6 +342,10 @@ export function ResumesPage() {
               <div className="tag-row">
                 {item.skills.length ? item.skills.map((skill) => <span className="tag" key={`${item.userId}-${skill.tagId}`}>{skill.tagName}</span>) : <span className="tag">Навыки не добавлены</span>}
               </div>
+
+              <Link className="btn btn--ghost" to={`/portfolio/${encodeURIComponent(item.username)}`}>
+                Портфолио
+              </Link>
 
               {session?.user?.id === item.userId ? (
                 <button type="button" className="btn btn--ghost" disabled>
