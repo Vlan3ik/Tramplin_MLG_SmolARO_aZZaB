@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Monolith.Contexts;
 using Monolith.Entities;
 using Monolith.Hubs;
+using Monolith.Models.Applications;
 using Monolith.Models.Chat;
 using Monolith.Models.Common;
 using Monolith.Services.Chats;
@@ -18,6 +19,40 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub> hubContext, IChatCacheService chatCache) : ControllerBase
 {
+    [HttpGet("me")]
+    [ProducesResponseType(typeof(IReadOnlyCollection<ApplicationListItemDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyCollection<ApplicationListItemDto>>> GetMine(CancellationToken cancellationToken)
+    {
+        var currentUserId = User.GetUserId();
+
+        var applications = await dbContext.Applications
+            .AsNoTracking()
+            .Include(x => x.Vacancy)
+                .ThenInclude(x => x.Company)
+            .Include(x => x.Vacancy)
+                .ThenInclude(x => x.City)
+            .Include(x => x.Vacancy)
+                .ThenInclude(x => x.Location)
+                    .ThenInclude(x => x!.City)
+            .Where(x => x.CandidateUserId == currentUserId)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var rows = applications
+            .Select(x => new ApplicationListItemDto(
+                x.Id,
+                x.VacancyId,
+                x.Vacancy.Title,
+                x.Vacancy.Company.BrandName ?? x.Vacancy.Company.LegalName,
+                BuildLocationLabel(x.Vacancy.City, x.Vacancy.Location),
+                x.Status,
+                x.CreatedAt,
+                x.UpdatedAt))
+            .ToArray();
+
+        return Ok(rows);
+    }
+
     /// <summary>
     /// Создает отклик на вакансию и связанный чат по отклику.
     /// </summary>
@@ -160,5 +195,37 @@ public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub>
         }
 
         return Created(string.Empty, new { applicationId = app.Id, chatId = chat.Id });
+    }
+
+    private static string BuildLocationLabel(City? city, Location? location)
+    {
+        var parts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(city?.CityName))
+        {
+            parts.Add(city!.CityName);
+        }
+
+        if (location is not null)
+        {
+            var streetParts = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(location.StreetName))
+            {
+                streetParts.Add(location.StreetName!);
+            }
+
+            if (!string.IsNullOrWhiteSpace(location.HouseNumber))
+            {
+                streetParts.Add(location.HouseNumber!);
+            }
+
+            if (streetParts.Count > 0)
+            {
+                parts.Add(string.Join(" ", streetParts));
+            }
+        }
+
+        return string.Join(", ", parts);
     }
 }

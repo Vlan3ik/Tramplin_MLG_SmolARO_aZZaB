@@ -52,6 +52,11 @@ function readStoredSession(): StoredAuthSession | null {
   }
 }
 
+export function hasStoredAuthSession() {
+  const session = readStoredSession()
+  return Boolean(session?.accessToken || session?.refreshToken)
+}
+
 function writeStoredTokens(tokens: RefreshApiResponse) {
   if (!isBrowser()) {
     return

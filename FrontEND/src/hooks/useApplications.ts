@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-
-const APPLICATIONS_STORAGE_KEY = 'tramplin.seeker.applications'
-const APPLICATIONS_CHANGE_EVENT = 'tramplin:applications-change'
+import { hasStoredAuthSession } from '../api/client'
+import { APPLICATIONS_CHANGE_EVENT, fetchMyApplications, type MyApplicationApi } from '../api/applications'
 
 export type SeekerApplication = {
   id: string
@@ -15,13 +14,54 @@ export type SeekerApplication = {
   tone: 'success' | 'warning' | 'danger'
   next: string
   note: string
+  statusCode: number
 }
 
-type ApplicationSource = {
-  id: number
-  title: string
-  company: string
-  location: string
+type ApplicationMeta = Pick<SeekerApplication, 'status' | 'tone' | 'next' | 'note'>
+
+const APPLICATION_STATUS_META: Record<number, ApplicationMeta> = {
+  1: {
+    status: 'Новый',
+    tone: 'warning',
+    next: 'Ожидайте, пока работодатель начнет обработку отклика.',
+    note: 'Отклик зарегистрирован и доступен работодателю.',
+  },
+  2: {
+    status: 'На рассмотрении',
+    tone: 'warning',
+    next: 'Работодатель просматривает ваш отклик.',
+    note: 'Отклик находится в очереди на проверку.',
+  },
+  3: {
+    status: 'Интервью',
+    tone: 'success',
+    next: 'Проверьте чат и подготовьтесь к интервью.',
+    note: 'Вас пригласили на следующий этап отбора.',
+  },
+  4: {
+    status: 'Оффер',
+    tone: 'success',
+    next: 'Ответьте работодателю в чате.',
+    note: 'Работодатель готов сделать предложение.',
+  },
+  5: {
+    status: 'Нанят',
+    tone: 'success',
+    next: 'Отклик завершен.',
+    note: 'Вы успешно приняты на позицию.',
+  },
+  6: {
+    status: 'Отклонен',
+    tone: 'danger',
+    next: 'Посмотрите другие вакансии.',
+    note: 'Работодатель отклонил отклик.',
+  },
+  7: {
+    status: 'Отменен',
+    tone: 'danger',
+    next: 'Вы можете отправить новый отклик.',
+    note: 'Отклик отменен.',
+  },
 }
 
 function formatAppliedDate(value: Date) {
@@ -30,125 +70,127 @@ function formatAppliedDate(value: Date) {
   return `${day} ${month}`
 }
 
-function parseStoredApplications(raw: string | null) {
-  if (!raw) {
-    return [] as SeekerApplication[]
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as unknown
-
-    if (!Array.isArray(parsed)) {
-      return [] as SeekerApplication[]
-    }
-
-    return parsed.filter((item): item is SeekerApplication => {
-      if (!item || typeof item !== 'object') {
-        return false
-      }
-
-      const candidate = item as Partial<SeekerApplication>
-
-      return (
-        typeof candidate.id === 'string' &&
-        typeof candidate.opportunityId === 'number' &&
-        typeof candidate.createdAt === 'string' &&
-        typeof candidate.title === 'string' &&
-        typeof candidate.company === 'string' &&
-        typeof candidate.location === 'string'
-      )
-    })
-  } catch {
-    return [] as SeekerApplication[]
+function mapApplicationMeta(status: number): ApplicationMeta {
+  return APPLICATION_STATUS_META[status] ?? {
+    status: `Статус #${status}`,
+    tone: 'warning',
+    next: 'Проверьте обновление в профиле позже.',
+    note: 'Статус отклика обновлен на стороне сервера.',
   }
 }
 
-function readApplications() {
-  if (typeof window === 'undefined') {
-    return [] as SeekerApplication[]
-  }
+function mapApiApplication(item: MyApplicationApi): SeekerApplication {
+  const meta = mapApplicationMeta(item.status)
+  const createdAt = new Date(item.createdAt)
 
-  return parseStoredApplications(window.localStorage.getItem(APPLICATIONS_STORAGE_KEY))
+  return {
+    id: String(item.id),
+    opportunityId: item.vacancyId,
+    createdAt: item.createdAt,
+    title: item.vacancyTitle,
+    company: item.companyName,
+    location: item.locationName,
+    date: Number.isNaN(createdAt.getTime()) ? '' : formatAppliedDate(createdAt),
+    status: meta.status,
+    tone: meta.tone,
+    next: meta.next,
+    note: meta.note,
+    statusCode: item.status,
+  }
 }
 
-function writeApplications(items: SeekerApplication[]) {
-  if (typeof window === 'undefined') {
-    return
+function isUnauthorizedError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false
   }
 
-  window.localStorage.setItem(APPLICATIONS_STORAGE_KEY, JSON.stringify(items))
-  window.dispatchEvent(new Event(APPLICATIONS_CHANGE_EVENT))
+  const message = error.message.toLowerCase()
+  return message.includes('(401)') || message.includes('unauthorized')
 }
 
 export function useApplications() {
-  const [applications, setApplications] = useState<SeekerApplication[]>(() => readApplications())
+  const [applications, setApplications] = useState<SeekerApplication[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return () => undefined
-    }
+  const loadApplications = useCallback(async (signal?: AbortSignal) => {
+    try {
+      if (signal?.aborted) {
+        return
+      }
 
-    const sync = () => setApplications(readApplications())
+      if (!hasStoredAuthSession()) {
+        setApplications([])
+        setError('')
+        setIsLoading(false)
+        return
+      }
 
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === APPLICATIONS_STORAGE_KEY) {
-        sync()
+      setIsLoading(true)
+      setError('')
+
+      const rows = await fetchMyApplications(signal)
+
+      if (signal?.aborted) {
+        return
+      }
+
+      setApplications(rows.map(mapApiApplication))
+    } catch (cause) {
+      if (signal?.aborted) {
+        return
+      }
+
+      if (isUnauthorizedError(cause)) {
+        setApplications([])
+        setError('')
+        return
+      }
+
+      setApplications([])
+      setError(cause instanceof Error ? cause.message : 'Не удалось загрузить отклики.')
+    } finally {
+      if (!signal?.aborted) {
+        setIsLoading(false)
       }
     }
+  }, [])
 
-    window.addEventListener('storage', onStorage)
+  useEffect(() => {
+    const controller = new AbortController()
+    void loadApplications(controller.signal)
+
+    if (typeof window === 'undefined') {
+      return () => controller.abort()
+    }
+
+    const sync = () => {
+      void loadApplications()
+    }
+
     window.addEventListener(APPLICATIONS_CHANGE_EVENT, sync)
+    window.addEventListener('focus', sync)
+    const intervalId = window.setInterval(sync, 30_000)
 
     return () => {
-      window.removeEventListener('storage', onStorage)
+      controller.abort()
       window.removeEventListener(APPLICATIONS_CHANGE_EVENT, sync)
+      window.removeEventListener('focus', sync)
+      window.clearInterval(intervalId)
     }
-  }, [])
+  }, [loadApplications])
 
   const hasApplied = useCallback(
     (opportunityId: number) => applications.some((item) => item.opportunityId === opportunityId),
     [applications],
   )
 
-  const addApplication = useCallback((source: ApplicationSource) => {
-    let created = false
-
-    setApplications((currentState) => {
-      if (currentState.some((item) => item.opportunityId === source.id)) {
-        return currentState
-      }
-
-      const now = new Date()
-      const nextState: SeekerApplication[] = [
-        {
-          id: `${source.id}-${now.getTime()}`,
-          opportunityId: source.id,
-          createdAt: now.toISOString(),
-          title: source.title,
-          company: source.company,
-          location: source.location,
-          date: formatAppliedDate(now),
-          status: 'На рассмотрении',
-          tone: 'warning',
-          next: 'Ожидайте ответ работодателя в чате',
-          note: 'Отклик отправлен с платформы',
-        },
-        ...currentState,
-      ]
-
-      writeApplications(nextState)
-      created = true
-      return nextState
-    })
-
-    return created
-  }, [])
-
   const sortedApplications = useMemo(() => applications, [applications])
 
   return {
     applications: sortedApplications,
     hasApplied,
-    addApplication,
+    isLoading,
+    error,
   }
 }

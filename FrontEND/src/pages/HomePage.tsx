@@ -29,7 +29,7 @@ const defaultFilters: OpportunityFilters = {
 export function HomePage() {
   const { selectedCityId } = useCity()
   const { session } = useAuth()
-  const { hasApplied, addApplication } = useApplications()
+  const { hasApplied } = useApplications()
 
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map')
   const [searchInput, setSearchInput] = useState('')
@@ -236,13 +236,6 @@ export function HomePage() {
         candidateUserId: session.user.id,
         vacancyId: detail.id,
         initiatorRole: 1,
-      })
-
-      addApplication({
-        id: detail.id,
-        title: detail.title,
-        company: detail.company,
-        location: detail.location,
       })
 
       setActionError(false)

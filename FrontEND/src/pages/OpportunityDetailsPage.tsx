@@ -40,7 +40,7 @@ function buildMapLink(opportunity: OpportunityDetail) {
 export function OpportunityDetailsPage() {
   const { id } = useParams()
   const { session } = useAuth()
-  const { hasApplied, addApplication } = useApplications()
+  const { hasApplied } = useApplications()
 
   const [opportunity, setOpportunity] = useState<OpportunityDetail | null>(null)
   const [similarOpportunities, setSimilarOpportunities] = useState<Opportunity[]>([])
@@ -188,13 +188,6 @@ export function OpportunityDetailsPage() {
         candidateUserId: session.user.id,
         vacancyId: opportunity.id,
         initiatorRole: 1,
-      })
-
-      addApplication({
-        id: opportunity.id,
-        title: opportunity.title,
-        company: opportunity.company,
-        location: opportunity.location,
       })
 
       setActionError(false)
