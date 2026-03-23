@@ -1,5 +1,6 @@
 import { Building2, Clock3, Globe, Mail, MapPin, MessageSquare, Phone, ShieldCheck, UploadCloud } from 'lucide-react'
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fetchCities, fetchLocations, fetchTags } from '../../api/catalog'
 import { fetchEmployerChats } from '../../api/chats'
 import {
@@ -201,6 +202,7 @@ function opportunityTypeLabel(value: EmployerOpportunity['type']) {
 }
 
 export function EmployerDashboardPage() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState<EmployerTabId>('overview')
   const [company, setCompany] = useState<EmployerCompany | null>(null)
   const [companyMissing, setCompanyMissing] = useState(false)
@@ -461,6 +463,15 @@ export function EmployerDashboardPage() {
       status: companyStatusText,
     }
   }, [applicationChats, applications.length, companyStatusText, opportunities.length])
+
+  function onTabSelect(nextTab: EmployerTabId) {
+    if (nextTab === 'create') {
+      navigate('/vacancy-flow/1?type=vacancy')
+      return
+    }
+
+    setTab(nextTab)
+  }
 
   function onCreateFormChange(event: ChangeEvent<HTMLInputElement>) {
     const { name, value } = event.target
@@ -840,7 +851,7 @@ export function EmployerDashboardPage() {
         setEditingVacancyId(null)
       }
 
-      setTab('create')
+      navigate(`/vacancy-flow/1?type=${item.source === 'vacancy' ? 'vacancy' : 'event'}`)
     } catch (editError) {
       setError(editError instanceof Error ? editError.message : 'Не удалось загрузить данные для редактирования.')
     } finally {
@@ -1098,7 +1109,7 @@ export function EmployerDashboardPage() {
             <>
               <nav className="card seeker-profile-tabs">
                 {employerTabs.map((item) => (
-                  <button key={item.id} type="button" className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)}>
+                  <button key={item.id} type="button" className={tab === item.id ? 'is-active' : ''} onClick={() => onTabSelect(item.id)}>
                     {item.label}
                   </button>
                 ))}
@@ -1226,6 +1237,17 @@ export function EmployerDashboardPage() {
 
               {tab === 'create' ? <section className="dashboard-section card seeker-profile-panel">
         <h2>Создать возможность</h2>
+        <div className="employer-flow-entry">
+          <p>Для создания вакансий и мероприятий используйте новый мастер публикации.</p>
+          <div className="favorite-card__actions">
+            <button type="button" className="btn btn--primary" onClick={() => navigate('/vacancy-flow/1?type=vacancy')}>
+              Перейти к созданию вакансии
+            </button>
+            <button type="button" className="btn btn--secondary" onClick={() => navigate('/vacancy-flow/1?type=event')}>
+              Перейти к созданию мероприятия
+            </button>
+          </div>
+        </div>
         <div className="form-grid form-grid--two">
           <form className="form-grid" onSubmit={onCreateVacancy}>
             <h3>Новая вакансия</h3>

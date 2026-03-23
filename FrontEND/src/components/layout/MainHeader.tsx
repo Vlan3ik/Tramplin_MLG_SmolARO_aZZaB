@@ -1,7 +1,8 @@
-import { LogOut } from 'lucide-react'
+﻿import { LogOut, User } from 'lucide-react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import logoUrl from '../../assets/logo.svg'
 import { useAuth } from '../../hooks/useAuth'
+import { getDefaultRouteForRole } from '../../utils/auth'
 
 const menuItems: Array<{ label: string; to?: string }> = [
   { label: 'Вакансии', to: '/' },
@@ -12,7 +13,7 @@ const menuItems: Array<{ label: string; to?: string }> = [
 
 export function MainHeader() {
   const navigate = useNavigate()
-  const { isAuthenticated, signOut } = useAuth()
+  const { isAuthenticated, session, signOut } = useAuth()
 
   async function handleLogout() {
     await signOut()
@@ -42,10 +43,16 @@ export function MainHeader() {
 
         <div className="main-header__actions">
           {isAuthenticated ? (
-            <button type="button" className="btn btn--ghost" onClick={handleLogout}>
-              <LogOut size={16} />
-              Выйти
-            </button>
+            <>
+              <Link to={getDefaultRouteForRole(session?.platformRole ?? null)} className="btn btn--ghost">
+                <User size={16} />
+                Профиль
+              </Link>
+              <button type="button" className="btn btn--ghost" onClick={handleLogout}>
+                <LogOut size={16} />
+                Выйти
+              </button>
+            </>
           ) : (
             <>
               <Link to="/login" className="btn btn--ghost">

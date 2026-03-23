@@ -29,8 +29,6 @@ function App() {
           <Route path="opportunity/:id" element={<OpportunityDetailsPage />} />
           <Route path="companies" element={<CompaniesListPage />} />
           <Route path="company/:id" element={<CompanyPage />} />
-          <Route path="vacancy-flow" element={<VacancyFlowPage />} />
-          <Route path="vacancy-flow/:step" element={<VacancyFlowPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
 
@@ -42,6 +40,8 @@ function App() {
         <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Employer]} />}>
           <Route path="verification/employer" element={<EmployerVerificationPage />} />
           <Route path="dashboard/employer" element={<EmployerDashboardPage />} />
+          <Route path="vacancy-flow" element={<VacancyFlowPage />} />
+          <Route path="vacancy-flow/:step" element={<VacancyFlowPage />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Seeker]} />}>
