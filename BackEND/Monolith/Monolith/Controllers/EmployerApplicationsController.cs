@@ -161,18 +161,34 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
             .Select(x => new ResumeLinkDto(x.Id, x.Kind, x.Url, x.Label))
             .ToListAsync(cancellationToken);
 
-        var candidateResume = candidateProfile is null
+        var hasResumeData =
+            candidateProfile is not null ||
+            resume is not null ||
+            skills.Count > 0 ||
+            projects.Count > 0 ||
+            education.Count > 0 ||
+            links.Count > 0;
+
+        var fallbackNameParts = application.CandidateUser.DisplayName
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var fallbackFirstName = fallbackNameParts.Length > 0 ? fallbackNameParts[0] : application.CandidateUser.Username;
+        var fallbackLastName = fallbackNameParts.Length > 1 ? fallbackNameParts[^1] : string.Empty;
+        var fallbackMiddleName = fallbackNameParts.Length > 2
+            ? string.Join(' ', fallbackNameParts.Skip(1).Take(fallbackNameParts.Length - 2))
+            : null;
+
+        var candidateResume = !hasResumeData
             ? null
             : new ResumeDetailDto(
-                candidateProfile.UserId,
+                candidateProfile?.UserId ?? application.CandidateUserId,
                 application.CandidateUser.Username,
-                candidateProfile.FirstName,
-                candidateProfile.LastName,
-                candidateProfile.MiddleName,
-                candidateProfile.BirthDate,
-                candidateProfile.Gender,
-                candidateProfile.Phone,
-                candidateProfile.About,
+                string.IsNullOrWhiteSpace(candidateProfile?.FirstName) ? fallbackFirstName : candidateProfile.FirstName,
+                string.IsNullOrWhiteSpace(candidateProfile?.LastName) ? fallbackLastName : candidateProfile.LastName,
+                candidateProfile?.MiddleName ?? fallbackMiddleName,
+                candidateProfile?.BirthDate,
+                candidateProfile?.Gender ?? CandidateGender.Unknown,
+                candidateProfile?.Phone,
+                candidateProfile?.About,
                 application.CandidateUser.AvatarUrl,
                 resume?.Headline,
                 resume?.DesiredPosition,
