@@ -1,9 +1,11 @@
 ﻿
-import { CalendarClock, MapPin, Phone, Settings2, UploadCloud, X } from 'lucide-react'
+import { Building2, CalendarClock, MapPin, UploadCloud, Users, X } from 'lucide-react'
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { createApplication } from '../../api/applications'
 import { fetchTags } from '../../api/catalog'
+import { fetchMyChats } from '../../api/chats'
+import { createContactRequest, deleteContact, fetchIncomingContactRequests, fetchMyContacts, fetchOutgoingContactRequests } from '../../api/contacts'
 import { fetchSeekerProfile, fetchSeekerResume, updateSeekerProfile, updateSeekerResume } from '../../api/me'
 import { uploadMyAvatar } from '../../api/media'
 import { fetchOpportunityById, fetchOpportunityDetailById, participateInOpportunity } from '../../api/opportunities'
@@ -13,12 +15,16 @@ import { TopServiceBar } from '../../components/layout/TopServiceBar'
 import { useApplications } from '../../hooks/useApplications'
 import { useAuth } from '../../hooks/useAuth'
 import type { TagListItem } from '../../types/catalog'
+import type { ContactRequest, ContactUser } from '../../types/contact'
 import type { SeekerProfile } from '../../types/me'
 import type { Opportunity } from '../../types/opportunity'
 import type { SeekerResume } from '../../types/resume'
 import { getFavoriteOpportunityIds, subscribeToFavoriteOpportunities } from '../../utils/favorites'
 
 type TabId = 'responses' | 'favorites' | 'resume'
+type SubscriptionTabId = 'seekers' | 'employers'
+type ProfilePanelId = 'portfolio' | 'info' | 'subscriptions'
+type FollowMode = 'subscriptions' | 'subscribers'
 
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'responses', label: 'Отклики' },
@@ -27,6 +33,36 @@ const tabs: Array<{ id: TabId; label: string }> = [
 ]
 
 const resumeSteps = ['Основная информация', 'Скиллы', 'Портфолио', 'Образование', 'Ссылки на соцсети']
+const subscriptionTabs: Array<{ id: SubscriptionTabId; label: string }> = [
+  { id: 'seekers', label: 'Соискатели' },
+  { id: 'employers', label: 'Работодатели' },
+]
+const profilePanels: Array<{ id: ProfilePanelId; label: string }> = [
+  { id: 'portfolio', label: 'Портфолио' },
+  { id: 'info', label: 'Информация' },
+  { id: 'subscriptions', label: 'Подписки' },
+]
+
+const subscriptionPreviewPhotos = [
+  'https://placehold.co/300x100?text=Project+1',
+  'https://placehold.co/300x100?text=Project+2',
+  'https://placehold.co/300x100?text=Project+3',
+  'https://placehold.co/300x100?text=Project+4',
+  'https://placehold.co/300x100?text=Project+5',
+  'https://placehold.co/300x100?text=Project+6',
+]
+const portfolioMockPhotos = [
+  'https://placehold.co/300x300?text=Work+1',
+  'https://placehold.co/300x300?text=Work+2',
+  'https://placehold.co/300x300?text=Work+3',
+  'https://placehold.co/300x300?text=Work+4',
+  'https://placehold.co/300x300?text=Work+5',
+  'https://placehold.co/300x300?text=Work+6',
+  'https://placehold.co/300x300?text=Work+7',
+  'https://placehold.co/300x300?text=Work+8',
+  'https://placehold.co/300x300?text=Work+9',
+  'https://placehold.co/300x300?text=Work+10',
+]
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || 'http://169.254.185.29:1488/api'
 const API_ORIGIN = (() => {
@@ -151,6 +187,14 @@ export function SeekerDashboardPage() {
   const [favoriteOpportunities, setFavoriteOpportunities] = useState<Opportunity[]>([])
   const [favoriteIds, setFavoriteIds] = useState<number[]>(() => getFavoriteOpportunityIds())
   const [applyingIds, setApplyingIds] = useState<Record<number, boolean>>({})
+  const [contacts, setContacts] = useState<ContactUser[]>([])
+  const [applicationChatTitles, setApplicationChatTitles] = useState<string[]>([])
+  const [incomingRequests, setIncomingRequests] = useState<ContactRequest[]>([])
+  const [outgoingRequests, setOutgoingRequests] = useState<ContactRequest[]>([])
+  const [subscriptionsTab, setSubscriptionsTab] = useState<SubscriptionTabId>('seekers')
+  const [subscriptionActionLoading, setSubscriptionActionLoading] = useState<Record<number, boolean>>({})
+  const [profilePanel, setProfilePanel] = useState<ProfilePanelId>('portfolio')
+  const [followMode, setFollowMode] = useState<FollowMode>('subscriptions')
 
   const [profileForm, setProfileForm] = useState({ firstName: '', lastName: '', middleName: '', phone: '', avatarUrl: '' })
   const [projectForm, setProjectForm] = useState(initialProject)
@@ -163,6 +207,7 @@ export function SeekerDashboardPage() {
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [loadingResume, setLoadingResume] = useState(true)
   const [loadingFavorites, setLoadingFavorites] = useState(true)
+  const [loadingSubscriptions, setLoadingSubscriptions] = useState(true)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingResume, setSavingResume] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -171,12 +216,14 @@ export function SeekerDashboardPage() {
   const [profileError, setProfileError] = useState('')
   const [resumeError, setResumeError] = useState('')
   const [favoritesError, setFavoritesError] = useState('')
+  const [subscriptionsError, setSubscriptionsError] = useState('')
   const [success, setSuccess] = useState('')
 
   useEffect(() => {
     if (!session?.accessToken) {
       setLoadingProfile(false)
       setLoadingResume(false)
+      setLoadingSubscriptions(false)
       setProfileError('Не удалось получить токен авторизации.')
       return
     }
@@ -186,13 +233,19 @@ export function SeekerDashboardPage() {
     async function loadData() {
       setProfileError('')
       setResumeError('')
+      setSubscriptionsError('')
       setLoadingProfile(true)
       setLoadingResume(true)
+      setLoadingSubscriptions(true)
 
-      const [profileResult, resumeResult, tagsResult] = await Promise.allSettled([
+      const [profileResult, resumeResult, tagsResult, contactsResult, incomingRequestsResult, outgoingRequestsResult, chatsResult] = await Promise.allSettled([
         fetchSeekerProfile(controller.signal),
         fetchSeekerResume(controller.signal),
         fetchTags(controller.signal),
+        fetchMyContacts(controller.signal),
+        fetchIncomingContactRequests(controller.signal),
+        fetchOutgoingContactRequests(controller.signal),
+        fetchMyChats(controller.signal),
       ])
 
       if (controller.signal.aborted) {
@@ -242,9 +295,32 @@ export function SeekerDashboardPage() {
         setTags(tagsResult.value)
       }
 
+      if (contactsResult.status === 'fulfilled') {
+        setContacts(contactsResult.value)
+      } else if (!isAbortError(contactsResult.reason)) {
+        setSubscriptionsError(contactsResult.reason instanceof Error ? contactsResult.reason.message : 'Ошибка загрузки подписок.')
+      }
+
+      if (incomingRequestsResult.status === 'fulfilled') {
+        setIncomingRequests(incomingRequestsResult.value)
+      }
+
+      if (outgoingRequestsResult.status === 'fulfilled') {
+        setOutgoingRequests(outgoingRequestsResult.value)
+      }
+
+      if (chatsResult.status === 'fulfilled') {
+        const titles = chatsResult.value
+          .filter((chat) => chat.type === 2)
+          .map((chat) => chat.title?.trim() ?? '')
+          .filter((value) => value.length > 0)
+        setApplicationChatTitles(Array.from(new Set(titles)))
+      }
+
       if (!controller.signal.aborted) {
         setLoadingProfile(false)
         setLoadingResume(false)
+        setLoadingSubscriptions(false)
       }
     }
 
@@ -306,24 +382,21 @@ export function SeekerDashboardPage() {
   const avatarFormUrl = useMemo(() => resolveAvatarUrl(profileForm.avatarUrl), [profileForm.avatarUrl])
   const displayName = useMemo(() => [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || 'Профиль соискателя', [profile])
   const avatarFallback = useMemo(() => (profile?.firstName?.charAt(0) || profile?.lastName?.charAt(0) || 'P').toUpperCase(), [profile])
+  const contactUserIds = useMemo(() => new Set(contacts.map((item) => item.userId)), [contacts])
+  const outgoingRequestIds = useMemo(() => outgoingRequests.map((item) => item.receiver.userId), [outgoingRequests])
+  const incomingRequestIds = useMemo(() => incomingRequests.map((item) => item.sender.userId), [incomingRequests])
+  const subscriptionsCount = contacts.length + outgoingRequests.length
+  const subscribersCount = contacts.length + incomingRequests.length
+  const isForeignProfile = useMemo(() => {
+    const currentUsername = session?.user?.username?.trim().toLowerCase()
+    const profileUsername = profile?.username?.trim().toLowerCase()
 
-  const completion = useMemo(() => {
-    const checks = [
-      Boolean(profile?.firstName),
-      Boolean(profile?.lastName),
-      Boolean(profile?.phone),
-      Boolean(profile?.avatarUrl),
-      Boolean(resume.headline),
-      Boolean(resume.desiredPosition),
-      Boolean(resume.summary),
-      resume.skills.length > 0,
-      resume.projects.length > 0,
-      resume.education.length > 0,
-      resume.links.length > 0,
-    ]
-    const done = checks.filter(Boolean).length
-    return { done, total: checks.length, percent: Math.round((done / checks.length) * 100) }
-  }, [profile, resume])
+    if (!currentUsername || !profileUsername) {
+      return false
+    }
+
+    return currentUsername !== profileUsername
+  }, [profile?.username, session?.user?.username])
 
   const responsesStats = useMemo(
     () => ({
@@ -334,6 +407,73 @@ export function SeekerDashboardPage() {
     }),
     [applications],
   )
+
+  const seekerSubscriptions = useMemo(
+    () => {
+      const base = contacts.map((contact, index) => {
+        const previews = subscriptionPreviewPhotos.slice(index % 3, (index % 3) + 3)
+        return {
+          id: String(contact.userId),
+          userId: contact.userId,
+          title: contact.username?.trim() || `Пользователь #${contact.userId}`,
+          subtitle: 'Соискатель',
+          description: 'Контакт из вашей сети.',
+          avatarUrl: resolveAvatarUrl(contact.avatarUrl),
+          previews,
+        }
+      }),
+      pending =
+        followMode === 'subscriptions'
+          ? outgoingRequests
+              .filter((item) => !contactUserIds.has(item.receiver.userId))
+              .map((item, index) => ({
+                id: `pending-out-${item.id}`,
+                userId: item.receiver.userId,
+                title: item.receiver.username?.trim() || `Пользователь #${item.receiver.userId}`,
+                subtitle: 'Соискатель',
+                description: 'Исходящая заявка на контакт.',
+                avatarUrl: resolveAvatarUrl(item.receiver.avatarUrl),
+                previews: subscriptionPreviewPhotos.slice(index % 3, (index % 3) + 3),
+              }))
+          : incomingRequests
+              .filter((item) => !contactUserIds.has(item.sender.userId))
+              .map((item, index) => ({
+                id: `pending-in-${item.id}`,
+                userId: item.sender.userId,
+                title: item.sender.username?.trim() || `Пользователь #${item.sender.userId}`,
+                subtitle: 'Соискатель',
+                description: 'Входящая заявка на контакт.',
+                avatarUrl: resolveAvatarUrl(item.sender.avatarUrl),
+                previews: subscriptionPreviewPhotos.slice(index % 3, (index % 3) + 3),
+              }))
+
+      return [...base, ...pending]
+    },
+    [contactUserIds, contacts, followMode, incomingRequests, outgoingRequests],
+  )
+
+  const employerSubscriptions = useMemo(() => {
+    return applicationChatTitles.map((company, index) => ({
+      id: `chat-company-${index}`,
+      userId: null,
+      title: company,
+      subtitle: 'Компания',
+      description: 'Компания из вашего application-чата.',
+      avatarUrl: null,
+      previews: subscriptionPreviewPhotos.slice(index % 3, (index % 3) + 3),
+    }))
+  }, [applicationChatTitles])
+
+  const portfolioItems = useMemo(() => {
+    return resume.projects.map((project, index) => ({
+      id: `resume-${project.id}`,
+      image: portfolioMockPhotos[index % portfolioMockPhotos.length],
+      title: project.title || 'Проект без названия',
+      author: displayName,
+      role: project.role || resume.desiredPosition || 'Соискатель',
+      description: project.description || resume.summary || 'Описание проекта пока не добавлено.',
+    }))
+  }, [displayName, resume.desiredPosition, resume.projects, resume.summary])
 
   async function onApplyFromFavorites(opportunityId: number) {
     if (!session?.accessToken || !session.user?.id) {
@@ -480,41 +620,191 @@ export function SeekerDashboardPage() {
     }
   }
 
+  async function onToggleSubscription(userId: number | null) {
+    if (!userId) {
+      return
+    }
+
+    setSubscriptionsError('')
+    setSubscriptionActionLoading((current) => ({ ...current, [userId]: true }))
+
+    try {
+      const isContact = contactUserIds.has(userId)
+      const hasPendingOutgoing = outgoingRequestIds.includes(userId)
+
+      if (isContact) {
+        await deleteContact(userId)
+      } else if (!hasPendingOutgoing) {
+        await createContactRequest(userId)
+      }
+
+      const [contactsList, outgoingRequestsList, incomingRequestsList] = await Promise.all([
+        fetchMyContacts(),
+        fetchOutgoingContactRequests(),
+        fetchIncomingContactRequests(),
+      ])
+      setContacts(contactsList)
+      setOutgoingRequests(outgoingRequestsList)
+      setIncomingRequests(incomingRequestsList)
+    } catch (error) {
+      setSubscriptionsError(error instanceof Error ? error.message : 'Не удалось обновить подписку.')
+    } finally {
+      setSubscriptionActionLoading((current) => ({ ...current, [userId]: false }))
+    }
+  }
+
   return (
     <div className="app-shell">
       <TopServiceBar />
       <MainHeader />
       <main>
         <section className="container seeker-profile-page">
-          <header className="card seeker-profile-hero">
-            <div className="seeker-profile-hero__avatar">{avatarUrl ? <img src={avatarUrl} alt={displayName} /> : <span>{avatarFallback}</span>}</div>
-            <div className="seeker-profile-hero__content">
-              <h1>{displayName}</h1>
-              <p>Личный кабинет соискателя: профиль, отклики и резюме.</p>
-              <div className="profile-completion">
-                <div className="profile-completion__head">
-                  <strong>Заполнение профиля: {completion.percent}%</strong>
-                  <span>{completion.done}/{completion.total}</span>
-                </div>
-                <div className="profile-completion__track"><span style={{ width: `${completion.percent}%` }} /></div>
-              </div>
-              <div className="seeker-profile-hero__meta">
-                <span><Phone size={14} />{profile?.phone ? formatPhone(profile.phone) : 'Телефон не указан'}</span>
-              </div>
+          <header className="seeker-profile-hero-exact">
+            <p className="seeker-profile-hero-exact__position">{resume.desiredPosition || resume.headline || 'Frontend Нижний тагил'}</p>
+            <div className="seeker-profile-hero-exact__avatar">{avatarUrl ? <img src={avatarUrl} alt={displayName} /> : <span>{avatarFallback}</span>}</div>
+            <h1 className="seeker-profile-hero-exact__name">{displayName}</h1>
+
+            <div className="seeker-profile-hero-exact__socials">
+              <img src="/Yandex_Zen_logo_icon 1.svg" alt="Yandex Zen" />
+              <img src="/Rutube_icon 1.svg" alt="Rutube" />
+              <img src="/Логотип_MAX 1.svg" alt="MAX" />
+              <img src="/Group 35.svg" alt="Group 35" />
             </div>
-            <div className="seeker-profile-hero__actions">
-              <button type="button" className="btn btn--primary" onClick={() => setIsSettingsOpen(true)} disabled={!profile || loadingProfile}>
-                <Settings2 size={16} />Редактировать профиль
-              </button>
-            </div>
+
+            {isForeignProfile ? <button type="button" className="seeker-profile-hero-exact__subscribe">Подписаться</button> : null}
           </header>
 
           {success ? <div className="auth-feedback seeker-profile-feedback">{success}</div> : null}
           {profileError ? <div className="auth-feedback auth-feedback--error">{profileError}</div> : null}
+          {subscriptionsError ? <div className="auth-feedback auth-feedback--error">{subscriptionsError}</div> : null}
 
-          {loadingProfile ? (
+          <nav className="seeker-profile-mode-switch">
+            {profilePanels.map((item) => (
+              <button key={item.id} type="button" className={profilePanel === item.id ? 'is-active' : ''} onClick={() => setProfilePanel(item.id)}>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          {profilePanel === 'portfolio' ? (
+            <section className="portfolio-grid">
+              {!portfolioItems.length ? <p>Портфолио пока пусто. Добавьте проекты в резюме.</p> : null}
+              {portfolioItems.map((item) => (
+                <article key={item.id} className="portfolio-card">
+                  <img src={item.image} alt={item.title} />
+                  <p className="portfolio-card__description">{item.title}</p>
+                  <div className="portfolio-card__author">
+                    <div className="portfolio-card__avatar">{avatarUrl ? <img src={avatarUrl} alt={item.author} /> : <span>{avatarFallback}</span>}</div>
+                    <div>
+                      <strong>{item.author}</strong>
+                      <span>{item.role}</span>
+                    </div>
+                  </div>
+                  <p>{item.description}</p>
+                </article>
+              ))}
+            </section>
+          ) : null}
+
+          {profilePanel === 'subscriptions' ? (
+          <section className="subscriptions-block">
+            <div className="subscriptions-block__toolbar">
+              <div className="subscriptions-block__counters">
+                <button
+                  type="button"
+                  className={followMode === 'subscriptions' ? 'subscriptions-pill subscriptions-pill--active' : 'subscriptions-pill'}
+                  onClick={() => setFollowMode('subscriptions')}
+                >
+                  {subscriptionsCount} подписок
+                </button>
+                <button
+                  type="button"
+                  className={followMode === 'subscribers' ? 'subscriptions-pill subscriptions-pill--active' : 'subscriptions-pill'}
+                  onClick={() => setFollowMode('subscribers')}
+                >
+                  {subscribersCount} подписчиков
+                </button>
+              </div>
+              <div className="subscriptions-block__type-tabs">
+                {subscriptionTabs.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={subscriptionsTab === item.id ? 'subscriptions-pill subscriptions-pill--active' : 'subscriptions-pill'}
+                    onClick={() => setSubscriptionsTab(item.id)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {loadingSubscriptions ? <p>Загружаем подписки...</p> : null}
+
+            {!loadingSubscriptions ? (
+                <div className="subscriptions-list">
+                  {(subscriptionsTab === 'seekers' ? seekerSubscriptions : employerSubscriptions).map((item) => (
+                    <article key={item.id} className="subscriptions-row">
+                      <div className="subscriptions-row__profile">
+                        <div className="subscriptions-row__avatar">
+                          {item.avatarUrl ? <img src={item.avatarUrl} alt={item.title} /> : <span>{item.title.charAt(0).toUpperCase()}</span>}
+                      </div>
+                      <div className="subscriptions-row__content">
+                        <h3>{item.title}</h3>
+                        <p className="subscriptions-row__subtitle">
+                          {subscriptionsTab === 'seekers' ? <Users size={14} /> : <Building2 size={14} />}
+                          {item.subtitle}
+                        </p>
+                        <p>{item.description}</p>
+                      </div>
+                    </div>
+                      <div className="subscriptions-row__previews">
+                        {item.previews.map((preview) => (
+                          <img key={`${item.id}-${preview}`} src={preview} alt={item.title} />
+                        ))}
+                      </div>
+                      <div className="subscriptions-row__actions">
+                        {(() => {
+                          const isSeeker = subscriptionsTab === 'seekers'
+                          const userId = item.userId
+                          const isContact = typeof userId === 'number' ? contactUserIds.has(userId) : false
+                          const hasPendingOutgoing = typeof userId === 'number' ? outgoingRequestIds.includes(userId) : false
+                          const hasPendingIncoming = typeof userId === 'number' ? incomingRequestIds.includes(userId) : false
+                          const isLoading = typeof userId === 'number' ? Boolean(subscriptionActionLoading[userId]) : false
+                          const isDisabled = !isSeeker || userId == null || hasPendingOutgoing || hasPendingIncoming || isLoading
+
+                          const label = isLoading
+                            ? 'Обновляем...'
+                            : hasPendingOutgoing
+                              ? 'Запрос отправлен'
+                              : hasPendingIncoming
+                                ? 'Входящая заявка'
+                              : isContact
+                                ? 'Вы подписаны'
+                                : 'Подписаться'
+
+                          return (
+                            <button type="button" className="subscription-follow-btn" disabled={isDisabled} onClick={() => void onToggleSubscription(userId)}>
+                              {label}
+                            </button>
+                          )
+                        })()}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
+
+            {!loadingSubscriptions && !(subscriptionsTab === 'seekers' ? seekerSubscriptions.length : employerSubscriptions.length) ? (
+              <p>В этом разделе пока нет данных.</p>
+            ) : null}
+          </section>
+          ) : null}
+
+          {profilePanel === 'info' && loadingProfile ? (
             <section className="card seeker-profile-state"><p>Загружаем профиль...</p></section>
-          ) : (
+          ) : null}
+          {profilePanel === 'info' ? (
             <>
               <nav className="card seeker-profile-tabs">
                 {tabs.map((item) => (
@@ -710,7 +1000,7 @@ export function SeekerDashboardPage() {
                 </section>
               ) : null}
             </>
-          )}
+          ) : null}
         </section>
       </main>
       <Footer />
