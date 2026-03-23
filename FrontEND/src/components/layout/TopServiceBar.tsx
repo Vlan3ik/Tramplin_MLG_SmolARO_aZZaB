@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapPin, Search, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useCity } from '../../contexts/CityContext'
@@ -131,14 +131,14 @@ export function TopServiceBar() {
             ) : null}
           </div>
 
-          <div className="service-bar__audience" aria-label="Роли платформы">
+          {/* <div className="service-bar__audience" aria-label="Роли платформы">
             <button type="button" className={activeAudience === 'seekers' ? 'is-active' : ''}>
               Соискателям
             </button>
             <button type="button" className={activeAudience === 'employers' ? 'is-active' : ''}>
               Работодателям
             </button>
-          </div>
+          </div> */}
 
           {errorMessage ? <span className="service-bar__city-error">{errorMessage}</span> : null}
         </div>

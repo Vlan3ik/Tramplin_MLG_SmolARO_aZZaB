@@ -495,10 +495,10 @@ export function CuratorDashboardPage() {
               <span><FileWarning size={14} />{vacanciesTotal + opportunitiesTotal} карточек</span>
             </div>
           </div>
-          <div className="seeker-profile-hero__actions">
+          {/* <div className="seeker-profile-hero__actions">
             <button type="button" className="btn btn--ghost" onClick={() => void loadUsers()}>Обновить пользователей</button>
             <button type="button" className="btn btn--ghost" onClick={() => void loadCompanies()}>Обновить компании</button>
-          </div>
+          </div> */}
         </section>
 
         {loading ? <section className="dashboard-section card seeker-profile-panel"><p>Загружаем данные кабинета...</p></section> : null}
