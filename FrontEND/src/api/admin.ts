@@ -442,6 +442,10 @@ export function updateAdminOpportunity(id: number, payload: AdminOpportunityUpse
   return putJson<AdminOpportunityApi, AdminOpportunityUpsertApiRequest>(`/admin/opportunities/${id}`, mapOpportunityUpsertRequest(payload))
 }
 
+export function updateAdminOpportunityStatus(id: number, status: number) {
+  return patchJson<unknown, { status: number }>(`/admin/opportunities/${id}/status`, { status })
+}
+
 export function deleteAdminOpportunity(id: number) {
   return deleteJson<unknown>(`/admin/opportunities/${id}`)
 }

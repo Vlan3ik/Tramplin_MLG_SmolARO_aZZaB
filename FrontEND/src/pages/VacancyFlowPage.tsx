@@ -282,7 +282,7 @@ export function VacancyFlowPage() {
   }, [eventChatEnabled])
 
   useEffect(() => {
-    if (!success || currentStep !== 5 || !isVacancyFlow) {
+    if (!success || currentStep !== 5) {
       return
     }
 
@@ -293,7 +293,7 @@ export function VacancyFlowPage() {
     return () => {
       window.clearTimeout(timer)
     }
-  }, [currentStep, isVacancyFlow, navigate, success])
+  }, [currentStep, navigate, success])
 
   const locationOptions = useMemo(() => {
     return isVacancyFlow ? vacancyLocations : eventLocations
@@ -807,7 +807,7 @@ export function VacancyFlowPage() {
                     ? 'Проверьте заполнение вакансии и отправьте ее на модерацию.'
                     : 'Проверьте заполнение мероприятия и отправьте его на модерацию.'}
                 </p>
-                {isVacancyFlow && success ? <p className="vf-note">Через несколько секунд вы вернетесь на главную страницу.</p> : null}
+                {success ? <p className="vf-note">Через несколько секунд вы вернетесь на главную страницу.</p> : null}
                 <img className="vf-congrats__image" src="/гордый чел стоит.svg" alt="Иллюстрация публикации" />
                 <div className="vf-actions">
                   <button type="button" className="vf-btn vf-btn--secondary" onClick={prevStep} disabled={isSubmitting}>

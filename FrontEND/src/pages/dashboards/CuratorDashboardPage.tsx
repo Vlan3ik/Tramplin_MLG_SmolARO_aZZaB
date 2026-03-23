@@ -13,6 +13,7 @@ import {
   fetchAdminVacancies,
   rejectAdminCompany,
   updateAdminCompany,
+  updateAdminOpportunityStatus,
   updateAdminUser,
   updateAdminVacancyStatus,
   verifyAdminCompany,
@@ -112,6 +113,7 @@ export function CuratorDashboardPage() {
   const [savingCompany, setSavingCompany] = useState(false)
   const [processingCompanyId, setProcessingCompanyId] = useState<number | null>(null)
   const [processingVacancyId, setProcessingVacancyId] = useState<number | null>(null)
+  const [processingOpportunityId, setProcessingOpportunityId] = useState<number | null>(null)
 
   const [editingUserId, setEditingUserId] = useState<number | null>(null)
   const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null)
@@ -449,6 +451,24 @@ export function CuratorDashboardPage() {
     }
   }
 
+  async function onChangeOpportunityStatus(item: AdminOpportunity, nextStatus: number) {
+    if (item.status === nextStatus) return
+    clearMessages()
+    setProcessingOpportunityId(item.id)
+    const previousStatus = item.status
+    setOpportunities((state) => state.map((opportunity) => (opportunity.id === item.id ? { ...opportunity, status: nextStatus } : opportunity)))
+
+    try {
+      await updateAdminOpportunityStatus(item.id, nextStatus)
+      setSuccess('Статус мероприятия обновлен.')
+    } catch (updateError) {
+      setOpportunities((state) => state.map((opportunity) => (opportunity.id === item.id ? { ...opportunity, status: previousStatus } : opportunity)))
+      setError(updateError instanceof Error ? updateError.message : 'Не удалось обновить статус мероприятия.')
+    } finally {
+      setProcessingOpportunityId(null)
+    }
+  }
+
   async function onVerifyCompany(item: AdminCompany) {
     clearMessages()
     setProcessingCompanyId(item.id)
@@ -721,6 +741,17 @@ export function CuratorDashboardPage() {
                     <span>{new Date(item.publishAt).toLocaleDateString('ru-RU')}</span>
                   </div>
                   <div className="favorite-card__actions">
+                    <select
+                      value={item.status}
+                      onChange={(event) => void onChangeOpportunityStatus(item, Number(event.target.value))}
+                      disabled={processingOpportunityId === item.id}
+                    >
+                      {Object.entries(moderationStatusLabel).map(([value, label]) => (
+                        <option key={value} value={Number(value)}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
                     <button type="button" className="btn btn--danger" onClick={() => void onDeleteOpportunity(item)}>Удалить</button>
                   </div>
                 </article>

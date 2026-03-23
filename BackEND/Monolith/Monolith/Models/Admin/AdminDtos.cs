@@ -67,6 +67,8 @@ public record AdminOpportunityUpsertRequest(
     DateTimeOffset PublishAt,
     DateTimeOffset? EventDate);
 
+public record AdminOpportunityStatusUpdateRequest(OpportunityStatus Status);
+
 public record AdminVacancyListItemDto(
     long Id,
     long CompanyId,

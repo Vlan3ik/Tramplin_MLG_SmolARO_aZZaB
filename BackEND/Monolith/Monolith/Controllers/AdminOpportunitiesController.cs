@@ -113,6 +113,23 @@ public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBa
     /// <param name="id">Идентификатор возможности.</param>
     /// <param name="cancellationToken">Токен отмены операции удаления.</param>
     /// <returns>Пустой ответ при успешном удалении.</returns>
+    /// <param name="request">Новый статус мероприятия.</param>
+    [HttpPatch("{id:long}/status")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateStatus(long id, AdminOpportunityStatusUpdateRequest request, CancellationToken cancellationToken)
+    {
+        var opportunity = await dbContext.Opportunities.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (opportunity is null)
+        {
+            return this.ToNotFoundError("admin.opportunities.not_found", "Opportunity not found.");
+        }
+
+        opportunity.Status = request.Status;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
