@@ -95,16 +95,33 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             return this.ToNotFoundError("me.profile.not_found", "Профиль соискателя не найден.");
         }
 
-        profile.FirstName = request.FirstName.Trim();
-        profile.LastName = request.LastName.Trim();
+        var firstName = request.FirstName?.Trim();
+        var lastName = request.LastName?.Trim();
+        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
+        {
+            return this.ToBadRequestError("me.profile.invalid_name", "Имя и фамилия обязательны.");
+        }
+
+        if (request.BirthDate.HasValue && request.BirthDate.Value > DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            return this.ToBadRequestError("me.profile.invalid_birth_date", "Дата рождения не может быть в будущем.");
+        }
+
+        if (request.Gender.HasValue && !Enum.IsDefined(typeof(CandidateGender), request.Gender.Value))
+        {
+            return this.ToBadRequestError("me.profile.invalid_gender", "Указан некорректный пол.");
+        }
+
+        profile.FirstName = firstName;
+        profile.LastName = lastName;
         profile.User.DisplayName = $"{profile.FirstName} {profile.LastName}".Trim();
-        profile.MiddleName = request.MiddleName?.Trim();
+        profile.MiddleName = string.IsNullOrWhiteSpace(request.MiddleName) ? null : request.MiddleName.Trim();
         profile.BirthDate = request.BirthDate;
         profile.Gender = request.Gender ?? CandidateGender.Unknown;
-        profile.Phone = request.Phone?.Trim();
-        profile.About = request.About?.Trim();
-        profile.AvatarUrl = request.AvatarUrl?.Trim();
-        profile.User.AvatarUrl = request.AvatarUrl?.Trim();
+        profile.Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+        profile.About = string.IsNullOrWhiteSpace(request.About) ? null : request.About.Trim();
+        profile.AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim();
+        profile.User.AvatarUrl = profile.AvatarUrl;
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

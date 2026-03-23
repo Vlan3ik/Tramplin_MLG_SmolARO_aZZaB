@@ -16,7 +16,7 @@ import { useApplications } from '../../hooks/useApplications'
 import { useAuth } from '../../hooks/useAuth'
 import type { TagListItem } from '../../types/catalog'
 import type { ContactRequest, ContactUser } from '../../types/contact'
-import type { SeekerProfile } from '../../types/me'
+import type { CandidateGender, SeekerProfile } from '../../types/me'
 import type { Opportunity } from '../../types/opportunity'
 import type { SeekerResume } from '../../types/resume'
 import { getFavoriteOpportunityIds, subscribeToFavoriteOpportunities } from '../../utils/favorites'
@@ -25,6 +25,18 @@ type TabId = 'responses' | 'favorites' | 'resume'
 type SubscriptionTabId = 'seekers' | 'employers'
 type ProfilePanelId = 'portfolio' | 'info' | 'subscriptions'
 type FollowMode = 'subscriptions' | 'subscribers'
+type ProfileGenderValue = '' | '0' | '1' | '2'
+
+type ProfileFormState = {
+  firstName: string
+  lastName: string
+  middleName: string
+  birthDate: string
+  gender: ProfileGenderValue
+  phone: string
+  about: string
+  avatarUrl: string
+}
 
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'responses', label: 'Отклики' },
@@ -41,6 +53,12 @@ const profilePanels: Array<{ id: ProfilePanelId; label: string }> = [
   { id: 'portfolio', label: 'Портфолио' },
   { id: 'info', label: 'Информация' },
   { id: 'subscriptions', label: 'Подписки' },
+]
+
+const profileGenderOptions: Array<{ value: ProfileGenderValue; label: string }> = [
+  { value: '', label: 'Не указан' },
+  { value: '1', label: 'Мужской' },
+  { value: '2', label: 'Женский' },
 ]
 
 const subscriptionPreviewPhotos = [
@@ -135,6 +153,33 @@ function toNullable(value: string) {
   return normalized ? normalized : null
 }
 
+function getTodayDateInputValue() {
+  const now = new Date()
+  const offsetMinutes = now.getTimezoneOffset()
+  return new Date(now.getTime() - offsetMinutes * 60000).toISOString().slice(0, 10)
+}
+
+function normalizeProfileGender(value: CandidateGender | null | undefined): ProfileGenderValue {
+  if (value === 1 || value === 2) {
+    return String(value) as ProfileGenderValue
+  }
+
+  return ''
+}
+
+function createProfileForm(profile: SeekerProfile): ProfileFormState {
+  return {
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    middleName: profile.middleName ?? '',
+    birthDate: profile.birthDate ?? '',
+    gender: normalizeProfileGender(profile.gender),
+    phone: profile.phone ? formatPhone(profile.phone) : '',
+    about: profile.about ?? '',
+    avatarUrl: profile.avatarUrl ?? '',
+  }
+}
+
 function normalizeUrl(value: string) {
   const trimmed = value.trim()
   if (!trimmed) return ''
@@ -178,7 +223,7 @@ function loadResumeLocal(userId: number) {
 
 export function SeekerDashboardPage() {
   const { session, signIn } = useAuth()
-  const { applications, hasApplied, addApplication } = useApplications()
+  const { applications, hasApplied, isLoading: loadingApplications } = useApplications()
   const [tab, setTab] = useState<TabId>('responses')
   const [step, setStep] = useState(0)
   const [profile, setProfile] = useState<SeekerProfile | null>(null)
@@ -196,7 +241,16 @@ export function SeekerDashboardPage() {
   const [profilePanel, setProfilePanel] = useState<ProfilePanelId>('portfolio')
   const [followMode, setFollowMode] = useState<FollowMode>('subscriptions')
 
-  const [profileForm, setProfileForm] = useState({ firstName: '', lastName: '', middleName: '', phone: '', avatarUrl: '' })
+  const [profileForm, setProfileForm] = useState<ProfileFormState>({
+    firstName: '',
+    lastName: '',
+    middleName: '',
+    birthDate: '',
+    gender: '',
+    phone: '',
+    about: '',
+    avatarUrl: '',
+  })
   const [projectForm, setProjectForm] = useState(initialProject)
   const [educationForm, setEducationForm] = useState(initialEducation)
   const [linkForm, setLinkForm] = useState(initialLink)
@@ -255,13 +309,7 @@ export function SeekerDashboardPage() {
       if (profileResult.status === 'fulfilled') {
         const p = profileResult.value
         setProfile(p)
-        setProfileForm({
-          firstName: p.firstName,
-          lastName: p.lastName,
-          middleName: p.middleName ?? '',
-          phone: p.phone ? formatPhone(p.phone) : '',
-          avatarUrl: p.avatarUrl ?? '',
-        })
+        setProfileForm(createProfileForm(p))
 
       } else if (!isAbortError(profileResult.reason)) {
         setProfileError(profileResult.reason instanceof Error ? profileResult.reason.message : 'Ошибка загрузки профиля.')
@@ -511,13 +559,6 @@ export function SeekerDashboardPage() {
         initiatorRole: 1,
       })
 
-      addApplication({
-        id: detail.id,
-        title: detail.title,
-        company: detail.company,
-        location: detail.location,
-      })
-
       setSuccess('Отклик отправлен.')
     } catch (error) {
       setProfileError(error instanceof Error ? error.message : 'Не удалось отправить отклик.')
@@ -537,6 +578,10 @@ export function SeekerDashboardPage() {
       setProfileError('Заполните имя и фамилию.')
       return
     }
+    if (profileForm.birthDate && profileForm.birthDate > getTodayDateInputValue()) {
+      setProfileError('Дата рождения не может быть в будущем.')
+      return
+    }
 
     setSavingProfile(true)
     setProfileError('')
@@ -546,12 +591,15 @@ export function SeekerDashboardPage() {
         firstName: profileForm.firstName.trim(),
         lastName: profileForm.lastName.trim(),
         middleName: toNullable(profileForm.middleName),
+        birthDate: toNullable(profileForm.birthDate),
+        gender: profileForm.gender ? (Number(profileForm.gender) as CandidateGender) : null,
         phone: toNullable(profileForm.phone),
-        about: toNullable(profile?.about ?? ''),
+        about: toNullable(profileForm.about),
         avatarUrl: toNullable(profileForm.avatarUrl),
       }
       const updated = await updateSeekerProfile(payload)
       setProfile(updated)
+      setProfileForm(createProfileForm(updated))
       setSuccess('Профиль сохранен.')
       setIsSettingsOpen(false)
       if (session.user) {
@@ -670,6 +718,17 @@ export function SeekerDashboardPage() {
               <img src="/Логотип_MAX 1.svg" alt="MAX" />
               <img src="/Group 35.svg" alt="Group 35" />
             </div>
+
+            {!isForeignProfile ? (
+              <div className="seeker-profile-hero-exact__actions">
+                <button type="button" className="seeker-profile-hero-exact__action btn btn--ghost" onClick={() => setIsSettingsOpen(true)} disabled={loadingProfile || !profile}>
+                  Редактировать профиль
+                </button>
+                <Link className="seeker-profile-hero-exact__action seeker-profile-hero-exact__action--link btn btn--primary" to="/dashboard/seeker/resume/print" target="_blank" rel="noreferrer">
+                  Печать / PDF
+                </Link>
+              </div>
+            ) : null}
 
             {isForeignProfile ? <button type="button" className="seeker-profile-hero-exact__subscribe">Подписаться</button> : null}
           </header>
@@ -821,8 +880,9 @@ export function SeekerDashboardPage() {
                     <article><strong>{responsesStats.warning}</strong><span>На рассмотрении</span></article>
                     <article><strong>{responsesStats.danger}</strong><span>Нужны правки</span></article>
                   </div>
-                  {!applications.length ? <p>Вы еще не отправляли отклики.</p> : null}
-                  {applications.length ? (
+                  {loadingApplications ? <p>Загружаем отклики...</p> : null}
+                  {!loadingApplications && !applications.length ? <p>Вы еще не отправляли отклики.</p> : null}
+                  {!loadingApplications && applications.length ? (
                     <div className="application-list">
                       {applications.map((item) => (
                         <article key={item.id} className="application-card">
@@ -1029,7 +1089,10 @@ export function SeekerDashboardPage() {
                 <label>Имя *<input value={profileForm.firstName} onChange={(e) => setProfileForm((s) => ({ ...s, firstName: e.target.value }))} /></label>
                 <label>Фамилия *<input value={profileForm.lastName} onChange={(e) => setProfileForm((s) => ({ ...s, lastName: e.target.value }))} /></label>
                 <label>Отчество<input value={profileForm.middleName} onChange={(e) => setProfileForm((s) => ({ ...s, middleName: e.target.value }))} /></label>
+                <label>Дата рождения<input type="date" value={profileForm.birthDate} onChange={(e) => setProfileForm((s) => ({ ...s, birthDate: e.target.value }))} max={getTodayDateInputValue()} /></label>
+                <label>Пол<select value={profileForm.gender} onChange={(e) => setProfileForm((s) => ({ ...s, gender: e.target.value as ProfileGenderValue }))}>{profileGenderOptions.map((option) => <option key={option.value || 'unknown'} value={option.value}>{option.label}</option>)}</select></label>
                 <label>Телефон<input value={profileForm.phone} onChange={(e) => setProfileForm((s) => ({ ...s, phone: formatPhone(e.target.value) }))} placeholder="+7 (___) ___-__-__" maxLength={18} /></label>
+                <label className="full-width">О себе<textarea rows={4} value={profileForm.about} onChange={(e) => setProfileForm((s) => ({ ...s, about: e.target.value }))} /></label>
               </div>
               <div className="profile-settings-modal__actions">
                 <button type="button" className="btn btn--ghost" onClick={() => setIsSettingsOpen(false)} disabled={savingProfile || uploadingAvatar}>Отмена</button>
