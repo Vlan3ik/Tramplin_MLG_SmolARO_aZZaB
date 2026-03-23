@@ -1,3 +1,5 @@
+using Monolith.Entities;
+
 namespace Monolith.Models.Subscriptions;
 
 public record SubscriptionUserDto(
@@ -5,6 +7,8 @@ public record SubscriptionUserDto(
     string Username,
     string DisplayName,
     string? AvatarUrl,
+    PlatformRole AccountType,
+    string? OrganizationName,
     DateTimeOffset SubscribedAt);
 
 public record SubscriptionStatsDto(

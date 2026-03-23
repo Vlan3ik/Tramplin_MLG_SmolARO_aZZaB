@@ -4,7 +4,6 @@ import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from '
 import { Link } from 'react-router-dom'
 import { createApplication } from '../../api/applications'
 import { fetchTags } from '../../api/catalog'
-import { fetchMyChats } from '../../api/chats'
 import { fetchSeekerProfile, fetchSeekerResume, updateSeekerProfile, updateSeekerResume } from '../../api/me'
 import { uploadMyAvatar } from '../../api/media'
 import { fetchOpportunityById, fetchOpportunityDetailById, participateInOpportunity } from '../../api/opportunities'
@@ -233,7 +232,6 @@ export function SeekerDashboardPage() {
   const [applyingIds, setApplyingIds] = useState<Record<number, boolean>>({})
   const [followingUsers, setFollowingUsers] = useState<SubscriptionUser[]>([])
   const [followerUsers, setFollowerUsers] = useState<SubscriptionUser[]>([])
-  const [applicationChatTitles, setApplicationChatTitles] = useState<string[]>([])
   const [subscriptionsTab, setSubscriptionsTab] = useState<SubscriptionTabId>('seekers')
   const [subscriptionActionLoading, setSubscriptionActionLoading] = useState<Record<number, boolean>>({})
   const [profilePanel, setProfilePanel] = useState<ProfilePanelId>('portfolio')
@@ -290,13 +288,12 @@ export function SeekerDashboardPage() {
       setLoadingResume(true)
       setLoadingSubscriptions(true)
 
-      const [profileResult, resumeResult, tagsResult, followingResult, followersResult, chatsResult] = await Promise.allSettled([
+      const [profileResult, resumeResult, tagsResult, followingResult, followersResult] = await Promise.allSettled([
         fetchSeekerProfile(controller.signal),
         fetchSeekerResume(controller.signal),
         fetchTags(controller.signal),
         fetchMyFollowingSubscriptions(controller.signal),
         fetchMyFollowerSubscriptions(controller.signal),
-        fetchMyChats(controller.signal),
       ])
 
       if (controller.signal.aborted) {
@@ -348,14 +345,6 @@ export function SeekerDashboardPage() {
 
       if (followersResult.status === 'fulfilled') {
         setFollowerUsers(followersResult.value)
-      }
-
-      if (chatsResult.status === 'fulfilled') {
-        const titles = chatsResult.value
-          .filter((chat) => chat.type === 2)
-          .map((chat) => chat.title?.trim() ?? '')
-          .filter((value) => value.length > 0)
-        setApplicationChatTitles(Array.from(new Set(titles)))
       }
 
       if (!controller.signal.aborted) {
@@ -447,36 +436,31 @@ export function SeekerDashboardPage() {
     [applications],
   )
 
-  const seekerSubscriptions = useMemo(
-    () => {
-      const source = followMode === 'subscriptions' ? followingUsers : followerUsers
-      return source.map((user, index) => {
-        const previews = subscriptionPreviewPhotos.slice(index % 3, (index % 3) + 3)
-        return {
-          id: `${followMode}-${user.userId}`,
-          userId: user.userId,
-          title: user.displayName?.trim() || user.username?.trim() || `Пользователь #${user.userId}`,
-          subtitle: 'Соискатель',
-          description: followMode === 'subscriptions' ? 'Вы подписаны на этого пользователя.' : 'Подписан на вас.',
-          avatarUrl: resolveAvatarUrl(user.avatarUrl),
-          previews,
-        }
-      })
-    },
-    [followMode, followerUsers, followingUsers],
-  )
-
-  const employerSubscriptions = useMemo(() => {
-    return applicationChatTitles.map((company, index) => ({
-      id: `chat-company-${index}`,
-      userId: null,
-      title: company,
-      subtitle: 'Компания',
-      description: 'Компания из вашего application-чата.',
-      avatarUrl: null,
+  const seekerSubscriptions = useMemo(() => {
+    const source = (followMode === 'subscriptions' ? followingUsers : followerUsers).filter((user) => user.accountType !== 2)
+    return source.map((user, index) => ({
+      id: `${followMode}-seeker-${user.userId}`,
+      userId: user.userId,
+      title: user.displayName?.trim() || user.username?.trim() || `Пользователь #${user.userId}`,
+      subtitle: 'Соискатель',
+      description: followMode === 'subscriptions' ? 'Вы подписаны на этого пользователя.' : 'Подписан на вас.',
+      avatarUrl: resolveAvatarUrl(user.avatarUrl),
       previews: subscriptionPreviewPhotos.slice(index % 3, (index % 3) + 3),
     }))
-  }, [applicationChatTitles])
+  }, [followMode, followerUsers, followingUsers])
+
+  const employerSubscriptions = useMemo(() => {
+    const source = (followMode === 'subscriptions' ? followingUsers : followerUsers).filter((user) => user.accountType === 2)
+    return source.map((user, index) => ({
+      id: `${followMode}-employer-${user.userId}`,
+      userId: user.userId,
+      title: user.organizationName?.trim() || user.displayName?.trim() || user.username?.trim() || `Компания #${user.userId}`,
+      subtitle: 'Работодатель',
+      description: followMode === 'subscriptions' ? 'Вы подписаны на эту организацию.' : 'Организация подписана на вас.',
+      avatarUrl: resolveAvatarUrl(user.avatarUrl),
+      previews: subscriptionPreviewPhotos.slice(index % 3, (index % 3) + 3),
+    }))
+  }, [followMode, followerUsers, followingUsers])
 
   const portfolioItems = useMemo(() => {
     return resume.projects.map((project, index) => ({
@@ -788,11 +772,10 @@ export function SeekerDashboardPage() {
                       </div>
                       <div className="subscriptions-row__actions">
                         {(() => {
-                          const isSeeker = subscriptionsTab === 'seekers'
                           const userId = item.userId
                           const isFollowing = typeof userId === 'number' ? followingUserIds.has(userId) : false
                           const isLoading = typeof userId === 'number' ? Boolean(subscriptionActionLoading[userId]) : false
-                          const isDisabled = !isSeeker || userId == null || isLoading
+                          const isDisabled = userId == null || isLoading
 
                           const label = isLoading
                             ? 'Обновляем...'

@@ -5,6 +5,8 @@ export type SubscriptionUser = {
   username: string
   displayName: string
   avatarUrl: string | null
+  accountType: number
+  organizationName: string | null
   subscribedAt: string
 }
 
@@ -13,6 +15,8 @@ type SubscriptionUserApi = {
   username?: string | null
   displayName?: string | null
   avatarUrl?: string | null
+  accountType?: number | null
+  organizationName?: string | null
   subscribedAt?: string | null
 }
 
@@ -22,6 +26,8 @@ function mapSubscriptionUser(item: SubscriptionUserApi): SubscriptionUser {
     username: item.username ?? '',
     displayName: item.displayName ?? item.username ?? `Пользователь #${item.userId}`,
     avatarUrl: item.avatarUrl ?? null,
+    accountType: item.accountType ?? 1,
+    organizationName: item.organizationName ?? null,
     subscribedAt: item.subscribedAt ?? '',
   }
 }

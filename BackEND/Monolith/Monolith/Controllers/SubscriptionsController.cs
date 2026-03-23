@@ -23,13 +23,22 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
         var items = await dbContext.UserSubscriptions
             .AsNoTracking()
             .Where(x => x.FollowerUserId == userId)
-            .Include(x => x.FollowingUser)
             .OrderByDescending(x => x.CreatedAt)
             .Select(x => new SubscriptionUserDto(
                 x.FollowingUserId,
                 x.FollowingUser.Username,
                 x.FollowingUser.DisplayName,
                 x.FollowingUser.AvatarUrl,
+                dbContext.UserRoles
+                    .Where(r => r.UserId == x.FollowingUserId)
+                    .Select(r => r.Role)
+                    .OrderByDescending(r => r == PlatformRole.Employer ? 2 : r == PlatformRole.Curator ? 1 : 0)
+                    .DefaultIfEmpty(PlatformRole.Seeker)
+                    .First(),
+                dbContext.CompanyMembers
+                    .Where(m => m.UserId == x.FollowingUserId)
+                    .Select(m => m.Company.BrandName ?? m.Company.LegalName)
+                    .FirstOrDefault(),
                 x.CreatedAt))
             .ToListAsync(cancellationToken);
 
@@ -44,13 +53,22 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
         var items = await dbContext.UserSubscriptions
             .AsNoTracking()
             .Where(x => x.FollowingUserId == userId)
-            .Include(x => x.FollowerUser)
             .OrderByDescending(x => x.CreatedAt)
             .Select(x => new SubscriptionUserDto(
                 x.FollowerUserId,
                 x.FollowerUser.Username,
                 x.FollowerUser.DisplayName,
                 x.FollowerUser.AvatarUrl,
+                dbContext.UserRoles
+                    .Where(r => r.UserId == x.FollowerUserId)
+                    .Select(r => r.Role)
+                    .OrderByDescending(r => r == PlatformRole.Employer ? 2 : r == PlatformRole.Curator ? 1 : 0)
+                    .DefaultIfEmpty(PlatformRole.Seeker)
+                    .First(),
+                dbContext.CompanyMembers
+                    .Where(m => m.UserId == x.FollowerUserId)
+                    .Select(m => m.Company.BrandName ?? m.Company.LegalName)
+                    .FirstOrDefault(),
                 x.CreatedAt))
             .ToListAsync(cancellationToken);
 
