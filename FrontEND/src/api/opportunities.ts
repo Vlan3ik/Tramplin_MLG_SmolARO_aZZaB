@@ -230,7 +230,6 @@ function formatSalary(min: number | null | undefined, max: number | null | undef
 
   return `до ${formatter.format(max ?? 0)} ${currency}`
 }
-
 function formatPrice(priceType: string | number | null | undefined, amount: number | null | undefined, currencyCode: string | null | undefined) {
   if (typeof priceType === 'number') {
     if (priceType === 1) return 'Бесплатно'
@@ -247,7 +246,6 @@ function formatPrice(priceType: string | number | null | undefined, amount: numb
 
   return amount != null ? `${new Intl.NumberFormat('ru-RU').format(amount)} ${currencyCode ?? 'RUB'}` : 'Условия уточняются'
 }
-
 function formatRelativeDate(publishAt: string | undefined) {
   if (!publishAt) {
     return 'Недавно'
@@ -275,7 +273,6 @@ function formatRelativeDate(publishAt: string | undefined) {
 
   return publishDate.toLocaleDateString('ru-RU')
 }
-
 function toOpportunityFromVacancy(apiItem: VacancyListItemApi, coordinates: { latitude: number | null; longitude: number | null }): Opportunity {
   const kind = apiItem.kind ?? apiItem.type
   const type = parseOpportunityType(kind)
@@ -300,7 +297,6 @@ function toOpportunityFromVacancy(apiItem: VacancyListItemApi, coordinates: { la
     longitude: coordinates.longitude,
   }
 }
-
 function toOpportunityFromOpportunity(
   apiItem: OpportunityListItemApi,
   coordinates: {
@@ -314,23 +310,22 @@ function toOpportunityFromOpportunity(
   return {
     id: apiItem.id,
     entityType: 'opportunity',
-    title: apiItem.title ?? 'Р‘РµР· РЅР°Р·РІР°РЅРёСЏ',
+    title: apiItem.title ?? 'Без названия',
     type: type === 'vacancy' ? 'event' : type,
-    company: apiItem.companyName ?? 'РљРѕРјРїР°РЅРёСЏ',
-    location: apiItem.locationName ?? 'Р›РѕРєР°С†РёСЏ РЅРµ СѓРєР°Р·Р°РЅР°',
+    company: apiItem.companyName ?? 'Компания',
+    location: apiItem.locationName ?? 'Локация не указана',
     compensation: formatPrice(apiItem.priceType, apiItem.priceAmount, apiItem.priceCurrencyCode),
-    workFormat: normalizedFormat === 'onsite' ? 'РћС„РёСЃ' : normalizedFormat === 'remote' ? 'РЈРґР°Р»РµРЅРЅРѕ' : 'Р“РёР±СЂРёРґ',
+    workFormat: normalizedFormat === 'onsite' ? 'Офис' : normalizedFormat === 'remote' ? 'Удаленно' : 'Гибрид',
     date: formatRelativeDate(apiItem.publishAt),
     description: (apiItem.tags ?? []).length
-      ? `РљР»СЋС‡РµРІС‹Рµ С‚РµРіРё: ${(apiItem.tags ?? []).slice(0, 4).join(', ')}.`
-      : 'РћРїРёСЃР°РЅРёРµ РґРѕР±Р°РІР»СЏРµС‚СЃСЏ РІ РєР°СЂС‚РѕС‡РєРµ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё.',
+      ? `Ключевые теги: ${(apiItem.tags ?? []).slice(0, 4).join(', ')}.`
+      : 'Описание добавляется в карточке возможности.',
     tags: apiItem.tags ?? [],
     verified: Boolean(apiItem.verifiedCompany),
     latitude: coordinates.latitude,
     longitude: coordinates.longitude,
   }
 }
-
 function parseMapEntityType(value: string | number | null | undefined) {
   if (typeof value === 'number') {
     return value === 1 ? 'vacancy' : value === 2 ? 'opportunity' : null
@@ -565,7 +560,6 @@ function mapOpportunityFromFeature(feature: MapOpportunityFeatureApi): Opportuni
     entityType: entityType ?? undefined,
   }
 }
-
 export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: AbortSignal) {
   const queryString = buildVacanciesQueryString(query)
   const opportunitiesQueryString = buildOpportunitiesQueryString(query)
@@ -696,7 +690,6 @@ function mapFromVacancyDetail(response: VacancyDetailApi): OpportunityDetail {
     address: toAddress(response.location),
   }
 }
-
 function mapFromOpportunityDetail(response: OpportunityDetailApi): OpportunityDetail {
   const kind = response.kind ?? response.type
   const normalizedFormat = parseFormat(response.format)
@@ -726,7 +719,6 @@ function mapFromOpportunityDetail(response: OpportunityDetailApi): OpportunityDe
     address: toAddress(response.location),
   }
 }
-
 function isProbablyNotFoundError(error: unknown) {
   if (!(error instanceof Error)) {
     return false
@@ -783,3 +775,4 @@ export async function fetchOpportunityDetailById(id: number, signal?: AbortSigna
 export function participateInOpportunity(id: number) {
   return postJson<unknown, Record<string, never>>(`/opportunities/${id}/participation`, {})
 }
+
