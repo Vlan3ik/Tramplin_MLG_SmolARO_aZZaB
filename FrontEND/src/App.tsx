@@ -18,6 +18,7 @@ import { VacancyFlowPage } from './pages/VacancyFlowPage'
 import { CuratorDashboardPage } from './pages/dashboards/CuratorDashboardPage'
 import { EmployerDashboardPage } from './pages/dashboards/EmployerDashboardPage'
 import { SeekerDashboardPage } from './pages/dashboards/SeekerDashboardPage'
+import { SeekerResumePrintPage } from './pages/dashboards/SeekerResumePrintPage'
 import { PlatformRole } from './types/auth'
 
 function App() {
@@ -48,6 +49,7 @@ function App() {
 
         <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Seeker]} />}>
           <Route path="dashboard/seeker" element={<SeekerDashboardPage />} />
+          <Route path="dashboard/seeker/resume/print" element={<SeekerResumePrintPage />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Curator]} />}>

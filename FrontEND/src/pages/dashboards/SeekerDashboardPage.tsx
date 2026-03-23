@@ -223,7 +223,7 @@ function loadResumeLocal(userId: number) {
 
 export function SeekerDashboardPage() {
   const { session, signIn } = useAuth()
-  const { applications, hasApplied, isLoading: loadingApplications } = useApplications()
+  const { applications, hasApplied, isLoading: loadingApplications, error: applicationsError } = useApplications()
   const [tab, setTab] = useState<TabId>('responses')
   const [step, setStep] = useState(0)
   const [profile, setProfile] = useState<SeekerProfile | null>(null)
@@ -736,6 +736,7 @@ export function SeekerDashboardPage() {
           {success ? <div className="auth-feedback seeker-profile-feedback">{success}</div> : null}
           {profileError ? <div className="auth-feedback auth-feedback--error">{profileError}</div> : null}
           {subscriptionsError ? <div className="auth-feedback auth-feedback--error">{subscriptionsError}</div> : null}
+          {applicationsError ? <div className="auth-feedback auth-feedback--error">{applicationsError}</div> : null}
 
           <nav className="seeker-profile-mode-switch">
             {profilePanels.map((item) => (
@@ -876,9 +877,9 @@ export function SeekerDashboardPage() {
                   <h2>Мои отклики</h2>
                   <div className="application-stats">
                     <article><strong>{responsesStats.total}</strong><span>Всего откликов</span></article>
-                    <article><strong>{responsesStats.success}</strong><span>Есть интервью</span></article>
+                    <article><strong>{responsesStats.success}</strong><span>Активные</span></article>
                     <article><strong>{responsesStats.warning}</strong><span>На рассмотрении</span></article>
-                    <article><strong>{responsesStats.danger}</strong><span>Нужны правки</span></article>
+                    <article><strong>{responsesStats.danger}</strong><span>Закрытые</span></article>
                   </div>
                   {loadingApplications ? <p>Загружаем отклики...</p> : null}
                   {!loadingApplications && !applications.length ? <p>Вы еще не отправляли отклики.</p> : null}
