@@ -18,6 +18,16 @@
   line-height: 1.2;
 }
 
+.sectionState {
+  width: min(1320px, calc(100vw - 32px));
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(1, 113, 225, 0.16);
+  border-radius: 16px;
+  padding: 20px 24px;
+  color: #0f172a;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
 .eventsCarouselViewport {
   width: min(1320px, calc(100vw - 32px));
   height: calc((var(--events-card-height) * 2) + (var(--events-gap) * 2));

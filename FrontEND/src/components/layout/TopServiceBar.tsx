@@ -2,8 +2,6 @@
 import { MapPin, Search, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useCity } from '../../contexts/CityContext'
-import { useAuth } from '../../hooks/useAuth'
-import { PlatformRole } from '../../types/auth'
 
 const POPULAR_CITY_NAMES = [
   'Москва',
@@ -18,13 +16,10 @@ const POPULAR_CITY_NAMES = [
 ]
 
 export function TopServiceBar() {
-  const { session } = useAuth()
   const { cities, errorMessage, isLoading, selectedCity, selectedCityId, selectCity } = useCity()
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const [cityQuery, setCityQuery] = useState('')
   const pickerRef = useRef<HTMLDivElement | null>(null)
-
-  const activeAudience = session?.platformRole === PlatformRole.Employer ? 'employers' : 'seekers'
 
   const popularCities = useMemo(
     () =>

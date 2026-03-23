@@ -1,22 +1,38 @@
+import { Link } from 'react-router-dom'
 import './Footer.css'
 
 type FooterColumn = {
   title: string
-  links: string[]
+  links: Array<{ label: string; to: string }>
 }
 
 const columns: FooterColumn[] = [
   {
     title: 'Соискателям',
-    links: ['Компании', 'Вакансии', 'Резюме', 'Мероприятия', 'Нетворкинг'],
+    links: [
+      { label: 'Компании', to: '/companies' },
+      { label: 'Вакансии', to: '/' },
+      { label: 'Резюме', to: '/dashboard/seeker' },
+      { label: 'Мероприятия', to: '/events' },
+      { label: 'Нетворкинг', to: '/about' },
+    ],
   },
   {
     title: 'Работодателям',
-    links: ['Размещение', 'Верификация', 'Соискатели', 'Учебные заведения'],
+    links: [
+      { label: 'Размещение', to: '/vacancy-flow' },
+      { label: 'Верификация', to: '/verification/employer' },
+      { label: 'Соискатели', to: '/companies' },
+      { label: 'Учебные заведения', to: '/about' },
+    ],
   },
   {
     title: 'Учебным заведениям',
-    links: ['Работодатели', 'Стажировки', 'Мероприятия'],
+    links: [
+      { label: 'Работодатели', to: '/companies' },
+      { label: 'Стажировки', to: '/' },
+      { label: 'Мероприятия', to: '/events' },
+    ],
   },
 ]
 
@@ -38,8 +54,8 @@ export function Footer() {
               <h4>{column.title}</h4>
               <ul>
                 {column.links.map((link) => (
-                  <li key={link}>
-                    <a href="#">{link}</a>
+                  <li key={link.label}>
+                    <Link to={link.to}>{link.label}</Link>
                   </li>
                 ))}
               </ul>
@@ -70,13 +86,7 @@ export function Footer() {
         </div>
       </div>
 
-      <img
-        className="platform-footer__decor"
-        src="/руки бакалы шапки и тд.svg"
-        alt=""
-        aria-hidden="true"
-      />
+      <img className="platform-footer__decor" src="/руки бакалы шапки и тд.svg" alt="" aria-hidden="true" />
     </footer>
   )
 }
-

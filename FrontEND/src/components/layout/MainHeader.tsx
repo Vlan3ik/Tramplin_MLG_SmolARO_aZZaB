@@ -6,7 +6,7 @@ import { getDefaultRouteForRole } from '../../utils/auth'
 
 const menuItems: Array<{ label: string; to?: string }> = [
   { label: 'Вакансии', to: '/' },
-  { label: 'Мероприятия' },
+  { label: 'Мероприятия', to: '/events' },
   { label: 'Компании', to: '/companies' },
   { label: 'Резюме' },
 ]

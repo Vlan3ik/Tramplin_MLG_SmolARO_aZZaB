@@ -1,4 +1,4 @@
-import { getJson, postJson } from './client'
+﻿import { getJson, postJson } from './client'
 import type { PagedResponse } from '../types/catalog'
 import type { Opportunity, OpportunityDetail, OpportunityFilters, OpportunityType } from '../types/opportunity'
 
@@ -297,6 +297,7 @@ function toOpportunityFromVacancy(apiItem: VacancyListItemApi, coordinates: { la
     longitude: coordinates.longitude,
   }
 }
+
 function toOpportunityFromOpportunity(
   apiItem: OpportunityListItemApi,
   coordinates: {

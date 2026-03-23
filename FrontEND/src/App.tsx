@@ -8,6 +8,7 @@ import { AboutPlatformPage } from './pages/AboutPlatformPage'
 import { CompaniesListPage } from './pages/CompaniesListPage'
 import { CompanyPage } from './pages/CompanyPage'
 import { EmployerVerificationPage } from './pages/EmployerVerificationPage'
+import { EventsPage } from './pages/EventsPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -26,6 +27,7 @@ function App() {
         <Route element={<PublicLayout />}>
           <Route index element={<HomePage />} />
           <Route path="about" element={<AboutPlatformPage />} />
+          <Route path="events" element={<EventsPage />} />
           <Route path="opportunity/:id" element={<OpportunityDetailsPage />} />
           <Route path="companies" element={<CompaniesListPage />} />
           <Route path="company/:id" element={<CompanyPage />} />
