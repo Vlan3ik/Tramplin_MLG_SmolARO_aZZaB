@@ -2,9 +2,7 @@ import { Building2, CheckCircle2, FileWarning, ShieldCheck, Users } from 'lucide
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
 import {
   createAdminCompany,
-  createAdminOpportunity,
   createAdminUser,
-  createAdminVacancy,
   deleteAdminCompany,
   deleteAdminOpportunity,
   deleteAdminUser,
@@ -15,23 +13,19 @@ import {
   fetchAdminVacancies,
   rejectAdminCompany,
   updateAdminCompany,
-  updateAdminOpportunity,
   updateAdminUser,
-  updateAdminVacancy,
   verifyAdminCompany,
   type AdminCompany,
   type AdminOpportunity,
-  type AdminOpportunityUpsertRequest,
   type AdminUser,
   type AdminUserUpsertRequest,
   type AdminVacancy,
-  type AdminVacancyUpsertRequest,
 } from '../../api/admin'
-import { fetchCities, fetchLocations } from '../../api/catalog'
+import { fetchCities } from '../../api/catalog'
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
-import type { City, Location } from '../../types/catalog'
+import type { City } from '../../types/catalog'
 
 type AdminTabId = 'overview' | 'users' | 'companies' | 'vacancies' | 'opportunities'
 
@@ -85,52 +79,6 @@ const vacancyKindLabel: Record<number, string> = {
   2: 'Работа',
 }
 
-function toIsoDateTimeFromLocalInput(value: string) {
-  const normalized = value.trim()
-  if (!normalized) {
-    return ''
-  }
-
-  const date = new Date(normalized)
-  if (Number.isNaN(date.getTime())) {
-    return ''
-  }
-
-  return date.toISOString()
-}
-
-function toLocalDateTimeInputValue(value: string) {
-  if (!value) {
-    return ''
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ''
-  }
-
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${year}-${month}-${day}T${hours}:${minutes}`
-}
-
-function toNumberOrNull(value: string) {
-  const normalized = value.trim()
-  if (!normalized) {
-    return null
-  }
-
-  const parsed = Number(normalized.replace(',', '.'))
-  if (!Number.isFinite(parsed)) {
-    return null
-  }
-
-  return parsed
-}
-
 function parseNamesFromUsername(username: string) {
   const chunks = username.trim().split(/\s+/).filter(Boolean)
   return {
@@ -139,17 +87,9 @@ function parseNamesFromUsername(username: string) {
   }
 }
 
-function locationLabel(location: Location) {
-  const parts = [location.streetName, location.houseNumber].filter(Boolean)
-  const addr = parts.length ? parts.join(', ') : 'Адрес не указан'
-  return `${location.cityName}: ${addr}`
-}
-
 export function CuratorDashboardPage() {
   const [tab, setTab] = useState<AdminTabId>('overview')
   const [cities, setCities] = useState<City[]>([])
-  const [vacancyLocations, setVacancyLocations] = useState<Location[]>([])
-  const [opportunityLocations, setOpportunityLocations] = useState<Location[]>([])
 
   const [users, setUsers] = useState<AdminUser[]>([])
   const [companies, setCompanies] = useState<AdminCompany[]>([])
@@ -169,14 +109,10 @@ export function CuratorDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [savingUser, setSavingUser] = useState(false)
   const [savingCompany, setSavingCompany] = useState(false)
-  const [savingVacancy, setSavingVacancy] = useState(false)
-  const [savingOpportunity, setSavingOpportunity] = useState(false)
   const [processingCompanyId, setProcessingCompanyId] = useState<number | null>(null)
 
   const [editingUserId, setEditingUserId] = useState<number | null>(null)
   const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null)
-  const [editingVacancyId, setEditingVacancyId] = useState<number | null>(null)
-  const [editingOpportunityId, setEditingOpportunityId] = useState<number | null>(null)
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -204,44 +140,6 @@ export function CuratorDashboardPage() {
     publicEmail: '',
     publicPhone: '',
     status: 2,
-  })
-
-  const [vacancyForm, setVacancyForm] = useState({
-    companyId: '',
-    createdByUserId: '',
-    title: '',
-    shortDescription: '',
-    fullDescription: '',
-    kind: 2,
-    format: 2,
-    status: 2,
-    cityId: '',
-    locationId: '',
-    salaryFrom: '',
-    salaryTo: '',
-    currencyCode: 'RUB',
-    salaryTaxMode: 3,
-    publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
-    applicationDeadline: '',
-  })
-
-  const [opportunityForm, setOpportunityForm] = useState({
-    companyId: '',
-    createdByUserId: '',
-    title: '',
-    shortDescription: '',
-    fullDescription: '',
-    kind: 4,
-    format: 2,
-    status: 2,
-    cityId: '',
-    locationId: '',
-    priceType: 1,
-    priceAmount: '',
-    priceCurrencyCode: 'RUB',
-    participantsCanWrite: true,
-    publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
-    eventDate: '',
   })
 
   async function loadUsers() {
@@ -274,9 +172,7 @@ export function CuratorDashboardPage() {
 
     Promise.allSettled([fetchCities(), loadUsers(), loadCompanies(), loadVacancies(), loadOpportunities()])
       .then((results) => {
-        if (!active) {
-          return
-        }
+        if (!active) return
 
         const [citiesResult] = results
         if (citiesResult.status === 'fulfilled') {
@@ -289,63 +185,13 @@ export function CuratorDashboardPage() {
         }
       })
       .finally(() => {
-        if (active) {
-          setLoading(false)
-        }
+        if (active) setLoading(false)
       })
 
     return () => {
       active = false
     }
   }, [])
-
-  useEffect(() => {
-    const cityId = Number(vacancyForm.cityId)
-    if (!Number.isInteger(cityId) || cityId <= 0) {
-      setVacancyLocations([])
-      return
-    }
-
-    let active = true
-    void fetchLocations(cityId)
-      .then((items) => {
-        if (active) {
-          setVacancyLocations(items)
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setVacancyLocations([])
-        }
-      })
-    return () => {
-      active = false
-    }
-  }, [vacancyForm.cityId])
-
-  useEffect(() => {
-    const cityId = Number(opportunityForm.cityId)
-    if (!Number.isInteger(cityId) || cityId <= 0) {
-      setOpportunityLocations([])
-      return
-    }
-
-    let active = true
-    void fetchLocations(cityId)
-      .then((items) => {
-        if (active) {
-          setOpportunityLocations(items)
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setOpportunityLocations([])
-        }
-      })
-    return () => {
-      active = false
-    }
-  }, [opportunityForm.cityId])
 
   const overviewStats = useMemo(
     () => ({
@@ -393,50 +239,6 @@ export function CuratorDashboardPage() {
     setEditingCompanyId(null)
   }
 
-  function resetVacancyForm() {
-    setVacancyForm({
-      companyId: '',
-      createdByUserId: '',
-      title: '',
-      shortDescription: '',
-      fullDescription: '',
-      kind: 2,
-      format: 2,
-      status: 2,
-      cityId: '',
-      locationId: '',
-      salaryFrom: '',
-      salaryTo: '',
-      currencyCode: 'RUB',
-      salaryTaxMode: 3,
-      publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
-      applicationDeadline: '',
-    })
-    setEditingVacancyId(null)
-  }
-
-  function resetOpportunityForm() {
-    setOpportunityForm({
-      companyId: '',
-      createdByUserId: '',
-      title: '',
-      shortDescription: '',
-      fullDescription: '',
-      kind: 4,
-      format: 2,
-      status: 2,
-      cityId: '',
-      locationId: '',
-      priceType: 1,
-      priceAmount: '',
-      priceCurrencyCode: 'RUB',
-      participantsCanWrite: true,
-      publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
-      eventDate: '',
-    })
-    setEditingOpportunityId(null)
-  }
-
   function onUserInputChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value, type } = event.target
     const checked = (event.target as HTMLInputElement).checked
@@ -451,33 +253,6 @@ export function CuratorDashboardPage() {
     setCompanyForm((state) => ({
       ...state,
       [name]: name === 'legalType' || name === 'status' ? Number(value) : value,
-    }))
-  }
-
-  function onVacancyInputChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
-    const { name, value } = event.target
-    setVacancyForm((state) => ({
-      ...state,
-      [name]:
-        name === 'kind' || name === 'format' || name === 'status' || name === 'salaryTaxMode'
-          ? Number(value)
-          : value,
-      ...(name === 'cityId' ? { locationId: '' } : {}),
-    }))
-  }
-
-  function onOpportunityInputChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
-    const { name, value, type } = event.target
-    const checked = (event.target as HTMLInputElement).checked
-    setOpportunityForm((state) => ({
-      ...state,
-      [name]:
-        name === 'kind' || name === 'format' || name === 'status' || name === 'priceType'
-          ? Number(value)
-          : type === 'checkbox'
-            ? checked
-            : value,
-      ...(name === 'cityId' ? { locationId: '' } : {}),
     }))
   }
 
@@ -568,135 +343,6 @@ export function CuratorDashboardPage() {
     }
   }
 
-  async function onSubmitVacancy(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    clearMessages()
-
-    const publishAt = toIsoDateTimeFromLocalInput(vacancyForm.publishAt)
-    if (!publishAt) {
-      setError('Укажите корректную дату публикации вакансии.')
-      return
-    }
-
-    const salaryFrom = toNumberOrNull(vacancyForm.salaryFrom)
-    const salaryTo = toNumberOrNull(vacancyForm.salaryTo)
-    if (salaryFrom !== null && salaryTo !== null && salaryTo < salaryFrom) {
-      setError('Зарплата "до" должна быть больше или равна зарплате "от".')
-      return
-    }
-
-    const deadline = vacancyForm.applicationDeadline.trim() ? toIsoDateTimeFromLocalInput(vacancyForm.applicationDeadline) : null
-    if (vacancyForm.applicationDeadline.trim() && !deadline) {
-      setError('Укажите корректный дедлайн откликов.')
-      return
-    }
-
-    const payload: AdminVacancyUpsertRequest = {
-      companyId: Number(vacancyForm.companyId),
-      createdByUserId: Number(vacancyForm.createdByUserId),
-      title: vacancyForm.title,
-      shortDescription: vacancyForm.shortDescription,
-      fullDescription: vacancyForm.fullDescription,
-      kind: vacancyForm.kind,
-      format: vacancyForm.format,
-      status: vacancyForm.status,
-      cityId: vacancyForm.cityId ? Number(vacancyForm.cityId) : null,
-      locationId: vacancyForm.locationId ? Number(vacancyForm.locationId) : null,
-      salaryFrom,
-      salaryTo,
-      currencyCode: vacancyForm.currencyCode.trim() ? vacancyForm.currencyCode.trim().toUpperCase() : null,
-      salaryTaxMode: vacancyForm.salaryTaxMode,
-      publishAt,
-      applicationDeadline: deadline,
-    }
-
-    if (!payload.companyId || !payload.createdByUserId) {
-      setError('Укажите ID компании и ID автора.')
-      return
-    }
-
-    setSavingVacancy(true)
-    try {
-      if (editingVacancyId) {
-        await updateAdminVacancy(editingVacancyId, payload)
-        setSuccess('Вакансия обновлена.')
-      } else {
-        await createAdminVacancy(payload)
-        setSuccess('Вакансия создана.')
-      }
-      resetVacancyForm()
-      await loadVacancies()
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Не удалось сохранить вакансию.')
-    } finally {
-      setSavingVacancy(false)
-    }
-  }
-
-  async function onSubmitOpportunity(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    clearMessages()
-
-    const publishAt = toIsoDateTimeFromLocalInput(opportunityForm.publishAt)
-    if (!publishAt) {
-      setError('Укажите корректную дату публикации мероприятия.')
-      return
-    }
-
-    const eventDate = opportunityForm.eventDate.trim() ? toIsoDateTimeFromLocalInput(opportunityForm.eventDate) : null
-    if (opportunityForm.eventDate.trim() && !eventDate) {
-      setError('Укажите корректную дату события.')
-      return
-    }
-
-    const priceAmount = toNumberOrNull(opportunityForm.priceAmount)
-    if ((opportunityForm.priceType === 2 || opportunityForm.priceType === 3) && priceAmount === null) {
-      setError('Для платного или призового события укажите сумму.')
-      return
-    }
-
-    const payload: AdminOpportunityUpsertRequest = {
-      companyId: Number(opportunityForm.companyId),
-      createdByUserId: Number(opportunityForm.createdByUserId),
-      title: opportunityForm.title,
-      shortDescription: opportunityForm.shortDescription,
-      fullDescription: opportunityForm.fullDescription,
-      kind: opportunityForm.kind,
-      format: opportunityForm.format,
-      status: opportunityForm.status,
-      cityId: opportunityForm.cityId ? Number(opportunityForm.cityId) : null,
-      locationId: opportunityForm.locationId ? Number(opportunityForm.locationId) : null,
-      priceType: opportunityForm.priceType,
-      priceAmount: opportunityForm.priceType === 1 ? null : priceAmount,
-      priceCurrencyCode: opportunityForm.priceType === 1 ? null : (opportunityForm.priceCurrencyCode.trim() || null),
-      participantsCanWrite: opportunityForm.participantsCanWrite,
-      publishAt,
-      eventDate,
-    }
-
-    if (!payload.companyId || !payload.createdByUserId) {
-      setError('Укажите ID компании и ID автора.')
-      return
-    }
-
-    setSavingOpportunity(true)
-    try {
-      if (editingOpportunityId) {
-        await updateAdminOpportunity(editingOpportunityId, payload)
-        setSuccess('Мероприятие обновлено.')
-      } else {
-        await createAdminOpportunity(payload)
-        setSuccess('Мероприятие создано.')
-      }
-      resetOpportunityForm()
-      await loadOpportunities()
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Не удалось сохранить мероприятие.')
-    } finally {
-      setSavingOpportunity(false)
-    }
-  }
-
   function onEditUser(item: AdminUser) {
     const names = parseNamesFromUsername(item.username)
     setUserForm({
@@ -733,65 +379,12 @@ export function CuratorDashboardPage() {
     clearMessages()
   }
 
-  function onEditVacancy(item: AdminVacancy) {
-    setVacancyForm({
-      companyId: String(item.companyId),
-      createdByUserId: '',
-      title: item.title,
-      shortDescription: '',
-      fullDescription: '',
-      kind: item.kind,
-      format: item.format,
-      status: item.status,
-      cityId: '',
-      locationId: '',
-      salaryFrom: '',
-      salaryTo: '',
-      currencyCode: 'RUB',
-      salaryTaxMode: 3,
-      publishAt: toLocalDateTimeInputValue(item.publishAt),
-      applicationDeadline: '',
-    })
-    setEditingVacancyId(item.id)
-    setTab('vacancies')
-    clearMessages()
-  }
-
-  function onEditOpportunity(item: AdminOpportunity) {
-    setOpportunityForm({
-      companyId: String(item.companyId),
-      createdByUserId: '',
-      title: item.title,
-      shortDescription: '',
-      fullDescription: '',
-      kind: item.kind,
-      format: item.format,
-      status: item.status,
-      cityId: '',
-      locationId: '',
-      priceType: 1,
-      priceAmount: '',
-      priceCurrencyCode: 'RUB',
-      participantsCanWrite: true,
-      publishAt: toLocalDateTimeInputValue(item.publishAt),
-      eventDate: '',
-    })
-    setEditingOpportunityId(item.id)
-    setTab('opportunities')
-    clearMessages()
-  }
-
   async function onDeleteUser(item: AdminUser) {
-    if (typeof window !== 'undefined' && !window.confirm(`Удалить пользователя ${item.email}?`)) {
-      return
-    }
-
+    if (typeof window !== 'undefined' && !window.confirm(`Удалить пользователя ${item.email}?`)) return
     clearMessages()
     try {
       await deleteAdminUser(item.id)
-      if (editingUserId === item.id) {
-        resetUserForm()
-      }
+      if (editingUserId === item.id) resetUserForm()
       setSuccess('Пользователь удален.')
       await loadUsers()
     } catch (deleteError) {
@@ -800,16 +393,11 @@ export function CuratorDashboardPage() {
   }
 
   async function onDeleteCompany(item: AdminCompany) {
-    if (typeof window !== 'undefined' && !window.confirm(`Удалить компанию ${item.legalName}?`)) {
-      return
-    }
-
+    if (typeof window !== 'undefined' && !window.confirm(`Удалить компанию ${item.legalName}?`)) return
     clearMessages()
     try {
       await deleteAdminCompany(item.id)
-      if (editingCompanyId === item.id) {
-        resetCompanyForm()
-      }
+      if (editingCompanyId === item.id) resetCompanyForm()
       setSuccess('Компания удалена.')
       await loadCompanies()
     } catch (deleteError) {
@@ -818,16 +406,10 @@ export function CuratorDashboardPage() {
   }
 
   async function onDeleteVacancy(item: AdminVacancy) {
-    if (typeof window !== 'undefined' && !window.confirm(`Удалить вакансию ${item.title}?`)) {
-      return
-    }
-
+    if (typeof window !== 'undefined' && !window.confirm(`Удалить вакансию ${item.title}?`)) return
     clearMessages()
     try {
       await deleteAdminVacancy(item.id)
-      if (editingVacancyId === item.id) {
-        resetVacancyForm()
-      }
       setSuccess('Вакансия удалена.')
       await loadVacancies()
     } catch (deleteError) {
@@ -836,16 +418,10 @@ export function CuratorDashboardPage() {
   }
 
   async function onDeleteOpportunity(item: AdminOpportunity) {
-    if (typeof window !== 'undefined' && !window.confirm(`Удалить мероприятие ${item.title}?`)) {
-      return
-    }
-
+    if (typeof window !== 'undefined' && !window.confirm(`Удалить мероприятие ${item.title}?`)) return
     clearMessages()
     try {
       await deleteAdminOpportunity(item.id)
-      if (editingOpportunityId === item.id) {
-        resetOpportunityForm()
-      }
       setSuccess('Мероприятие удалено.')
       await loadOpportunities()
     } catch (deleteError) {
@@ -892,7 +468,7 @@ export function CuratorDashboardPage() {
           </div>
           <div className="seeker-profile-hero__content">
             <h1>Кабинет администратора</h1>
-            <p>Управление пользователями, компаниями и модерацией вакансий/мероприятий через реальные backend API.</p>
+            <p>Управление пользователями, компаниями и модерацией вакансий/мероприятий.</p>
             <div className="seeker-profile-hero__meta">
               <span><Users size={14} />{usersTotal} пользователей</span>
               <span><Building2 size={14} />{companiesTotal} компаний</span>
@@ -921,22 +497,10 @@ export function CuratorDashboardPage() {
           <section className="dashboard-section card seeker-profile-panel">
             <h2>Обзор</h2>
             <div className="employer-analytics">
-              <article>
-                <strong>{overviewStats.users}</strong>
-                <span>Всего пользователей</span>
-              </article>
-              <article>
-                <strong>{overviewStats.companies}</strong>
-                <span>Всего компаний</span>
-              </article>
-              <article>
-                <strong>{overviewStats.pendingVerification}</strong>
-                <span>Ждут верификации</span>
-              </article>
-              <article>
-                <strong>{overviewStats.moderation}</strong>
-                <span>Карточек в системе</span>
-              </article>
+              <article><strong>{overviewStats.users}</strong><span>Всего пользователей</span></article>
+              <article><strong>{overviewStats.companies}</strong><span>Всего компаний</span></article>
+              <article><strong>{overviewStats.pendingVerification}</strong><span>Ждут верификации</span></article>
+              <article><strong>{overviewStats.moderation}</strong><span>Карточек в системе</span></article>
             </div>
           </section>
         ) : null}
@@ -946,11 +510,7 @@ export function CuratorDashboardPage() {
             <div className="seeker-profile-panel__head">
               <h2>Пользователи</h2>
               <div className="admin-toolbar">
-                <input
-                  value={usersSearch}
-                  onChange={(event) => setUsersSearch(event.target.value)}
-                  placeholder="Поиск по email/username"
-                />
+                <input value={usersSearch} onChange={(event) => setUsersSearch(event.target.value)} placeholder="Поиск по email/username" />
                 <button type="button" className="btn btn--ghost" onClick={() => void loadUsers()}>Найти</button>
               </div>
             </div>
@@ -981,14 +541,11 @@ export function CuratorDashboardPage() {
               </div>
             </form>
 
-            <div className="favorite-list">
+            <div className="admin-list-grid">
               {users.map((item) => (
-                <article key={item.id} className="favorite-card">
+                <article key={item.id} className="favorite-card admin-list-card">
                   <div className="favorite-card__head">
-                    <div>
-                      <h3>{item.email}</h3>
-                      <p>{item.username}</p>
-                    </div>
+                    <div><h3>{item.email}</h3><p>{item.username}</p></div>
                     <span className="status-chip">{accountStatusLabel[item.status] ?? `Статус ${item.status}`}</span>
                   </div>
                   <p>Роли: {item.roles.join(', ') || 'не назначены'}</p>
@@ -1007,11 +564,7 @@ export function CuratorDashboardPage() {
             <div className="seeker-profile-panel__head">
               <h2>Компании</h2>
               <div className="admin-toolbar">
-                <input
-                  value={companiesSearch}
-                  onChange={(event) => setCompaniesSearch(event.target.value)}
-                  placeholder="Поиск по названию/индустрии"
-                />
+                <input value={companiesSearch} onChange={(event) => setCompaniesSearch(event.target.value)} placeholder="Поиск по названию/индустрии" />
                 <button type="button" className="btn btn--ghost" onClick={() => void loadCompanies()}>Найти</button>
               </div>
             </div>
@@ -1061,14 +614,11 @@ export function CuratorDashboardPage() {
               </div>
             </form>
 
-            <div className="favorite-list">
+            <div className="admin-list-grid">
               {companies.map((item) => (
-                <article key={item.id} className="favorite-card">
+                <article key={item.id} className="favorite-card admin-list-card">
                   <div className="favorite-card__head">
-                    <div>
-                      <h3>{item.brandName || item.legalName}</h3>
-                      <p>{item.legalName}</p>
-                    </div>
+                    <div><h3>{item.brandName || item.legalName}</h3><p>{item.legalName}</p></div>
                     <span className="status-chip">{companyStatusLabel[item.status] ?? `Статус ${item.status}`}</span>
                   </div>
                   <p>Индустрия: {item.industry || 'не указана'}</p>
@@ -1093,96 +643,15 @@ export function CuratorDashboardPage() {
             <div className="seeker-profile-panel__head">
               <h2>Вакансии</h2>
               <div className="admin-toolbar">
-                <input
-                  value={vacanciesSearch}
-                  onChange={(event) => setVacanciesSearch(event.target.value)}
-                  placeholder="Поиск по заголовку"
-                />
+                <input value={vacanciesSearch} onChange={(event) => setVacanciesSearch(event.target.value)} placeholder="Поиск по заголовку" />
                 <button type="button" className="btn btn--ghost" onClick={() => void loadVacancies()}>Найти</button>
               </div>
             </div>
-
-            <form className="form-grid form-grid--two admin-form-card" onSubmit={onSubmitVacancy}>
-              <h3>{editingVacancyId ? `Редактирование вакансии #${editingVacancyId}` : 'Создание вакансии'}</h3>
-              <label>ID компании<input name="companyId" value={vacancyForm.companyId} onChange={onVacancyInputChange} required /></label>
-              <label>ID автора<input name="createdByUserId" value={vacancyForm.createdByUserId} onChange={onVacancyInputChange} required /></label>
-              <label className="full-width">Название<input name="title" value={vacancyForm.title} onChange={onVacancyInputChange} required /></label>
-              <label className="full-width">Краткое описание<textarea rows={2} name="shortDescription" value={vacancyForm.shortDescription} onChange={onVacancyInputChange} required /></label>
-              <label className="full-width">Полное описание<textarea rows={3} name="fullDescription" value={vacancyForm.fullDescription} onChange={onVacancyInputChange} required /></label>
-              <label>
-                Вид
-                <select name="kind" value={vacancyForm.kind} onChange={onVacancyInputChange}>
-                  <option value={1}>Стажировка</option>
-                  <option value={2}>Работа</option>
-                </select>
-              </label>
-              <label>
-                Формат
-                <select name="format" value={vacancyForm.format} onChange={onVacancyInputChange}>
-                  <option value={1}>Офис</option>
-                  <option value={2}>Гибрид</option>
-                  <option value={3}>Удаленно</option>
-                </select>
-              </label>
-              <label>
-                Статус
-                <select name="status" value={vacancyForm.status} onChange={onVacancyInputChange}>
-                  <option value={1}>Черновик</option>
-                  <option value={2}>На модерации</option>
-                  <option value={3}>Активно</option>
-                  <option value={4}>Завершено</option>
-                  <option value={5}>Отменено</option>
-                  <option value={6}>Отклонено</option>
-                  <option value={7}>Архив</option>
-                </select>
-              </label>
-              <label>
-                Город
-                <select name="cityId" value={vacancyForm.cityId} onChange={onVacancyInputChange}>
-                  <option value="">Не выбран</option>
-                  {cities.map((city) => (
-                    <option key={city.id} value={city.id}>{city.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Локация
-                <select name="locationId" value={vacancyForm.locationId} onChange={onVacancyInputChange} disabled={!vacancyForm.cityId}>
-                  <option value="">Не выбрана</option>
-                  {vacancyLocations.map((location) => (
-                    <option key={location.id} value={location.id}>{locationLabel(location)}</option>
-                  ))}
-                </select>
-              </label>
-              <label>Зарплата от<input name="salaryFrom" value={vacancyForm.salaryFrom} onChange={onVacancyInputChange} /></label>
-              <label>Зарплата до<input name="salaryTo" value={vacancyForm.salaryTo} onChange={onVacancyInputChange} /></label>
-              <label>Валюта<input name="currencyCode" value={vacancyForm.currencyCode} onChange={onVacancyInputChange} /></label>
-              <label>
-                Налоги
-                <select name="salaryTaxMode" value={vacancyForm.salaryTaxMode} onChange={onVacancyInputChange}>
-                  <option value={1}>До вычета</option>
-                  <option value={2}>После вычета</option>
-                  <option value={3}>Не указано</option>
-                </select>
-              </label>
-              <label>Дата публикации<input type="datetime-local" name="publishAt" value={vacancyForm.publishAt} onChange={onVacancyInputChange} required /></label>
-              <label>Дедлайн откликов<input type="datetime-local" name="applicationDeadline" value={vacancyForm.applicationDeadline} onChange={onVacancyInputChange} /></label>
-              <div className="favorite-card__actions full-width">
-                <button type="submit" className="btn btn--primary" disabled={savingVacancy}>
-                  {savingVacancy ? 'Сохраняем...' : editingVacancyId ? 'Обновить вакансию' : 'Создать вакансию'}
-                </button>
-                {editingVacancyId ? <button type="button" className="btn btn--ghost" onClick={resetVacancyForm}>Отменить редактирование</button> : null}
-              </div>
-            </form>
-
-            <div className="favorite-list">
+            <div className="admin-list-grid">
               {vacancies.map((item) => (
-                <article key={item.id} className="favorite-card">
+                <article key={item.id} className="favorite-card admin-list-card">
                   <div className="favorite-card__head">
-                    <div>
-                      <h3>{item.title}</h3>
-                      <p>Компания ID: {item.companyId}</p>
-                    </div>
+                    <div><h3>{item.title}</h3><p>Компания ID: {item.companyId}</p></div>
                     <span className="status-chip">{moderationStatusLabel[item.status] ?? `Статус ${item.status}`}</span>
                   </div>
                   <div className="favorite-card__meta">
@@ -1191,7 +660,6 @@ export function CuratorDashboardPage() {
                     <span>{new Date(item.publishAt).toLocaleDateString('ru-RU')}</span>
                   </div>
                   <div className="favorite-card__actions">
-                    <button type="button" className="btn btn--secondary" onClick={() => onEditVacancy(item)}>Редактировать</button>
                     <button type="button" className="btn btn--danger" onClick={() => void onDeleteVacancy(item)}>Удалить</button>
                   </div>
                 </article>
@@ -1205,101 +673,15 @@ export function CuratorDashboardPage() {
             <div className="seeker-profile-panel__head">
               <h2>Мероприятия</h2>
               <div className="admin-toolbar">
-                <input
-                  value={opportunitiesSearch}
-                  onChange={(event) => setOpportunitiesSearch(event.target.value)}
-                  placeholder="Поиск по заголовку"
-                />
+                <input value={opportunitiesSearch} onChange={(event) => setOpportunitiesSearch(event.target.value)} placeholder="Поиск по заголовку" />
                 <button type="button" className="btn btn--ghost" onClick={() => void loadOpportunities()}>Найти</button>
               </div>
             </div>
-
-            <form className="form-grid form-grid--two admin-form-card" onSubmit={onSubmitOpportunity}>
-              <h3>{editingOpportunityId ? `Редактирование мероприятия #${editingOpportunityId}` : 'Создание мероприятия'}</h3>
-              <label>ID компании<input name="companyId" value={opportunityForm.companyId} onChange={onOpportunityInputChange} required /></label>
-              <label>ID автора<input name="createdByUserId" value={opportunityForm.createdByUserId} onChange={onOpportunityInputChange} required /></label>
-              <label className="full-width">Название<input name="title" value={opportunityForm.title} onChange={onOpportunityInputChange} required /></label>
-              <label className="full-width">Краткое описание<textarea rows={2} name="shortDescription" value={opportunityForm.shortDescription} onChange={onOpportunityInputChange} required /></label>
-              <label className="full-width">Полное описание<textarea rows={3} name="fullDescription" value={opportunityForm.fullDescription} onChange={onOpportunityInputChange} required /></label>
-              <label>
-                Вид
-                <select name="kind" value={opportunityForm.kind} onChange={onOpportunityInputChange}>
-                  <option value={1}>Хакатон</option>
-                  <option value={2}>День открытых дверей</option>
-                  <option value={3}>Лекция</option>
-                  <option value={4}>Другое</option>
-                </select>
-              </label>
-              <label>
-                Формат
-                <select name="format" value={opportunityForm.format} onChange={onOpportunityInputChange}>
-                  <option value={1}>Офис</option>
-                  <option value={2}>Гибрид</option>
-                  <option value={3}>Удаленно</option>
-                </select>
-              </label>
-              <label>
-                Статус
-                <select name="status" value={opportunityForm.status} onChange={onOpportunityInputChange}>
-                  <option value={1}>Черновик</option>
-                  <option value={2}>На модерации</option>
-                  <option value={3}>Активно</option>
-                  <option value={4}>Завершено</option>
-                  <option value={5}>Отменено</option>
-                  <option value={6}>Отклонено</option>
-                  <option value={7}>Архив</option>
-                </select>
-              </label>
-              <label>
-                Город
-                <select name="cityId" value={opportunityForm.cityId} onChange={onOpportunityInputChange}>
-                  <option value="">Не выбран</option>
-                  {cities.map((city) => (
-                    <option key={city.id} value={city.id}>{city.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Локация
-                <select name="locationId" value={opportunityForm.locationId} onChange={onOpportunityInputChange} disabled={!opportunityForm.cityId}>
-                  <option value="">Не выбрана</option>
-                  {opportunityLocations.map((location) => (
-                    <option key={location.id} value={location.id}>{locationLabel(location)}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Тип цены
-                <select name="priceType" value={opportunityForm.priceType} onChange={onOpportunityInputChange}>
-                  <option value={1}>Бесплатно</option>
-                  <option value={2}>Платно</option>
-                  <option value={3}>Приз</option>
-                </select>
-              </label>
-              <label>Сумма<input name="priceAmount" value={opportunityForm.priceAmount} onChange={onOpportunityInputChange} /></label>
-              <label>Валюта<input name="priceCurrencyCode" value={opportunityForm.priceCurrencyCode} onChange={onOpportunityInputChange} /></label>
-              <label className="employer-checkbox">
-                <input type="checkbox" name="participantsCanWrite" checked={opportunityForm.participantsCanWrite} onChange={onOpportunityInputChange} />
-                Участники могут писать в чат
-              </label>
-              <label>Дата публикации<input type="datetime-local" name="publishAt" value={opportunityForm.publishAt} onChange={onOpportunityInputChange} required /></label>
-              <label>Дата события<input type="datetime-local" name="eventDate" value={opportunityForm.eventDate} onChange={onOpportunityInputChange} /></label>
-              <div className="favorite-card__actions full-width">
-                <button type="submit" className="btn btn--primary" disabled={savingOpportunity}>
-                  {savingOpportunity ? 'Сохраняем...' : editingOpportunityId ? 'Обновить мероприятие' : 'Создать мероприятие'}
-                </button>
-                {editingOpportunityId ? <button type="button" className="btn btn--ghost" onClick={resetOpportunityForm}>Отменить редактирование</button> : null}
-              </div>
-            </form>
-
-            <div className="favorite-list">
+            <div className="admin-list-grid">
               {opportunities.map((item) => (
-                <article key={item.id} className="favorite-card">
+                <article key={item.id} className="favorite-card admin-list-card">
                   <div className="favorite-card__head">
-                    <div>
-                      <h3>{item.title}</h3>
-                      <p>Компания ID: {item.companyId}</p>
-                    </div>
+                    <div><h3>{item.title}</h3><p>Компания ID: {item.companyId}</p></div>
                     <span className="status-chip">{moderationStatusLabel[item.status] ?? `Статус ${item.status}`}</span>
                   </div>
                   <div className="favorite-card__meta">
@@ -1308,7 +690,6 @@ export function CuratorDashboardPage() {
                     <span>{new Date(item.publishAt).toLocaleDateString('ru-RU')}</span>
                   </div>
                   <div className="favorite-card__actions">
-                    <button type="button" className="btn btn--secondary" onClick={() => onEditOpportunity(item)}>Редактировать</button>
                     <button type="button" className="btn btn--danger" onClick={() => void onDeleteOpportunity(item)}>Удалить</button>
                   </div>
                 </article>

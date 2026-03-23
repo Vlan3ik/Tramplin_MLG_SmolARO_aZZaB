@@ -45,6 +45,13 @@ main:has(.vf-page) {
   color: var(--vf-muted);
 }
 
+.vf-note--moderation {
+  padding: 10px 14px;
+  border: 1px solid #d8e6f8;
+  border-radius: 12px;
+  background: #f5f9ff;
+}
+
 .vf-message {
   margin: 14px 0 0;
   border-radius: 12px;
