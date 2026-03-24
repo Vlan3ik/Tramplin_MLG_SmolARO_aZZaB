@@ -1,4 +1,4 @@
-export type SearchSuggestEntityType = 'vacancy' | 'opportunity'
+export type SearchSuggestEntityType = 'vacancy' | 'opportunity' | 'profile'
 
 export type SearchSuggestItem = {
   entityType: SearchSuggestEntityType
@@ -6,7 +6,7 @@ export type SearchSuggestItem = {
   title: string
   companyName: string
   locationName: string
+  username: string | null
   publishAt: string | null
   score: number
 }
-

@@ -7,6 +7,7 @@ type PublicPortfolioProjectApi = {
   title: string
   mainPhotoUrl: string | null
   authorFio: string
+  authorAvatarUrl: string | null
   primaryRole: string | null
   shortDescription: string | null
 }
@@ -15,6 +16,10 @@ type PublicPortfolioProjectResponseApi = PagedResponse<PublicPortfolioProjectApi
 
 type PublicPortfolioProjectDetailApi = {
   projectId: number
+  authorUserId: number
+  authorUsername: string | null
+  authorFio: string | null
+  authorAvatarUrl: string | null
   title: string
   authorRole: string | null
   description: string | null
@@ -28,6 +33,26 @@ type PublicPortfolioProjectDetailApi = {
     sortOrder: number
     isMain: boolean
   }>
+  participants?: Array<{
+    userId: number
+    username: string | null
+    fio: string | null
+    avatarUrl: string | null
+    role: string | null
+  }> | null
+  collaborations?: Array<{
+    id: number
+    type: number
+    userId: number | null
+    username: string | null
+    userFio: string | null
+    userAvatarUrl: string | null
+    vacancyId: number | null
+    vacancyTitle: string | null
+    opportunityId: number | null
+    opportunityTitle: string | null
+    label: string | null
+  }> | null
 }
 
 type PortfolioProjectMutationRequest = {
@@ -70,6 +95,7 @@ function mapProject(item: PublicPortfolioProjectApi): PublicPortfolioProjectCard
     title: item.title,
     mainPhotoUrl: item.mainPhotoUrl,
     authorFio: item.authorFio,
+    authorAvatarUrl: item.authorAvatarUrl,
     primaryRole: item.primaryRole,
     shortDescription: item.shortDescription,
   }
@@ -78,6 +104,10 @@ function mapProject(item: PublicPortfolioProjectApi): PublicPortfolioProjectCard
 function mapProjectDetail(item: PublicPortfolioProjectDetailApi): PublicPortfolioProjectDetail {
   return {
     projectId: item.projectId,
+    authorUserId: item.authorUserId,
+    authorUsername: item.authorUsername,
+    authorFio: item.authorFio,
+    authorAvatarUrl: item.authorAvatarUrl,
     title: item.title,
     authorRole: item.authorRole,
     description: item.description,
@@ -91,6 +121,30 @@ function mapProjectDetail(item: PublicPortfolioProjectDetailApi): PublicPortfoli
           url: photo.url,
           sortOrder: photo.sortOrder,
           isMain: Boolean(photo.isMain),
+        }))
+      : [],
+    participants: Array.isArray(item.participants)
+      ? item.participants.map((participant) => ({
+          userId: participant.userId,
+          username: participant.username ?? null,
+          fio: participant.fio ?? null,
+          avatarUrl: participant.avatarUrl ?? null,
+          role: participant.role ?? null,
+        }))
+      : [],
+    collaborations: Array.isArray(item.collaborations)
+      ? item.collaborations.map((collaboration) => ({
+          id: collaboration.id,
+          type: collaboration.type,
+          userId: collaboration.userId ?? null,
+          username: collaboration.username ?? null,
+          userFio: collaboration.userFio ?? null,
+          userAvatarUrl: collaboration.userAvatarUrl ?? null,
+          vacancyId: collaboration.vacancyId ?? null,
+          vacancyTitle: collaboration.vacancyTitle ?? null,
+          opportunityId: collaboration.opportunityId ?? null,
+          opportunityTitle: collaboration.opportunityTitle ?? null,
+          label: collaboration.label ?? null,
         }))
       : [],
   }
@@ -114,10 +168,13 @@ export async function fetchPublicPortfolioProjects(username: string, signal?: Ab
   return (response.items ?? []).map(mapProject)
 }
 
-export async function fetchPublicPortfolioProjectDetail(projectId: number, signal?: AbortSignal): Promise<PublicPortfolioProjectDetail> {
+export async function fetchPublicPortfolioProjectDetail(
+  projectId: number,
+  options?: { signal?: AbortSignal; withAuth?: boolean },
+): Promise<PublicPortfolioProjectDetail> {
   const response = await getJson<PublicPortfolioProjectDetailApi>(`/portfolio/projects/${projectId}`, {
-    signal,
-    withAuth: false,
+    signal: options?.signal,
+    withAuth: options?.withAuth ?? false,
   })
 
   return mapProjectDetail(response)

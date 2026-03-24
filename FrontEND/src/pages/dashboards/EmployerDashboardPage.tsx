@@ -31,6 +31,7 @@ import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
 import type { City, Location, TagListItem } from '../../types/catalog'
+import { formatSkillLevelDisplay } from '../../utils/skill-levels'
 
 type EmployerTabId = 'overview' | 'company' | 'create' | 'opportunities' | 'applications' | 'verification'
 
@@ -222,11 +223,7 @@ function formatDateOnly(value: string) {
 }
 
 function formatSkillLevel(value: number) {
-  if (!value) {
-    return 'Уровень не указан'
-  }
-
-  return `Уровень ${value}`
+  return formatSkillLevelDisplay(value)
 }
 
 function formatYearsExperience(value: number) {

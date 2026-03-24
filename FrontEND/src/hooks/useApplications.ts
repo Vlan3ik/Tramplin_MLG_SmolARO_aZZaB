@@ -108,7 +108,7 @@ function isUnauthorizedError(error: unknown) {
   return message.includes('(401)') || message.includes('unauthorized')
 }
 
-export function useApplications() {
+export function useApplications(enabled = true) {
   const [applications, setApplications] = useState<SeekerApplication[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -116,6 +116,13 @@ export function useApplications() {
   const loadApplications = useCallback(async (signal?: AbortSignal) => {
     try {
       if (signal?.aborted) {
+        return
+      }
+
+      if (!enabled) {
+        setApplications([])
+        setError('')
+        setIsLoading(false)
         return
       }
 
@@ -154,9 +161,16 @@ export function useApplications() {
         setIsLoading(false)
       }
     }
-  }, [])
+  }, [enabled])
 
   useEffect(() => {
+    if (!enabled) {
+      setApplications([])
+      setError('')
+      setIsLoading(false)
+      return
+    }
+
     const controller = new AbortController()
     void loadApplications(controller.signal)
 
@@ -178,7 +192,7 @@ export function useApplications() {
       window.removeEventListener('focus', sync)
       window.clearInterval(intervalId)
     }
-  }, [loadApplications])
+  }, [enabled, loadApplications])
 
   const hasApplied = useCallback(
     (opportunityId: number) => applications.some((item) => item.opportunityId === opportunityId),

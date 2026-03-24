@@ -343,7 +343,7 @@ export function ResumesPage() {
                 {item.skills.length ? item.skills.map((skill) => <span className="tag" key={`${item.userId}-${skill.tagId}`}>{skill.tagName}</span>) : <span className="tag">Навыки не добавлены</span>}
               </div>
 
-              <Link className="btn btn--ghost" to={`/portfolio/${encodeURIComponent(item.username)}`}>
+              <Link className="btn btn--ghost" to={`/dashboard/seeker/${encodeURIComponent(item.username)}`}>
                 Портфолио
               </Link>
 

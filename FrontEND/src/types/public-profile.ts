@@ -44,8 +44,8 @@ export type PublicProfile = {
   phone: string | null
   about: string | null
   avatarUrl: string | null
+  profileBannerUrl: string | null
   resume: PublicProfileResume | null
   stats: PublicProfileStats
   visibilityMode: string
 }
-

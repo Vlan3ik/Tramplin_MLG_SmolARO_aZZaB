@@ -51,6 +51,7 @@ public record PortfolioProjectListItemDto(
     string Title,
     string? MainPhotoUrl,
     string AuthorFio,
+    string? AuthorAvatarUrl,
     string? PrimaryRole,
     string? ShortDescription);
 
@@ -70,6 +71,7 @@ public record PortfolioProjectParticipantDto(
     long UserId,
     string Username,
     string Fio,
+    string? AvatarUrl,
     string Role);
 
 /// <summary>
@@ -81,6 +83,7 @@ public record PortfolioProjectCollaborationDto(
     long? UserId,
     string? Username,
     string? UserFio,
+    string? UserAvatarUrl,
     long? VacancyId,
     string? VacancyTitle,
     long? OpportunityId,
@@ -95,6 +98,7 @@ public record PortfolioProjectDetailDto(
     long AuthorUserId,
     string AuthorUsername,
     string AuthorFio,
+    string? AuthorAvatarUrl,
     string Title,
     string? AuthorRole,
     string? Description,

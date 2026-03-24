@@ -12,6 +12,7 @@ type PublicProfileApi = {
   phone: string | null
   about: string | null
   avatarUrl: string | null
+  profileBannerUrl: string | null
   resume: {
     headline: string | null
     desiredPosition: string | null
@@ -51,6 +52,7 @@ export async function fetchPublicProfileByUsername(username: string, signal?: Ab
     phone: response.phone,
     about: response.about,
     avatarUrl: response.avatarUrl,
+    profileBannerUrl: response.profileBannerUrl,
     resume: response.resume
       ? {
           headline: response.resume.headline,
@@ -75,4 +77,3 @@ export async function fetchPublicProfileByUsername(username: string, signal?: Ab
     visibilityMode: response.visibilityMode,
   }
 }
-

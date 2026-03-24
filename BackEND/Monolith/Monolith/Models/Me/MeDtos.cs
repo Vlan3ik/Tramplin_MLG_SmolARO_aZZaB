@@ -186,6 +186,7 @@ public record PublicProfileResponse(
     string? Phone,
     string? About,
     string? AvatarUrl,
+    string? ProfileBannerUrl,
     ResumeDetailsResponse? Resume,
     ProfileStatsResponse Stats,
     string VisibilityMode);

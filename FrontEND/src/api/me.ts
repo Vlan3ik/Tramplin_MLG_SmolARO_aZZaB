@@ -72,6 +72,15 @@ type SeekerSettingsApiResponse = {
   showContactsInResume: boolean
 }
 
+export type MeApiResponse = {
+  id: number
+  email: string | null
+  username: string | null
+  avatarUrl: string | null
+  profileBannerUrl: string | null
+  roles: string[] | null
+}
+
 type UpdateResumeDetailsRequest = {
   headline: string | null
   desiredPosition: string | null
@@ -121,6 +130,26 @@ export function fetchSeekerProfile(signal?: AbortSignal) {
   return getJson<SeekerProfile>('/me/profile', { signal })
 }
 
+function normalizeSkillLevel(value: number | null | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 1
+  }
+
+  return Math.max(1, Math.min(5, Math.round(value)))
+}
+
+function normalizeYearsExperience(value: number | null | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 0
+  }
+
+  return Math.max(0, value)
+}
+
+export function fetchMe(signal?: AbortSignal) {
+  return getJson<MeApiResponse>('/me', { signal })
+}
+
 export function updateSeekerProfile(payload: UpdateSeekerProfileRequest) {
   return putJson<SeekerProfile, UpdateSeekerProfileRequest>('/me/profile', payload)
 }
@@ -164,8 +193,8 @@ export async function fetchSeekerResume(signal?: AbortSignal): Promise<SeekerRes
       ? response.skills.map((skill) => ({
           tagId: skill.tagId,
           tagName: skill.tagName,
-          level: skill.level ?? 0,
-          yearsExperience: skill.yearsExperience ?? 0,
+          level: normalizeSkillLevel(skill.level),
+          yearsExperience: normalizeYearsExperience(skill.yearsExperience),
         }))
       : [],
     experiences: Array.isArray(response.experiences)
@@ -217,16 +246,16 @@ export async function fetchSeekerResume(signal?: AbortSignal): Promise<SeekerRes
 
 export async function updateSeekerResume(payload: SeekerResume) {
   const body: UpdateResumeDetailsRequest = {
-    headline: payload.headline,
+    headline: null,
     desiredPosition: payload.desiredPosition,
     summary: payload.summary,
     salaryFrom: payload.salaryFrom,
     salaryTo: payload.salaryTo,
-    currencyCode: payload.currencyCode,
+    currencyCode: 'RUB',
     skills: payload.skills.map((skill) => ({
       tagId: skill.tagId,
-      level: skill.level || null,
-      yearsExperience: skill.yearsExperience || null,
+      level: normalizeSkillLevel(skill.level),
+      yearsExperience: normalizeYearsExperience(skill.yearsExperience),
     })),
     experiences: payload.experiences.map((experience) => ({
       companyId: experience.companyId ?? null,

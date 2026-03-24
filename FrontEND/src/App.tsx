@@ -1,4 +1,4 @@
-import { Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { DashboardRedirect } from './components/auth/DashboardRedirect'
 import { GuestOnlyRoute } from './components/auth/GuestOnlyRoute'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
@@ -13,21 +13,28 @@ import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { OpportunityDetailsPage } from './pages/OpportunityDetailsPage'
-import { PortfolioPage } from './pages/PortfolioPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ResumesPage } from './pages/ResumesPage'
 import { VacancyFlowPage } from './pages/VacancyFlowPage'
 import { CuratorDashboardPage } from './pages/dashboards/CuratorDashboardPage'
 import { EmployerDashboardPage } from './pages/dashboards/EmployerDashboardPage'
 import { SeekerDashboardPage } from './pages/dashboards/SeekerDashboardPage'
+import { SeekerPortfolioProjectPage } from './pages/dashboards/SeekerPortfolioProjectPage'
 import { SeekerResumePrintPage } from './pages/dashboards/SeekerResumePrintPage'
 import { PlatformRole } from './types/auth'
+
+function PortfolioLegacyRedirect() {
+  const { username = '' } = useParams<{ username?: string }>()
+  const normalized = username.trim()
+  return <Navigate to={`/dashboard/seeker/${encodeURIComponent(normalized)}`} replace />
+}
 
 function App() {
   const location = useLocation()
   const isResumePrintPage = location.pathname.startsWith('/dashboard/seeker/resume/print')
+  const isResumeEditPage = location.pathname.startsWith('/dashboard/seeker/resume/edit')
   const isResumeViewPage = location.pathname === '/resumes'
-  const shouldHideChatWidget = isResumePrintPage || isResumeViewPage
+  const shouldHideChatWidget = isResumePrintPage || isResumeEditPage || isResumeViewPage
 
   return (
     <>
@@ -37,12 +44,15 @@ function App() {
           <Route path="about" element={<AboutPlatformPage />} />
           <Route path="events" element={<EventsPage />} />
           <Route path="resumes" element={<ResumesPage />} />
-          <Route path="portfolio/:username" element={<PortfolioPage />} />
           <Route path="opportunity/:id" element={<OpportunityDetailsPage />} />
           <Route path="companies" element={<CompaniesListPage />} />
           <Route path="company/:id" element={<CompanyPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
+
+        <Route path="dashboard/seeker/:username" element={<SeekerDashboardPage />} />
+        <Route path="dashboard/seeker/:username/project/:projectId" element={<SeekerPortfolioProjectPage />} />
+        <Route path="portfolio/:username" element={<PortfolioLegacyRedirect />} />
 
         <Route element={<GuestOnlyRoute />}>
           <Route path="register" element={<RegisterPage />} />
@@ -58,6 +68,8 @@ function App() {
 
         <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Seeker]} />}>
           <Route path="dashboard/seeker" element={<SeekerDashboardPage />} />
+          <Route path="dashboard/seeker/project/:projectId" element={<SeekerPortfolioProjectPage />} />
+          <Route path="dashboard/seeker/resume/edit" element={<SeekerDashboardPage />} />
           <Route path="dashboard/seeker/resume/print" element={<SeekerResumePrintPage />} />
         </Route>
 

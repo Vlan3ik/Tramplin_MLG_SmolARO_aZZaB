@@ -5,6 +5,7 @@ import { fetchSeekerProfile, fetchSeekerResume } from '../../api/me'
 import { API_ORIGIN } from '../../config/api'
 import type { SeekerProfile } from '../../types/me'
 import type { SeekerResume } from '../../types/resume'
+import { formatSkillLevelDisplay } from '../../utils/skill-levels'
 import './SeekerResumePrintPage.css'
 
 function resolveAvatarUrl(value: string | null | undefined) {
@@ -167,7 +168,7 @@ export function SeekerResumePrintPage() {
                     {resume.skills.map((skill) => (
                       <li key={skill.tagId}>
                         <strong>{skill.tagName}</strong>
-                        <span>{skill.level}/5, {skill.yearsExperience} лет опыта</span>
+                        <span>{formatSkillLevelDisplay(skill.level)}, {skill.yearsExperience} лет опыта</span>
                       </li>
                     ))}
                   </ul>

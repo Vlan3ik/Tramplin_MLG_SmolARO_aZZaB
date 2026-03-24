@@ -167,7 +167,7 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
 
         var authorInfo = userInfos.TryGetValue(project.UserId, out var info)
             ? info
-            : new UserInfo(project.UserId, string.Empty, "Неизвестный пользователь");
+            : new UserInfo(project.UserId, string.Empty, "Неизвестный пользователь", null);
 
         var photos = project.Photos
             .OrderByDescending(x => x.IsMain)
@@ -182,11 +182,12 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
             {
                 var participantInfo = userInfos.TryGetValue(x.UserId, out var participantUserInfo)
                     ? participantUserInfo
-                    : new UserInfo(x.UserId, x.User.Username, x.User.DisplayName);
+                    : new UserInfo(x.UserId, x.User.Username, x.User.DisplayName, null);
                 return new PortfolioProjectParticipantDto(
                     x.UserId,
                     participantInfo.Username,
                     participantInfo.Fio,
+                    participantInfo.AvatarUrl,
                     x.Role);
             })
             .ToList();
@@ -197,6 +198,7 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
                 project.UserId,
                 authorInfo.Username,
                 authorInfo.Fio,
+                authorInfo.AvatarUrl,
                 project.Role ?? string.Empty));
         }
 
@@ -215,6 +217,7 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
                     x.UserId,
                     collabUserInfo?.Username,
                     collabUserInfo?.Fio,
+                    collabUserInfo?.AvatarUrl,
                     x.VacancyId,
                     x.Vacancy?.Title,
                     x.OpportunityId,
@@ -230,6 +233,7 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
             project.UserId,
             authorInfo.Username,
             authorInfo.Fio,
+            authorInfo.AvatarUrl,
             project.Title,
             project.Role,
             project.Description,
@@ -360,7 +364,8 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
                 x.User.Username,
                 x.User.DisplayName,
                 x.FirstName,
-                x.LastName
+                x.LastName,
+                x.AvatarUrl
             })
             .ToListAsync(cancellationToken);
 
@@ -369,7 +374,7 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
             x =>
             {
                 var fio = BuildFio(x.FirstName, x.LastName, x.DisplayName);
-                return new UserInfo(x.UserId, x.Username, fio);
+                return new UserInfo(x.UserId, x.Username, fio, x.AvatarUrl);
             });
 
         var missingUserIds = userIds.Where(x => !result.ContainsKey(x)).ToArray();
@@ -383,7 +388,7 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
 
             foreach (var user in users)
             {
-                result[user.Id] = new UserInfo(user.Id, user.Username, string.IsNullOrWhiteSpace(user.DisplayName) ? user.Username : user.DisplayName);
+                result[user.Id] = new UserInfo(user.Id, user.Username, string.IsNullOrWhiteSpace(user.DisplayName) ? user.Username : user.DisplayName, null);
             }
         }
 
@@ -397,7 +402,7 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
     {
         var authorInfo = authorInfos.TryGetValue(project.UserId, out var info)
             ? info
-            : new UserInfo(project.UserId, string.Empty, "Неизвестный пользователь");
+            : new UserInfo(project.UserId, string.Empty, "Неизвестный пользователь", null);
 
         var mainPhotoUrl = project.Photos
             .OrderByDescending(x => x.IsMain)
@@ -423,6 +428,7 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
             project.Title,
             mainPhotoUrl,
             authorInfo.Fio,
+            authorInfo.AvatarUrl,
             role,
             Shorten(project.Description));
     }
@@ -465,5 +471,5 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
         return long.TryParse(value, out var userId) ? userId : null;
     }
 
-    private sealed record UserInfo(long UserId, string Username, string Fio);
+    private sealed record UserInfo(long UserId, string Username, string Fio, string? AvatarUrl);
 }

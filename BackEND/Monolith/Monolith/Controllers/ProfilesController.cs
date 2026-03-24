@@ -69,6 +69,7 @@ public class ProfilesController(AppDbContext dbContext) : ControllerBase
             canViewProfile && settings.ShowContactsInResume ? profile.Phone : null,
             canViewProfile ? profile.About : null,
             canViewProfile ? profile.AvatarUrl : null,
+            canViewProfile ? profile.User.ProfileBannerUrl : null,
             resume,
             stats,
             canViewProfile ? "visible" : "hidden"));

@@ -6,7 +6,8 @@ namespace Monolith.Models.Search;
 public enum SearchSuggestEntityType
 {
     Vacancy = 1,
-    Opportunity = 2
+    Opportunity = 2,
+    Profile = 3
 }
 
 /// <summary>
@@ -27,5 +28,6 @@ public record SearchSuggestItemDto(
     string Title,
     string CompanyName,
     string LocationName,
-    DateTimeOffset PublishAt,
-    double Score);
+    DateTimeOffset? PublishAt,
+    double Score,
+    string? Username);
