@@ -84,8 +84,8 @@ Priority:
 
 Quick examples:
 - Use localhost backend: `http://localhost:5173/?apiHost=http://localhost:1488`
-- Use backend on another device: `http://localhost:5173/?apiHost=http://192.168.1.25:1488`
-- Set full API base directly: `http://localhost:5173/?apiBaseUrl=http://localhost:1488/api`
+- Use backend on another device: `http://localhost:5173/?apiHost=http://169.254.185.29:1488`
+- Set full API base directly: `http://localhost:5173/?apiBaseUrl=http://169.254.185.29:1488/api`
 - Reset override: `http://localhost:5173/?apiReset=1`
 
 Notes:
