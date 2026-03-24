@@ -1,7 +1,7 @@
 import { Eye, EyeOff } from 'lucide-react'
-import { type ChangeEvent, type FormEvent, useState } from 'react'
+import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { loginUser } from '../api/auth'
+import { getVkLoginUrl, loginUser, loginViaVk } from '../api/auth'
 import { useAuth } from '../hooks/useAuth'
 import { createAuthSession, getSafeRedirectPath } from '../utils/auth'
 
@@ -18,6 +18,8 @@ const initialFormState: LoginFormState = {
   email: '',
   password: '',
 }
+
+const VK_STATE_STORAGE_KEY = 'tramplin.auth.vk.state'
 
 function readRedirectPath(state: unknown) {
   if (!state || typeof state !== 'object') {
@@ -36,9 +38,49 @@ export function LoginPage() {
   const [formState, setFormState] = useState(initialFormState)
   const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isVkSubmitting, setIsVkSubmitting] = useState(false)
+  const [handledVkCode, setHandledVkCode] = useState<string | null>(null)
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
 
   const redirectPath = readRedirectPath(location.state)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const vkCode = params.get('code')
+    const vkState = params.get('state')
+
+    if (!vkCode || handledVkCode === vkCode) {
+      return
+    }
+
+    setHandledVkCode(vkCode)
+    setErrorMessage('')
+
+    const expectedState = window.localStorage.getItem(VK_STATE_STORAGE_KEY)
+    window.localStorage.removeItem(VK_STATE_STORAGE_KEY)
+
+    if (expectedState && vkState !== expectedState) {
+      setErrorMessage('Некорректный state параметр VK.')
+      navigate('/login', { replace: true, state: location.state })
+      return
+    }
+
+    void (async () => {
+      setIsVkSubmitting(true)
+
+      try {
+        const response = await loginViaVk(vkCode)
+        const session = createAuthSession(response)
+        signIn(session)
+        navigate(getSafeRedirectPath(redirectPath, session.platformRole ?? null), { replace: true })
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : 'Не удалось войти через VK.')
+        navigate('/login', { replace: true, state: location.state })
+      } finally {
+        setIsVkSubmitting(false)
+      }
+    })()
+  }, [handledVkCode, location.search, location.state, navigate, redirectPath, signIn])
 
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const field = event.target.name as keyof LoginFormState
@@ -78,6 +120,26 @@ export function LoginPage() {
       setErrorMessage(error instanceof Error ? error.message : 'Не удалось выполнить вход.')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  async function handleVkLogin() {
+    setErrorMessage('')
+    setIsVkSubmitting(true)
+
+    try {
+      const state =
+        typeof window.crypto?.randomUUID === 'function'
+          ? window.crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+      window.localStorage.setItem(VK_STATE_STORAGE_KEY, state)
+      const response = await getVkLoginUrl(state)
+      window.location.assign(response.url)
+    } catch (error) {
+      window.localStorage.removeItem(VK_STATE_STORAGE_KEY)
+      setErrorMessage(error instanceof Error ? error.message : 'Не удалось начать авторизацию через VK.')
+      setIsVkSubmitting(false)
     }
   }
 
@@ -130,6 +192,9 @@ export function LoginPage() {
 
           <button type="submit" className="btn btn--primary" disabled={isSubmitting}>
             {isSubmitting ? 'Входим...' : 'Войти'}
+          </button>
+          <button type="button" className="btn btn--secondary" disabled={isVkSubmitting} onClick={handleVkLogin}>
+            {isVkSubmitting ? 'VK...' : 'Войти через VK'}
           </button>
         </form>
 

@@ -6,6 +6,10 @@ public record RegisterRequest(string Email, string Password, string FirstName, s
 
 public record LoginRequest(string Email, string Password);
 
+public record VkLoginUrlResponse(string Url);
+
+public record VkLoginRequest(string Code);
+
 public record RefreshRequest(string RefreshToken);
 
 public record LogoutRequest(string RefreshToken);

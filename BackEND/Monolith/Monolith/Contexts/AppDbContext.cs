@@ -54,6 +54,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.ToTable("users");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.VkUserId).HasColumnName("vk_user_id").HasMaxLength(100);
             entity.Property(x => x.Email).HasColumnName("email").HasMaxLength(320);
             entity.Property(x => x.Username).HasColumnName("username").HasMaxLength(50);
             entity.Property(x => x.PasswordHash).HasColumnName("password_hash");
@@ -66,6 +67,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasIndex(x => x.Email).IsUnique();
             entity.HasIndex(x => x.Username).IsUnique();
+            entity.HasIndex(x => x.VkUserId).IsUnique().HasFilter("vk_user_id IS NOT NULL");
         });
 
         modelBuilder.Entity<UserRole>(entity =>

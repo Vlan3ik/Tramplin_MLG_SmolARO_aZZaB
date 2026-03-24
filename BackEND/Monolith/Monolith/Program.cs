@@ -18,6 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<MinioOptions>(builder.Configuration.GetSection("Minio"));
 builder.Services.Configure<NominatimOptions>(builder.Configuration.GetSection(NominatimOptions.SectionName));
+builder.Services.Configure<VkAuthOptions>(builder.Configuration.GetSection(VkAuthOptions.SectionName));
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {

@@ -27,6 +27,10 @@ export type LoginRequest = {
   password: string
 }
 
+export type VkLoginUrlResponse = {
+  url: string
+}
+
 export type RefreshRequest = {
   refreshToken: string
 }
