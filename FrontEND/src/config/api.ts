@@ -1,5 +1,5 @@
 ﻿const RAW_ENV_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
-const DEFAULT_FALLBACK_API_BASE_URL = 'http://localhost:1488/api'
+const DEFAULT_FALLBACK_API_BASE_URL = 'http://169.254.185.29:1488//api'
 const API_BASE_URL_STORAGE_KEY = 'tramplin.dev.api-base-url'
 const API_BASE_URL_QUERY_KEY = 'apiBaseUrl'
 const API_HOST_QUERY_KEY = 'apiHost'
