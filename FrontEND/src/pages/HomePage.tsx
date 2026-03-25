@@ -7,7 +7,7 @@ import {
   participateInOpportunity,
   type MapViewportBounds,
 } from '../api/opportunities'
-import { FilterSidebar } from '../components/home/FilterSidebar'
+import { FilterModal } from '../components/home/FilterModal'
 import { MapBoard } from '../components/home/MapBoard'
 import { OpportunityCard } from '../components/home/OpportunityCard'
 import { SearchHero } from '../components/home/SearchHero'
@@ -15,7 +15,7 @@ import { SecondarySections } from '../components/home/SecondarySections'
 import { useCity } from '../contexts/CityContext'
 import { useApplications } from '../hooks/useApplications'
 import { useAuth } from '../hooks/useAuth'
-import type { Opportunity, OpportunityFilters, OpportunityType } from '../types/opportunity'
+import type { Opportunity, OpportunityFilters } from '../types/opportunity'
 import type { SearchSuggestItem } from '../types/search'
 import { CommunityTabsSection } from '../components/layout/community-tabs/CommunityTabsSection'
 import { EventsCarouselSection } from '../components/layout/events-carousel/EventsCarouselSection'
@@ -23,6 +23,9 @@ import { EventsCarouselSection } from '../components/layout/events-carousel/Even
 const defaultFilters: OpportunityFilters = {
   types: [],
   formats: [],
+  tagIds: [],
+  salaryFrom: null,
+  salaryTo: null,
   verifiedOnly: false,
 }
 
@@ -35,6 +38,7 @@ export function HomePage() {
   const [searchInput, setSearchInput] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [filters, setFilters] = useState<OpportunityFilters>(defaultFilters)
+  const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
 
   const [listItems, setListItems] = useState<Opportunity[]>([])
   const [listTotal, setListTotal] = useState(0)
@@ -172,31 +176,8 @@ export function HomePage() {
     }
   }
 
-  function handleTypesChange(types: OpportunityType[]) {
-    setFilters((current) => ({
-      ...current,
-      types,
-    }))
-  }
-
-  function handleFormatsChange(formats: string[]) {
-    setFilters((current) => ({
-      ...current,
-      formats,
-    }))
-  }
-
-  function handleVerifiedOnlyChange(verifiedOnly: boolean) {
-    setFilters((current) => ({
-      ...current,
-      verifiedOnly,
-    }))
-  }
-
   function handleResetFilters() {
     setFilters(defaultFilters)
-    setSearchInput('')
-    setAppliedSearch('')
   }
 
   async function handleApply(opportunity: Opportunity) {
@@ -261,6 +242,15 @@ export function HomePage() {
         onSearchChange={setSearchInput}
         onSearchSubmit={handleSearchSubmit}
         onSuggestionSelect={handleSuggestionSelect}
+        onFiltersClick={() => setIsFiltersModalOpen(true)}
+      />
+
+      <FilterModal
+        isOpen={isFiltersModalOpen}
+        filters={filters}
+        onApply={setFilters}
+        onReset={handleResetFilters}
+        onClose={() => setIsFiltersModalOpen(false)}
       />
 
       <section className="home-workspace container">
@@ -280,13 +270,6 @@ export function HomePage() {
           />
         ) : (
           <div className="list-mode">
-            <FilterSidebar
-              filters={filters}
-              onTypesChange={handleTypesChange}
-              onFormatsChange={handleFormatsChange}
-              onVerifiedOnlyChange={handleVerifiedOnlyChange}
-              onReset={handleResetFilters}
-            />
             <div className="list-mode__results">
               <div className="result-toolbar card">
                 <div>

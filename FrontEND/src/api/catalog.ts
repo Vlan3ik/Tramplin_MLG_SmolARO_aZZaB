@@ -1,4 +1,4 @@
-import type { City, Location, PagedResponse, TagListItem } from '../types/catalog'
+import type { City, Location, PagedResponse, TagGroup, TagListItem } from '../types/catalog'
 import { getJson } from './client'
 
 type CityApiItem = {
@@ -18,6 +18,12 @@ type LocationApiItem = {
   longitude: number | null
   streetName: string | null
   houseNumber: string | null
+}
+
+type TagGroupApiItem = {
+  id: number
+  code: string
+  name: string
 }
 
 async function fetchCitiesPage(page: number, signal?: AbortSignal) {
@@ -54,6 +60,31 @@ export function fetchTags(signal?: AbortSignal) {
   return getJson<TagListItem[]>('/catalog/tags', {
     signal,
   })
+}
+
+export async function fetchTagGroups(signal?: AbortSignal) {
+  const items = await getJson<TagGroupApiItem[]>('/catalog/tag-groups', {
+    signal,
+  })
+
+  return items.map(
+    (item): TagGroup => ({
+      id: item.id,
+      code: item.code,
+      name: item.name,
+    }),
+  )
+}
+
+export async function fetchTechnologyTags(signal?: AbortSignal) {
+  const [tagGroups, tags] = await Promise.all([fetchTagGroups(signal), fetchTags(signal)])
+  const technologyGroup = tagGroups.find((item) => item.code === 'technology')
+
+  if (!technologyGroup) {
+    return []
+  }
+
+  return tags.filter((tag) => tag.groupId === technologyGroup.id || tag.groupCode === technologyGroup.code)
 }
 
 async function fetchLocationsPage(page: number, cityId?: number, signal?: AbortSignal) {

@@ -35,6 +35,9 @@ export function EventsPage() {
       filters: {
         types: ['event'] as OpportunityType[],
         formats,
+        tagIds: [],
+        salaryFrom: null,
+        salaryTo: null,
         verifiedOnly,
       },
     }),

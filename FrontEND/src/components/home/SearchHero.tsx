@@ -10,6 +10,7 @@ type SearchHeroProps = {
   onSearchChange: (value: string) => void
   onSearchSubmit: (valueOverride?: string) => void
   onSuggestionSelect: (item: SearchSuggestItem) => void | Promise<void>
+  onFiltersClick: () => void
 }
 
 const HERO_IFRAME_URL =
@@ -31,6 +32,7 @@ export function SearchHero({
   onSearchChange,
   onSearchSubmit,
   onSuggestionSelect,
+  onFiltersClick,
 }: SearchHeroProps) {
   const [isSuggestOpen, setIsSuggestOpen] = useState(false)
   const [isSuggestLoading, setIsSuggestLoading] = useState(false)
@@ -205,7 +207,7 @@ export function SearchHero({
             Найти
           </button>
 
-          <button className="btn btn--ghost" type="button" aria-disabled="true">
+          <button className="btn btn--ghost" type="button" onClick={onFiltersClick}>
             <SlidersHorizontal size={16} />
             Фильтры
           </button>

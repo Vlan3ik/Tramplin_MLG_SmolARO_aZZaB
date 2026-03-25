@@ -84,7 +84,7 @@ export function OpportunityDetailsPage() {
             page: 1,
             pageSize: 4,
             search: detail.company,
-            filters: { types: [], formats: [], verifiedOnly: false },
+            filters: { types: [], formats: [], tagIds: [], salaryFrom: null, salaryTo: null, verifiedOnly: false },
           },
           controller.signal,
         )
