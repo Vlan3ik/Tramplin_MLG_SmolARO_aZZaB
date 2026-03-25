@@ -159,33 +159,180 @@
 .date-input {
   position: relative;
   width: 100%;
+  display: inline-block;
+}
+
+.date-input__display {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--text-primary);
   display: inline-flex;
   align-items: center;
-}
-
-.date-input > input {
-  padding-right: 2.35rem;
-}
-
-.date-input__trigger {
-  position: absolute;
-  right: 0.38rem;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 0;
-  width: 1.85rem;
-  height: 1.85rem;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  color: var(--text-secondary);
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.52rem 0.74rem;
   cursor: pointer;
 }
 
-.date-input__trigger:hover {
-  background: #f1f5fb;
+.date-input__display:hover {
+  border-color: var(--accent);
+}
+
+.date-input.is-open .date-input__display {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 91, 255, 0.14);
+}
+
+.date-input__display-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.date-input__dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  width: min(320px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.18);
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.date-input__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+
+  strong {
+    font-size: 0.93rem;
+  }
+}
+
+.date-input__month-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.date-input__month-btn:hover {
+  border-color: var(--accent);
   color: var(--accent);
+}
+
+.date-input__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+
+  span {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+}
+
+.date-input__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.date-input__day {
+  border: 1px solid transparent;
+  background: #fff;
+  border-radius: 8px;
+  width: 100%;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.date-input__day:hover {
+  border-color: var(--accent);
+}
+
+.date-input__day.is-today {
+  border-color: rgba(0, 91, 255, 0.35);
+}
+
+.date-input__day.is-selected {
+  background: var(--accent);
+  color: #fff;
+}
+
+.date-input__day:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.date-input__day.is-empty {
+  visibility: hidden;
+}
+
+.date-input__time {
+  display: grid;
+  gap: 0.35rem;
+
+  span {
+    font-size: 0.86rem;
+    color: var(--text-secondary);
+  }
+
+  input {
+    min-height: 38px;
+    padding: 0.45rem 0.65rem;
+  }
+}
+
+.date-input__actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.date-input__action-btn {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-primary);
+  min-height: 34px;
+  padding: 0 0.62rem;
+  cursor: pointer;
+}
+
+.date-input__action-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.date-input__action-btn.is-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.date-input.is-disabled .date-input__display {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .input-wrap {
