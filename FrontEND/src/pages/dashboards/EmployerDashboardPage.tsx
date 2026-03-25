@@ -693,6 +693,7 @@ export function EmployerDashboardPage() {
     setCreatingVacancy(true)
 
     try {
+      const selectedLocation = vacancyLocations.find((location) => String(location.id) === vacancyForm.locationId.trim())
       const payload = {
         title: vacancyForm.title,
         shortDescription: vacancyForm.shortDescription,
@@ -702,6 +703,8 @@ export function EmployerDashboardPage() {
         status: vacancyForm.status,
         cityId: vacancyForm.cityId.trim() ? Number(vacancyForm.cityId) : null,
         locationId: vacancyForm.locationId.trim() ? Number(vacancyForm.locationId) : null,
+        locationLatitude: selectedLocation?.latitude ?? null,
+        locationLongitude: selectedLocation?.longitude ?? null,
         salaryFrom,
         salaryTo,
         currencyCode: normalizeCurrencyCode(vacancyForm.currencyCode),
@@ -768,6 +771,7 @@ export function EmployerDashboardPage() {
     try {
       const normalizedPriceAmount = opportunityForm.priceType === 1 ? null : priceAmount
       const normalizedPriceCurrency = opportunityForm.priceType === 1 ? null : normalizeCurrencyCode(opportunityForm.priceCurrencyCode)
+      const selectedLocation = opportunityLocations.find((location) => String(location.id) === opportunityForm.locationId.trim())
 
       const payload = {
         title: opportunityForm.title,
@@ -778,6 +782,8 @@ export function EmployerDashboardPage() {
         status: opportunityForm.status,
         cityId: opportunityForm.cityId.trim() ? Number(opportunityForm.cityId) : null,
         locationId: opportunityForm.locationId.trim() ? Number(opportunityForm.locationId) : null,
+        locationLatitude: selectedLocation?.latitude ?? null,
+        locationLongitude: selectedLocation?.longitude ?? null,
         priceType: opportunityForm.priceType,
         priceAmount: normalizedPriceAmount,
         priceCurrencyCode: normalizedPriceCurrency,

@@ -157,6 +157,27 @@ main:has(.vf-page) {
   grid-column: 1 / -1;
 }
 
+.vf-map-picker {
+  width: 100%;
+  min-height: 340px;
+  border: 1px solid #d6dfeb;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(16, 54, 87, 0.06);
+}
+
+.vf-map-hint {
+  margin: 0;
+  color: var(--vf-muted);
+  font-size: 14px;
+}
+
+.vf-map-address {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
 .vf-field span {
   font-size: 18px;
   font-weight: 500;

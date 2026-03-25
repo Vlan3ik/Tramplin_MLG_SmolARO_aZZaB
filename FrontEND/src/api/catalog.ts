@@ -14,6 +14,8 @@ type LocationApiItem = {
   id: number
   cityId: number
   cityName: string | null
+  latitude: number | null
+  longitude: number | null
   streetName: string | null
   houseNumber: string | null
 }
@@ -82,6 +84,8 @@ export async function fetchLocations(cityId?: number, signal?: AbortSignal) {
         id: location.id,
         cityId: location.cityId,
         cityName: location.cityName ?? '',
+        latitude: location.latitude ?? null,
+        longitude: location.longitude ?? null,
         streetName: location.streetName ?? '',
         houseNumber: location.houseNumber ?? '',
       })),
