@@ -2,6 +2,8 @@
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { fetchCities, fetchLocations, fetchTags } from '../api/catalog'
 import { createEmployerOpportunity, createEmployerVacancy } from '../api/employer'
+import { DateInput } from '../components/forms/DateInput'
+import { TagPicker } from '../components/forms/TagPicker'
 import type { City, Location, TagListItem } from '../types/catalog'
 import './VacancyFlowPage.css'
 
@@ -95,13 +97,6 @@ function toNumberOrNull(value: string) {
 function normalizeCurrencyCode(value: string) {
   const normalized = value.trim().toUpperCase()
   return normalized || null
-}
-
-function parseSelectedNumberOptions(options: HTMLOptionsCollection) {
-  return Array.from(options)
-    .filter((option) => option.selected)
-    .map((option) => Number(option.value))
-    .filter((value) => Number.isInteger(value) && value > 0)
 }
 
 function locationOptionLabel(location: Location) {
@@ -352,17 +347,17 @@ export function VacancyFlowPage() {
     }))
   }
 
-  function onVacancyTagsChange(event: ChangeEvent<HTMLSelectElement>) {
+  function onVacancyTagsChange(values: number[]) {
     setVacancyForm((state) => ({
       ...state,
-      tagIds: parseSelectedNumberOptions(event.target.options),
+      tagIds: values,
     }))
   }
 
-  function onEventTagsChange(event: ChangeEvent<HTMLSelectElement>) {
+  function onEventTagsChange(values: number[]) {
     setEventForm((state) => ({
       ...state,
-      tagIds: parseSelectedNumberOptions(event.target.options),
+      tagIds: values,
     }))
   }
 
@@ -648,18 +643,15 @@ export function VacancyFlowPage() {
 
                   <label className="vf-field vf-field--full">
                     <span>Теги</span>
-                    <select
-                      multiple
-                      value={(isVacancyFlow ? vacancyForm.tagIds : eventForm.tagIds).map(String)}
+                    <TagPicker
+                      className="vf-tag-picker"
+                      options={tags.map((tag) => ({ id: tag.id, label: tag.name }))}
+                      selectedIds={isVacancyFlow ? vacancyForm.tagIds : eventForm.tagIds}
                       onChange={isVacancyFlow ? onVacancyTagsChange : onEventTagsChange}
-                      className="vf-select-multiple"
-                    >
-                      {tags.map((tag) => (
-                        <option key={tag.id} value={tag.id}>
-                          {tag.name}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Выберите теги"
+                      searchPlaceholder="Поиск по тегам..."
+                      emptyMessage="Теги не найдены"
+                    />
                   </label>
                 </div>
                 <p className="vf-note vf-note--moderation">After submit, the card is sent to moderation automatically.</p>
@@ -740,11 +732,11 @@ export function VacancyFlowPage() {
                     </label>
                     <label className="vf-field">
                       <span>Дата публикации</span>
-                      <input type="datetime-local" name="publishAt" value={vacancyForm.publishAt} onChange={onVacancyFormChange} />
+                      <DateInput type="datetime-local" name="publishAt" value={vacancyForm.publishAt} onChange={onVacancyFormChange} />
                     </label>
                     <label className="vf-field">
                       <span>Дедлайн откликов</span>
-                      <input type="datetime-local" name="applicationDeadline" value={vacancyForm.applicationDeadline} onChange={onVacancyFormChange} />
+                      <DateInput type="datetime-local" name="applicationDeadline" value={vacancyForm.applicationDeadline} onChange={onVacancyFormChange} />
                     </label>
                   </div>
                 ) : (
@@ -767,11 +759,11 @@ export function VacancyFlowPage() {
                     </label>
                     <label className="vf-field">
                       <span>Дата публикации</span>
-                      <input type="datetime-local" name="publishAt" value={eventForm.publishAt} onChange={onEventFormChange} />
+                      <DateInput type="datetime-local" name="publishAt" value={eventForm.publishAt} onChange={onEventFormChange} />
                     </label>
                     <label className="vf-field">
                       <span>Дата события</span>
-                      <input type="datetime-local" name="eventDate" value={eventForm.eventDate} onChange={onEventFormChange} />
+                      <DateInput type="datetime-local" name="eventDate" value={eventForm.eventDate} onChange={onEventFormChange} />
                     </label>
 
                     <div className="vf-switch-row">

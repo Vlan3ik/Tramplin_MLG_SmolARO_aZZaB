@@ -30,6 +30,8 @@ import { uploadCompanyLogo } from '../../api/media'
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
+import { DateInput } from '../../components/forms/DateInput'
+import { TagPicker } from '../../components/forms/TagPicker'
 import type { City, Location, TagListItem } from '../../types/catalog'
 import { formatSkillLevelDisplay } from '../../utils/skill-levels'
 
@@ -153,13 +155,6 @@ function locationOptionLabel(location: Location) {
   const addressParts = [location.streetName, location.houseNumber].filter(Boolean)
   const address = addressParts.length ? addressParts.join(', ') : 'Адрес не указан'
   return `${location.cityName}: ${address}`
-}
-
-function parseSelectedNumberOptions(options: HTMLOptionsCollection) {
-  return Array.from(options)
-    .filter((option) => option.selected)
-    .map((option) => Number(option.value))
-    .filter((value) => Number.isInteger(value) && value > 0)
 }
 
 function formatDate(value: string) {
@@ -577,16 +572,14 @@ export function EmployerDashboardPage() {
     }))
   }
 
-  function onVacancyTagsChange(event: ChangeEvent<HTMLSelectElement>) {
-    const values = parseSelectedNumberOptions(event.target.options)
+  function onVacancyTagsChange(values: number[]) {
     setVacancyForm((state) => ({
       ...state,
       tagIds: values,
     }))
   }
 
-  function onOpportunityTagsChange(event: ChangeEvent<HTMLSelectElement>) {
-    const values = parseSelectedNumberOptions(event.target.options)
+  function onOpportunityTagsChange(values: number[]) {
     setOpportunityForm((state) => ({
       ...state,
       tagIds: values,
@@ -1393,21 +1386,22 @@ export function EmployerDashboardPage() {
             </label>
             <label>
               Дата публикации
-              <input name="publishAt" type="datetime-local" value={vacancyForm.publishAt} onChange={onVacancyFormChange} required />
+              <DateInput name="publishAt" type="datetime-local" value={vacancyForm.publishAt} onChange={onVacancyFormChange} required />
             </label>
             <label>
               Дедлайн откликов
-              <input name="applicationDeadline" type="datetime-local" value={vacancyForm.applicationDeadline} onChange={onVacancyFormChange} />
+              <DateInput name="applicationDeadline" type="datetime-local" value={vacancyForm.applicationDeadline} onChange={onVacancyFormChange} />
             </label>
             <label>
               Теги
-              <select multiple value={vacancyForm.tagIds.map(String)} onChange={onVacancyTagsChange}>
-                {tags.map((tag) => (
-                  <option key={tag.id} value={tag.id}>
-                    {tag.name}
-                  </option>
-                ))}
-              </select>
+              <TagPicker
+                options={tags.map((tag) => ({ id: tag.id, label: tag.name }))}
+                selectedIds={vacancyForm.tagIds}
+                onChange={onVacancyTagsChange}
+                placeholder="Select tags"
+                searchPlaceholder="Search tags..."
+                emptyMessage="No tags found"
+              />
             </label>
             <button type="submit" className="btn btn--primary" disabled={!company || creatingVacancy}>
               {creatingVacancy ? (editingVacancyId ? 'Сохраняем...' : 'Создаем...') : editingVacancyId ? 'Сохранить вакансию' : 'Создать вакансию'}
@@ -1514,21 +1508,22 @@ export function EmployerDashboardPage() {
             </label>
             <label>
               Дата публикации
-              <input name="publishAt" type="datetime-local" value={opportunityForm.publishAt} onChange={onOpportunityFormChange} required />
+              <DateInput name="publishAt" type="datetime-local" value={opportunityForm.publishAt} onChange={onOpportunityFormChange} required />
             </label>
             <label>
               Дата события
-              <input name="eventDate" type="datetime-local" value={opportunityForm.eventDate} onChange={onOpportunityFormChange} />
+              <DateInput name="eventDate" type="datetime-local" value={opportunityForm.eventDate} onChange={onOpportunityFormChange} />
             </label>
             <label>
               Теги
-              <select multiple value={opportunityForm.tagIds.map(String)} onChange={onOpportunityTagsChange}>
-                {tags.map((tag) => (
-                  <option key={tag.id} value={tag.id}>
-                    {tag.name}
-                  </option>
-                ))}
-              </select>
+              <TagPicker
+                options={tags.map((tag) => ({ id: tag.id, label: tag.name }))}
+                selectedIds={opportunityForm.tagIds}
+                onChange={onOpportunityTagsChange}
+                placeholder="Select tags"
+                searchPlaceholder="Search tags..."
+                emptyMessage="No tags found"
+              />
             </label>
             <button type="submit" className="btn btn--secondary" disabled={!company || creatingOpportunity}>
               {creatingOpportunity ? (editingOpportunityId ? 'Сохраняем...' : 'Создаем...') : editingOpportunityId ? 'Сохранить возможность' : 'Создать возможность'}

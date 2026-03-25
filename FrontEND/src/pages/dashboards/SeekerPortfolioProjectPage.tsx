@@ -14,6 +14,7 @@ import { fetchOpportunityCollaborationSuggestions, fetchProfileCollaborationSugg
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
+import { DateInput } from '../../components/forms/DateInput'
 import { API_ORIGIN } from '../../config/api'
 import { useAuth } from '../../hooks/useAuth'
 import type { PortfolioProjectMutationRequest } from '../../api/portfolio'
@@ -312,7 +313,7 @@ export function SeekerPortfolioProjectPage() {
             <div className="profile-settings-modal__head"><h2 id="project-edit-modal-title">Редактирование проекта</h2></div>
             <div className="seeker-project-edit__grid">
               <label>Название<input value={title} onChange={(e) => setTitle(e.target.value)} /></label><label>Роль<input value={role} onChange={(e) => setRole(e.target.value)} /></label>
-              <label>Р”Р°С‚Р° РЅР°С‡ала<input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label><label>Р”Р°С‚Р° Р·Р°РІРµСЂС€ения<input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
+              <label>Р”Р°С‚Р° РЅР°С‡ала<DateInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label><label>Р”Р°С‚Р° Р·Р°РІРµСЂС€ения<DateInput type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
               <label>Repo URL<input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} /></label><label>Demo URL<input value={demoUrl} onChange={(e) => setDemoUrl(e.target.value)} /></label>
               <label className="full-width">Описание<textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
               <label className="seeker-project-edit__private full-width"><input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />РЎРєСЂС‹С‚СЊ РїСЂРѕРµРєС‚ РёР· РїСѓР±Р»РёС‡РЅРѕРіРѕ РїСЂРѕС„иля</label>

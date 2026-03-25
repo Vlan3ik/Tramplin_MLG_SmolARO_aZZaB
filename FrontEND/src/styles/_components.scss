@@ -53,6 +53,141 @@
   width: 100%;
 }
 
+.tag-picker {
+  position: relative;
+  width: 100%;
+}
+
+.tag-picker__trigger {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-height: 44px;
+  padding: 0.55rem 0.8rem;
+  background: #fff;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  cursor: pointer;
+}
+
+.tag-picker__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.tag-picker__arrow {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.tag-picker__dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+
+.tag-picker__search {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
+
+.tag-picker__search:focus {
+  outline: none;
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.tag-picker__list {
+  max-height: 240px;
+  overflow: auto;
+}
+
+.tag-picker__option {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #edf1f6;
+  background: #fff;
+  color: var(--text-primary);
+  padding: 0.6rem 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tag-picker__option:hover {
+  background: #f7fbff;
+}
+
+.tag-picker__option.is-selected {
+  background: var(--accent-soft);
+}
+
+.tag-picker__option-check {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.tag-picker__empty {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.tag-picker.is-disabled .tag-picker__trigger {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.date-input {
+  position: relative;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+}
+
+.date-input > input {
+  padding-right: 2.35rem;
+}
+
+.date-input__trigger {
+  position: absolute;
+  right: 0.38rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.date-input__trigger:hover {
+  background: #f1f5fb;
+  color: var(--accent);
+}
+
 .input-wrap {
   position: relative;
   display: flex;
