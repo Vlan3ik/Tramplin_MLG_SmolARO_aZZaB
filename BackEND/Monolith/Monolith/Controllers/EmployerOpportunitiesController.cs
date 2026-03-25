@@ -216,6 +216,11 @@ public class EmployerOpportunitiesController(
         }
 
         var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+        if (resolvedLocation is null)
+        {
+            return this.ToBadRequestError("employer.opportunities.location_unresolved", "Unable to resolve location from mapPoint.");
+        }
+
         var resolvedStatus = await ResolvePublicationStatusAsync(membership.CompanyId, request.Status, cancellationToken);
         var opportunity = new Opportunity
         {
@@ -227,8 +232,8 @@ public class EmployerOpportunitiesController(
             Kind = request.Kind,
             Format = request.Format,
             Status = resolvedStatus,
-            CityId = request.CityId,
-            LocationId = request.LocationId,
+            CityId = resolvedLocation.CityId,
+            LocationId = resolvedLocation.LocationId,
             PriceType = request.PriceType,
             PriceAmount = request.PriceAmount,
             PriceCurrencyCode = request.PriceCurrencyCode?.Trim().ToUpperInvariant(),
@@ -236,12 +241,6 @@ public class EmployerOpportunitiesController(
             PublishAt = request.PublishAt,
             EventDate = request.EventDate
         };
-
-        if (resolvedLocation is not null)
-        {
-            opportunity.CityId = resolvedLocation.CityId;
-            opportunity.LocationId = resolvedLocation.LocationId;
-        }
 
         dbContext.Opportunities.Add(opportunity);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -281,6 +280,11 @@ public class EmployerOpportunitiesController(
         }
 
         var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+        if (resolvedLocation is null)
+        {
+            return this.ToBadRequestError("employer.opportunities.location_unresolved", "Unable to resolve location from mapPoint.");
+        }
+
         var resolvedStatus = await ResolvePublicationStatusAsync(membership.CompanyId, request.Status, cancellationToken);
 
         opportunity.Title = request.Title.Trim();
@@ -289,20 +293,14 @@ public class EmployerOpportunitiesController(
         opportunity.Kind = request.Kind;
         opportunity.Format = request.Format;
         opportunity.Status = resolvedStatus;
-        opportunity.CityId = request.CityId;
-        opportunity.LocationId = request.LocationId;
+        opportunity.CityId = resolvedLocation.CityId;
+        opportunity.LocationId = resolvedLocation.LocationId;
         opportunity.PriceType = request.PriceType;
         opportunity.PriceAmount = request.PriceAmount;
         opportunity.PriceCurrencyCode = request.PriceCurrencyCode?.Trim().ToUpperInvariant();
         opportunity.ParticipantsCanWrite = request.ParticipantsCanWrite;
         opportunity.PublishAt = request.PublishAt;
         opportunity.EventDate = request.EventDate;
-
-        if (resolvedLocation is not null)
-        {
-            opportunity.CityId = resolvedLocation.CityId;
-            opportunity.LocationId = resolvedLocation.LocationId;
-        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await ReplaceOpportunityTags(opportunity.Id, request.TagIds, cancellationToken);
@@ -440,6 +438,16 @@ public class EmployerOpportunitiesController(
             {
                 return "Paid and prize events require amount and currency.";
             }
+        }
+
+        if (request.MapPoint is null)
+        {
+            return "mapPoint is required. cityId/locationId are resolved automatically.";
+        }
+
+        if (request.CityId is not null || request.LocationId is not null)
+        {
+            return "cityId and locationId cannot be set manually. Use mapPoint.";
         }
 
         if (request.MapPoint is not null)

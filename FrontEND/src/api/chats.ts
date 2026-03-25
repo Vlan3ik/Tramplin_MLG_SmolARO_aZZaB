@@ -40,6 +40,14 @@ type SendChatMessageRequest = {
   text: string
 }
 
+type CreateDirectChatRequest = {
+  userId: number
+}
+
+type CreateDirectChatResponse = {
+  chatId: number
+}
+
 function mapMessage(item: ChatMessageApi): ChatMessage {
   return {
     id: item.id,
@@ -163,6 +171,12 @@ export async function fetchEmployerChatDetail(chatId: number, beforeMessageId?: 
       nextBeforeMessageId: response.history.nextBeforeMessageId,
     },
   }
+}
+
+export async function createDirectChat(userId: number) {
+  const payload: CreateDirectChatRequest = { userId }
+  const response = await postJson<CreateDirectChatResponse, CreateDirectChatRequest>('/chats/direct', payload)
+  return response.chatId
 }
 
 export async function sendChatMessage(chatId: number, text: string) {

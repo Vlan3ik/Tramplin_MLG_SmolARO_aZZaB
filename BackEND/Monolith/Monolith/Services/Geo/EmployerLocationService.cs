@@ -42,6 +42,34 @@ public class EmployerLocationService(AppDbContext dbContext, IReverseGeocodingSe
         return new ResolvedLocationResult(city.Id, location.Id);
     }
 
+    public async Task<ResolvedAddressResult?> ResolveAddressAsync(decimal latitude, decimal longitude, CancellationToken cancellationToken)
+    {
+        var reverse = await reverseGeocodingService.ReverseAsync(latitude, longitude, cancellationToken);
+        var nearestCity = await ResolveNearestCityAsync(latitude, longitude, cancellationToken);
+
+        var cityName = CleanText(reverse?.CityName) ?? nearestCity?.CityName;
+        var regionName = CleanText(reverse?.RegionName) ?? nearestCity?.RegionName;
+        var countryCode = CleanText(reverse?.CountryCode) ?? nearestCity?.CountryCode;
+        var street = CleanText(reverse?.StreetName);
+        var house = CleanText(reverse?.HouseNumber);
+        var resolvedLatitude = reverse?.Latitude ?? nearestCity?.Latitude ?? latitude;
+        var resolvedLongitude = reverse?.Longitude ?? nearestCity?.Longitude ?? longitude;
+
+        if (cityName is null && street is null && house is null)
+        {
+            return null;
+        }
+
+        return new ResolvedAddressResult(
+            countryCode,
+            regionName,
+            cityName,
+            street,
+            house,
+            resolvedLatitude,
+            resolvedLongitude);
+    }
+
     private async Task<City?> ResolveCityAsync(
         ReverseGeocodingAddress? reverse,
         decimal latitude,
@@ -84,6 +112,15 @@ public class EmployerLocationService(AppDbContext dbContext, IReverseGeocodingSe
                 Math.Abs(x.Longitude!.Value - longitude))
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    private async Task<City?> ResolveNearestCityAsync(decimal latitude, decimal longitude, CancellationToken cancellationToken)
+        => await dbContext.Cities
+            .AsNoTracking()
+            .Where(x => x.Latitude != null && x.Longitude != null)
+            .OrderBy(x =>
+                Math.Abs(x.Latitude!.Value - latitude) +
+                Math.Abs(x.Longitude!.Value - longitude))
+            .FirstOrDefaultAsync(cancellationToken);
 
     private async Task<LocationEntity?> FindLocationAsync(long cityId, string? street, string? house, CancellationToken cancellationToken)
     {

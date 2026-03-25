@@ -13,7 +13,8 @@ type SearchHeroProps = {
 }
 
 const HERO_IFRAME_URL =
-      'https://g.igroutka.ru/games/1652/1u2NbYJlreRAtwo7/3fdb3fff-ce9a-467e-aa21-a2f103202af3/index.html'
+    'https://luxespa-smolensk.ru/'
+      // 'https://g.igroutka.ru/games/1652/1u2NbYJlreRAtwo7/3fdb3fff-ce9a-467e-aa21-a2f103202af3/index.html'
   // 'https://igroutka.ru/loader/game/54272/'
 
 const SUGGEST_MIN_QUERY_LENGTH = 2

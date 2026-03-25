@@ -232,6 +232,11 @@ public class EmployerVacanciesController(
         }
 
         var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+        if (resolvedLocation is null)
+        {
+            return this.ToBadRequestError("employer.vacancies.location_unresolved", "Unable to resolve location from mapPoint.");
+        }
+
         var resolvedStatus = await ResolvePublicationStatusAsync(membership.CompanyId, request.Status, cancellationToken);
         var vacancy = new Vacancy
         {
@@ -243,8 +248,8 @@ public class EmployerVacanciesController(
             Kind = request.Kind,
             Format = request.Format,
             Status = resolvedStatus,
-            CityId = request.CityId,
-            LocationId = request.LocationId,
+            CityId = resolvedLocation.CityId,
+            LocationId = resolvedLocation.LocationId,
             SalaryFrom = request.SalaryFrom,
             SalaryTo = request.SalaryTo,
             CurrencyCode = request.CurrencyCode?.Trim().ToUpperInvariant(),
@@ -252,12 +257,6 @@ public class EmployerVacanciesController(
             PublishAt = request.PublishAt,
             ApplicationDeadline = request.ApplicationDeadline
         };
-
-        if (resolvedLocation is not null)
-        {
-            vacancy.CityId = resolvedLocation.CityId;
-            vacancy.LocationId = resolvedLocation.LocationId;
-        }
 
         dbContext.Vacancies.Add(vacancy);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -297,6 +296,11 @@ public class EmployerVacanciesController(
         }
 
         var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+        if (resolvedLocation is null)
+        {
+            return this.ToBadRequestError("employer.vacancies.location_unresolved", "Unable to resolve location from mapPoint.");
+        }
+
         var resolvedStatus = await ResolvePublicationStatusAsync(membership.CompanyId, request.Status, cancellationToken);
 
         vacancy.Title = request.Title.Trim();
@@ -305,20 +309,14 @@ public class EmployerVacanciesController(
         vacancy.Kind = request.Kind;
         vacancy.Format = request.Format;
         vacancy.Status = resolvedStatus;
-        vacancy.CityId = request.CityId;
-        vacancy.LocationId = request.LocationId;
+        vacancy.CityId = resolvedLocation.CityId;
+        vacancy.LocationId = resolvedLocation.LocationId;
         vacancy.SalaryFrom = request.SalaryFrom;
         vacancy.SalaryTo = request.SalaryTo;
         vacancy.CurrencyCode = request.CurrencyCode?.Trim().ToUpperInvariant();
         vacancy.SalaryTaxMode = request.SalaryTaxMode;
         vacancy.PublishAt = request.PublishAt;
         vacancy.ApplicationDeadline = request.ApplicationDeadline;
-
-        if (resolvedLocation is not null)
-        {
-            vacancy.CityId = resolvedLocation.CityId;
-            vacancy.LocationId = resolvedLocation.LocationId;
-        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await ReplaceVacancyTags(vacancy.Id, request.TagIds, cancellationToken);
@@ -542,6 +540,16 @@ public class EmployerVacanciesController(
         if (request.SalaryFrom is not null && request.SalaryTo is not null && request.SalaryTo < request.SalaryFrom)
         {
             return "salaryTo must be >= salaryFrom.";
+        }
+
+        if (request.MapPoint is null)
+        {
+            return "mapPoint is required. cityId/locationId are resolved automatically.";
+        }
+
+        if (request.CityId is not null || request.LocationId is not null)
+        {
+            return "cityId and locationId cannot be set manually. Use mapPoint.";
         }
 
         if (request.MapPoint is not null)

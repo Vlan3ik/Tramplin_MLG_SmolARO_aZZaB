@@ -55,6 +55,7 @@ public class MeController(AppDbContext dbContext) : ControllerBase
         var userId = User.GetUserId();
         var profile = await dbContext.CandidateProfiles
             .Include(x => x.User)
+            .Include(x => x.City)
             .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
         if (profile is null)
         {
@@ -70,6 +71,8 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             profile.BirthDate,
             profile.Gender,
             profile.Phone,
+            profile.CityId,
+            profile.City?.CityName,
             profile.About,
             profile.AvatarUrl));
     }
@@ -111,6 +114,30 @@ public class MeController(AppDbContext dbContext) : ControllerBase
         {
             return this.ToBadRequestError("me.profile.invalid_gender", "Указан некорректный пол.");
         }
+        long? resolvedCityId = request.CityId;
+
+        if (resolvedCityId is not null)
+        {
+            var cityExists = await dbContext.Cities.AnyAsync(x => x.Id == resolvedCityId.Value, cancellationToken);
+            if (!cityExists)
+            {
+                return this.ToBadRequestError("me.profile.invalid_city", "Указан некорректный город.");
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(request.City))
+        {
+            var normalizedCity = request.City.Trim().ToLower();
+            resolvedCityId = await dbContext.Cities
+                .Where(x => x.CityName.ToLower() == normalizedCity)
+                .OrderBy(x => x.Id)
+                .Select(x => (long?)x.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (resolvedCityId is null)
+            {
+                return this.ToBadRequestError("me.profile.invalid_city", "Указан некорректный город.");
+            }
+        }
 
         profile.FirstName = firstName;
         profile.LastName = lastName;
@@ -119,6 +146,7 @@ public class MeController(AppDbContext dbContext) : ControllerBase
         profile.BirthDate = request.BirthDate;
         profile.Gender = request.Gender ?? CandidateGender.Unknown;
         profile.Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+        profile.CityId = resolvedCityId;
         profile.About = string.IsNullOrWhiteSpace(request.About) ? null : request.About.Trim();
         profile.AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim();
         profile.User.AvatarUrl = profile.AvatarUrl;
@@ -134,6 +162,13 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             profile.BirthDate,
             profile.Gender,
             profile.Phone,
+            profile.CityId,
+            profile.CityId is null
+                ? null
+                : await dbContext.Cities
+                    .Where(x => x.Id == profile.CityId.Value)
+                    .Select(x => x.CityName)
+                    .FirstOrDefaultAsync(cancellationToken),
             profile.About,
             profile.AvatarUrl));
     }

@@ -2,15 +2,54 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Monolith.Contexts;
 using Monolith.Entities;
+using Monolith.Models.Map;
 using Monolith.Models.Opportunities;
+using Monolith.Services.Geo;
 
 namespace Monolith.Controllers;
 
 [ApiController]
 [Route("map")]
 [Produces("application/json")]
-public class MapController(AppDbContext dbContext) : ControllerBase
+public class MapController(AppDbContext dbContext, IEmployerLocationService employerLocationService) : ControllerBase
 {
+    [HttpGet("reverse-geocode")]
+    [ProducesResponseType(typeof(MapReverseGeocodeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<MapReverseGeocodeResponse>> ReverseGeocode(
+        [FromQuery] decimal latitude,
+        [FromQuery] decimal longitude,
+        CancellationToken cancellationToken)
+    {
+        if (latitude is < -90 or > 90)
+        {
+            return BadRequest(new { code = "map.invalid_latitude", message = "latitude must be between -90 and 90." });
+        }
+
+        if (longitude is < -180 or > 180)
+        {
+            return BadRequest(new { code = "map.invalid_longitude", message = "longitude must be between -180 and 180." });
+        }
+
+        var result = await employerLocationService.ResolveAddressAsync(latitude, longitude, cancellationToken);
+        if (result is null)
+        {
+            return NotFound(new { code = "map.address_not_found", message = "Address not found for these coordinates." });
+        }
+
+        return Ok(new MapReverseGeocodeResponse(
+            latitude,
+            longitude,
+            result.Latitude,
+            result.Longitude,
+            result.CountryCode,
+            result.RegionName,
+            result.CityName,
+            result.StreetName,
+            result.HouseNumber));
+    }
+
     /// <summary>
     /// Возвращает GeoJSON-коллекцию активных вакансий и возможностей для карты.
     /// </summary>
