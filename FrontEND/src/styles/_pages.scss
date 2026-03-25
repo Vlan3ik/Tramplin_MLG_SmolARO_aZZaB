@@ -659,16 +659,21 @@
 }
 
 .company-profile-hero__verified {
-  position: absolute;
-  right: 14px;
-  bottom: 16px;
-  width: 44px;
-  height: 44px;
+  width: 58px;
+  height: 58px;
   border-radius: 999px;
   display: grid;
   place-items: center;
   background: #06a430;
   color: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+
+.company-profile-hero__verified--floating {
+  position: absolute;
+  left: calc(50% + 80px);
+  top: 304px;
+  z-index: 6;
 }
 
 .company-profile-hero__name {
@@ -1944,10 +1949,13 @@
   }
 
   .company-profile-hero__verified {
-    width: 34px;
-    height: 34px;
-    right: 6px;
-    bottom: 8px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .company-profile-hero__verified--floating {
+    left: calc(50% + 54px);
+    top: 214px;
   }
 
   .company-profile-hero__name {

@@ -73,6 +73,8 @@ function parseOpportunityType(value: CompanyOpportunityApi['type']): Opportunity
 
   const normalized = value.toLowerCase().trim()
 
+  if (normalized === 'job') return 'vacancy'
+  if (normalized === 'hackathon') return 'event'
   if (normalized.includes('vacan')) return 'vacancy'
   if (normalized.includes('intern')) return 'internship'
   if (normalized.includes('ment')) return 'mentorship'

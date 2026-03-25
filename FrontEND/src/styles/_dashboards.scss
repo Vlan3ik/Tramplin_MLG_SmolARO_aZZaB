@@ -141,6 +141,11 @@
   .moderation-grid {
     grid-template-columns: 1fr;
   }
+
+  .seeker-list-filters,
+  .seeker-list-filters--triple {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -152,6 +157,7 @@
     flex-direction: column;
     align-items: flex-start;
   }
+
 }
 
 .seeker-profile-page {
@@ -1347,6 +1353,23 @@
   .btn {
     min-height: 38px;
   }
+}
+
+.seeker-list-filters {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 0.65rem;
+
+  label {
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+  }
+}
+
+.seeker-list-filters--triple {
+  grid-template-columns: 1fr 220px 220px;
 }
 
 .subscriptions-block {

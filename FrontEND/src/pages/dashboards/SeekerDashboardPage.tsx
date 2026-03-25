@@ -961,6 +961,11 @@ export function SeekerDashboardPage() {
   const [tags, setTags] = useState<TagListItem[]>([])
   const [favoriteOpportunities, setFavoriteOpportunities] = useState<Opportunity[]>([])
   const [favoriteIds, setFavoriteIds] = useState<number[]>(() => getFavoriteOpportunityIds())
+  const [responsesSearch, setResponsesSearch] = useState('')
+  const [responsesToneFilter, setResponsesToneFilter] = useState<'all' | 'success' | 'warning' | 'danger'>('all')
+  const [favoritesSearch, setFavoritesSearch] = useState('')
+  const [favoritesTypeFilter, setFavoritesTypeFilter] = useState<'all' | Opportunity['type']>('all')
+  const [favoritesFormatFilter, setFavoritesFormatFilter] = useState<'all' | string>('all')
   const [applyingIds, setApplyingIds] = useState<Record<number, boolean>>({})
   const [followingUsers, setFollowingUsers] = useState<SubscriptionUser[]>([])
   const [followerUsers, setFollowerUsers] = useState<SubscriptionUser[]>([])
@@ -1523,14 +1528,62 @@ export function SeekerDashboardPage() {
     return '/dashboard/seeker'
   }, [isPublicReadOnlyMode, publicUsername])
 
+  const filteredApplications = useMemo(() => {
+    const query = responsesSearch.trim().toLowerCase()
+
+    return applications.filter((item) => {
+      if (responsesToneFilter !== 'all' && item.tone !== responsesToneFilter) {
+        return false
+      }
+
+      if (!query) {
+        return true
+      }
+
+      const haystack = [item.title, item.company, item.location, item.status].join(' ').toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [applications, responsesSearch, responsesToneFilter])
+
+  const filteredFavoriteOpportunities = useMemo(() => {
+    const query = favoritesSearch.trim().toLowerCase()
+
+    return favoriteOpportunities.filter((item) => {
+      if (favoritesTypeFilter !== 'all' && item.type !== favoritesTypeFilter) {
+        return false
+      }
+
+      if (favoritesFormatFilter !== 'all' && item.workFormat !== favoritesFormatFilter) {
+        return false
+      }
+
+      if (!query) {
+        return true
+      }
+
+      const haystack = [item.title, item.company, item.location, item.description].join(' ').toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [favoriteOpportunities, favoritesFormatFilter, favoritesSearch, favoritesTypeFilter])
+
+  const favoriteTypeOptions = useMemo(
+    () => Array.from(new Set(favoriteOpportunities.map((item) => item.type))),
+    [favoriteOpportunities],
+  )
+
+  const favoriteFormatOptions = useMemo(
+    () => Array.from(new Set(favoriteOpportunities.map((item) => item.workFormat).filter(Boolean))),
+    [favoriteOpportunities],
+  )
+
   const responsesStats = useMemo(
     () => ({
-      total: applications.length,
-      success: applications.filter((item) => item.tone === 'success').length,
-      warning: applications.filter((item) => item.tone === 'warning').length,
-      danger: applications.filter((item) => item.tone === 'danger').length,
+      total: filteredApplications.length,
+      success: filteredApplications.filter((item) => item.tone === 'success').length,
+      warning: filteredApplications.filter((item) => item.tone === 'warning').length,
+      danger: filteredApplications.filter((item) => item.tone === 'danger').length,
     }),
-    [applications],
+    [filteredApplications],
   )
 
   const seekerSubscriptions = useMemo(() => {
@@ -1635,6 +1688,22 @@ export function SeekerDashboardPage() {
     }
     return `До ${formatter.format(resume.salaryTo ?? 0)} ₽`
   }, [resume.salaryFrom, resume.salaryTo])
+  const primaryEducation = useMemo(() => resume.education[0] ?? null, [resume.education])
+  const educationCourseAndYear = useMemo(() => {
+    if (!primaryEducation) {
+      return 'Не указаны'
+    }
+
+    const pieces: string[] = []
+    if (primaryEducation.course > 0) {
+      pieces.push(`${primaryEducation.course} курс`)
+    }
+    if (primaryEducation.graduationYear > 0) {
+      pieces.push(`${primaryEducation.graduationYear} год`)
+    }
+
+    return pieces.length ? pieces.join(' / ') : 'Не указаны'
+  }, [primaryEducation])
 
   async function onApplyFromFavorites(opportunityId: number) {
     if (!session?.accessToken || !session.user?.id) {
@@ -1714,7 +1783,7 @@ export function SeekerDashboardPage() {
       setProfile(updated)
       setProfileForm(createProfileForm(updated))
 
-      const nextScope = toResumeAndProfileScope(profileVisibility)
+      const nextProfileScope = toResumeAndProfileScope(profileVisibility)
       const settingsToSave = seekerSettings ?? {
         userId: updated.userId,
         profileVisibility: PRIVACY_SCOPE_AUTHORIZED_USERS,
@@ -1724,8 +1793,8 @@ export function SeekerDashboardPage() {
       }
 
       const updatedSettings = await updateSeekerSettings({
-        profileVisibility: nextScope,
-        resumeVisibility: nextScope,
+        profileVisibility: nextProfileScope,
+        resumeVisibility: settingsToSave.resumeVisibility,
         openToWork: settingsToSave.openToWork,
         showContactsInResume: settingsToSave.showContactsInResume,
       })
@@ -2741,6 +2810,25 @@ export function SeekerDashboardPage() {
               {!isPublicReadOnlyMode && tab === 'responses' ? (
                 <section className="card seeker-profile-panel">
                   <h2>Мои отклики</h2>
+                  <div className="seeker-list-filters">
+                    <label>
+                      Поиск
+                      <input
+                        value={responsesSearch}
+                        onChange={(event) => setResponsesSearch(event.target.value)}
+                        placeholder="Вакансия, компания, город"
+                      />
+                    </label>
+                    <label>
+                      Статус
+                      <select value={responsesToneFilter} onChange={(event) => setResponsesToneFilter(event.target.value as 'all' | 'success' | 'warning' | 'danger')}>
+                        <option value="all">Все</option>
+                        <option value="success">Активные</option>
+                        <option value="warning">На рассмотрении</option>
+                        <option value="danger">Закрытые</option>
+                      </select>
+                    </label>
+                  </div>
                   <div className="application-stats">
                     <article><strong>{responsesStats.total}</strong><span>Всего откликов</span></article>
                     <article><strong>{responsesStats.success}</strong><span>Активные</span></article>
@@ -2749,9 +2837,10 @@ export function SeekerDashboardPage() {
                   </div>
                   {loadingApplications ? <p>Загружаем отклики...</p> : null}
                   {!loadingApplications && !applications.length ? <p>Вы еще не отправляли отклики.</p> : null}
-                  {!loadingApplications && applications.length ? (
+                  {!loadingApplications && applications.length && !filteredApplications.length ? <p>По текущим фильтрам откликов ничего не найдено.</p> : null}
+                  {!loadingApplications && filteredApplications.length ? (
                     <div className="application-list">
-                      {applications.map((item) => (
+                      {filteredApplications.map((item) => (
                         <article key={item.id} className="application-card">
                           <div className="application-card__top">
                             <div><h3>{item.title}</h3><p>{item.company}</p></div>
@@ -2773,14 +2862,49 @@ export function SeekerDashboardPage() {
               {!isPublicReadOnlyMode && tab === 'favorites' ? (
                 <section className="card seeker-profile-panel">
                   <h2>Избранное</h2>
+                  <div className="seeker-list-filters seeker-list-filters--triple">
+                    <label>
+                      Поиск
+                      <input
+                        value={favoritesSearch}
+                        onChange={(event) => setFavoritesSearch(event.target.value)}
+                        placeholder="Вакансия, компания, описание"
+                      />
+                    </label>
+                    <label>
+                      Тип
+                      <select value={favoritesTypeFilter} onChange={(event) => setFavoritesTypeFilter(event.target.value as 'all' | Opportunity['type'])}>
+                        <option value="all">Все</option>
+                        {favoriteTypeOptions.map((item) => (
+                          <option key={`favorite-type-${item}`} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Формат
+                      <select value={favoritesFormatFilter} onChange={(event) => setFavoritesFormatFilter(event.target.value)}>
+                        <option value="all">Все</option>
+                        {favoriteFormatOptions.map((item) => (
+                          <option key={`favorite-format-${item}`} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
                   {loadingFavorites ? <p>Загружаем избранные вакансии...</p> : null}
                   {favoritesError ? <div className="auth-feedback auth-feedback--error">{favoritesError}</div> : null}
                   {!loadingFavorites && !favoriteOpportunities.length ? (
                     <p>В избранном пока пусто. Добавьте вакансии с главной страницы.</p>
                   ) : null}
-                  {!loadingFavorites && favoriteOpportunities.length ? (
+                  {!loadingFavorites && favoriteOpportunities.length && !filteredFavoriteOpportunities.length ? (
+                    <p>По текущим фильтрам избранного ничего не найдено.</p>
+                  ) : null}
+                  {!loadingFavorites && filteredFavoriteOpportunities.length ? (
                     <div className="favorite-list">
-                      {favoriteOpportunities.map((item) => (
+                      {filteredFavoriteOpportunities.map((item) => (
                         <article key={item.id} className="favorite-card">
                           <div className="favorite-card__head">
                             <div>
@@ -2821,6 +2945,8 @@ export function SeekerDashboardPage() {
                         <p><UserRound size={16} /><span>ФИО</span><strong>{displayName}</strong></p>
                         <p><MapPin size={16} /><span>Логин</span><strong>{profile?.username || 'Не указан'}</strong></p>
                         <p><Building2 size={16} /><span>Позиция</span><strong>{profileRoleTitle}</strong></p>
+                        <p><Building2 size={16} /><span>ВУЗ</span><strong>{primaryEducation?.university || 'Не указан'}</strong></p>
+                        <p><CalendarClock size={16} /><span>Курс / выпуск</span><strong>{educationCourseAndYear}</strong></p>
                         <p><CalendarClock size={16} /><span>Дата рождения</span><strong>{profile?.birthDate || 'Не указана'}</strong></p>
                         <p>
                           {seekerSettings?.openToWork ? <Check size={16} /> : <CircleOff size={16} />}
