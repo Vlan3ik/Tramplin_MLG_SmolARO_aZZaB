@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { fetchTechnologyTags } from '../../api/catalog'
 import type { TagListItem } from '../../types/catalog'
@@ -16,6 +16,23 @@ const formatOptions = [
   { value: 'remote', label: 'Удаленно' },
   { value: 'hybrid', label: 'Гибрид' },
   { value: 'onsite', label: 'Офис' },
+]
+
+const typeOptions = [
+  { value: 'vacancy', label: 'Вакансии' },
+  { value: 'internship', label: 'Стажировки' },
+  { value: 'event', label: 'Мероприятия' },
+  { value: 'mentorship', label: 'Менторство' },
+] as const
+
+const statusOptions = [
+  { value: 1, label: 'Запланировано' },
+  { value: 2, label: 'На модерации' },
+  { value: 3, label: 'Активно' },
+  { value: 4, label: 'Закрыто' },
+  { value: 5, label: 'Отменено' },
+  { value: 6, label: 'Отклонено' },
+  { value: 7, label: 'В архиве' },
 ]
 
 function toggleArrayValue<T>(values: T[], value: T) {
@@ -66,7 +83,14 @@ export function FilterModal({ isOpen, filters, onApply, onClose, onReset }: Filt
   }, [isOpen, isTagsLoading, technologyTags.length])
 
   const hasActiveFilters = useMemo(
-    () => draft.formats.length > 0 || draft.tagIds.length > 0 || draft.salaryFrom != null || draft.salaryTo != null || draft.verifiedOnly,
+    () =>
+      draft.types.length > 0 ||
+      draft.formats.length > 0 ||
+      draft.statuses.length > 0 ||
+      draft.tagIds.length > 0 ||
+      draft.salaryFrom != null ||
+      draft.salaryTo != null ||
+      draft.verifiedOnly,
     [draft],
   )
 
@@ -86,6 +110,27 @@ export function FilterModal({ isOpen, filters, onApply, onClose, onReset }: Filt
         </div>
 
         <div className="filters-modal__body">
+          <section className="filter-group">
+            <h4>Тип возможности</h4>
+            <div className="filter-group__options">
+              {typeOptions.map((option) => (
+                <label key={option.value}>
+                  <input
+                    type="checkbox"
+                    checked={draft.types.includes(option.value)}
+                    onChange={() =>
+                      setDraft((current) => ({
+                        ...current,
+                        types: toggleArrayValue(current.types, option.value),
+                      }))
+                    }
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </section>
+
           <section className="filter-group">
             <h4>Навыки</h4>
             {isTagsLoading ? <p>Загружаем навыки...</p> : null}
@@ -168,6 +213,43 @@ export function FilterModal({ isOpen, filters, onApply, onClose, onReset }: Filt
                 </label>
               ))}
             </div>
+          </section>
+
+          <section className="filter-group">
+            <h4>Статусы</h4>
+            <div className="filter-group__options">
+              {statusOptions.map((option) => (
+                <label key={option.value}>
+                  <input
+                    type="checkbox"
+                    checked={draft.statuses.includes(option.value)}
+                    onChange={() =>
+                      setDraft((current) => ({
+                        ...current,
+                        statuses: toggleArrayValue(current.statuses, option.value),
+                      }))
+                    }
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section className="filter-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={draft.verifiedOnly}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    verifiedOnly: event.target.checked,
+                  }))
+                }
+              />
+              <span>Только верифицированные компании</span>
+            </label>
           </section>
         </div>
 

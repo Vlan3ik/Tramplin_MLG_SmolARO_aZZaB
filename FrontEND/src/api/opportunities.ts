@@ -359,6 +359,68 @@ function mapKeyFor(entityType: 'vacancy' | 'opportunity', id: number) {
   return `${entityType}:${id}`
 }
 
+function createEmptyPagedResponse<T>(page = 1, pageSize = 24): PagedResponse<T> {
+  return {
+    items: [],
+    totalCount: 0,
+    total: 0,
+    page,
+    pageSize,
+  }
+}
+
+function shouldRequestVacancies(filters: OpportunityFilters) {
+  if (!filters.types.length) {
+    return true
+  }
+
+  return filters.types.includes('vacancy') || filters.types.includes('internship')
+}
+
+function shouldRequestOpportunities(filters: OpportunityFilters) {
+  if (!filters.types.length) {
+    return true
+  }
+
+  return filters.types.includes('event') || filters.types.includes('mentorship')
+}
+
+function normalizeWorkFormat(value: string) {
+  const normalized = value.toLowerCase()
+
+  if (normalized.includes('удален')) {
+    return 'remote'
+  }
+
+  if (normalized.includes('гибрид')) {
+    return 'hybrid'
+  }
+
+  return 'onsite'
+}
+
+function applyClientFilters(items: Opportunity[], filters: OpportunityFilters) {
+  return items.filter((item) => {
+    if (filters.types.length && !filters.types.includes(item.type)) {
+      return false
+    }
+
+    if (filters.statuses.length && !filters.statuses.includes(item.status)) {
+      return false
+    }
+
+    if (filters.formats.length && !filters.formats.includes(normalizeWorkFormat(item.workFormat))) {
+      return false
+    }
+
+    if (filters.verifiedOnly && !item.verified) {
+      return false
+    }
+
+    return true
+  })
+}
+
 function buildVacanciesQueryString(query: HomeSearchQuery) {
   const params = new URLSearchParams()
 
@@ -640,9 +702,15 @@ export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: Ab
   const queryString = buildVacanciesQueryString(query)
   const opportunitiesQueryString = buildOpportunitiesQueryString(query)
   const mapQueryString = buildMapQueryString(query)
+  const needVacancies = shouldRequestVacancies(query.filters)
+  const needOpportunities = shouldRequestOpportunities(query.filters)
   const [vacanciesResponse, opportunitiesResponse, mapResponse] = await Promise.all([
-    getJson<PagedResponse<VacancyListItemApi>>(`/vacancies?${queryString}`, { signal, withAuth: false }),
-    getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal, withAuth: false }),
+    needVacancies
+      ? getJson<PagedResponse<VacancyListItemApi>>(`/vacancies?${queryString}`, { signal, withAuth: false })
+      : Promise.resolve(createEmptyPagedResponse<VacancyListItemApi>(query.page ?? 1, query.pageSize ?? 24)),
+    needOpportunities
+      ? getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal, withAuth: false })
+      : Promise.resolve(createEmptyPagedResponse<OpportunityListItemApi>(query.page ?? 1, query.pageSize ?? 24)),
     getJson<MapOpportunityResponseApi>(`/map/opportunities?${mapQueryString}`, { signal, withAuth: false }),
   ])
 
@@ -684,7 +752,7 @@ export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: Ab
     return toOpportunityFromOpportunity(item, coordinates)
   })
 
-  const items = [...vacancyItems, ...opportunityItems].sort((a, b) => b.id - a.id)
+  const items = applyClientFilters([...vacancyItems, ...opportunityItems], query.filters).sort((a, b) => b.id - a.id)
 
   return {
     items,
@@ -695,9 +763,15 @@ export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: Ab
 export async function fetchHomeListOpportunities(query: HomeSearchQuery, signal?: AbortSignal) {
   const queryString = buildVacanciesQueryString(query)
   const opportunitiesQueryString = buildOpportunitiesQueryString(query)
+  const needVacancies = shouldRequestVacancies(query.filters)
+  const needOpportunities = shouldRequestOpportunities(query.filters)
   const [vacanciesResponse, opportunitiesResponse] = await Promise.all([
-    getJson<PagedResponse<VacancyListItemApi>>(`/vacancies?${queryString}`, { signal, withAuth: false }),
-    getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal, withAuth: false }),
+    needVacancies
+      ? getJson<PagedResponse<VacancyListItemApi>>(`/vacancies?${queryString}`, { signal, withAuth: false })
+      : Promise.resolve(createEmptyPagedResponse<VacancyListItemApi>(query.page ?? 1, query.pageSize ?? 24)),
+    needOpportunities
+      ? getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal, withAuth: false })
+      : Promise.resolve(createEmptyPagedResponse<OpportunityListItemApi>(query.page ?? 1, query.pageSize ?? 24)),
   ])
 
   const vacancyItems = (vacanciesResponse.items ?? []).map((item) =>
@@ -714,7 +788,7 @@ export async function fetchHomeListOpportunities(query: HomeSearchQuery, signal?
     }),
   )
 
-  const items = [...vacancyItems, ...opportunityItems].sort((a, b) => b.id - a.id)
+  const items = applyClientFilters([...vacancyItems, ...opportunityItems], query.filters).sort((a, b) => b.id - a.id)
 
   return {
     items,
@@ -758,9 +832,12 @@ export async function fetchMapOpportunities(query: MapSearchQuery, signal?: Abor
   const mapQueryString = buildMapSearchQueryString(query)
   const mapResponse = await getJson<MapOpportunityResponseApi>(`/map/opportunities?${mapQueryString}`, { signal, withAuth: false })
 
-  const items = (mapResponse.features ?? [])
+  const items = applyClientFilters(
+    (mapResponse.features ?? [])
     .map((feature) => mapOpportunityFromFeature(feature))
-    .filter((item): item is Opportunity => item !== null)
+    .filter((item): item is Opportunity => item !== null),
+    query.filters,
+  )
 
   return {
     items,

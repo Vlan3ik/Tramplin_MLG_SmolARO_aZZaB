@@ -12,7 +12,6 @@ import { MapBoard } from '../components/home/MapBoard'
 import { OpportunityCard } from '../components/home/OpportunityCard'
 import { SearchHero } from '../components/home/SearchHero'
 import { SecondarySections } from '../components/home/SecondarySections'
-import { useCity } from '../contexts/CityContext'
 import { useApplications } from '../hooks/useApplications'
 import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityFilters } from '../types/opportunity'
@@ -31,7 +30,6 @@ const defaultFilters: OpportunityFilters = {
 }
 
 export function HomePage() {
-  const { selectedCityId } = useCity()
   const { session } = useAuth()
   const { hasApplied } = useApplications()
 
@@ -62,10 +60,10 @@ export function HomePage() {
       page: 1,
       pageSize: 24,
       search: appliedSearch,
-      cityId: selectedCityId,
+      cityId: null,
       filters,
     }),
-    [appliedSearch, filters, selectedCityId],
+    [appliedSearch, filters],
   )
 
   const mapQuery = useMemo(
