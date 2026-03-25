@@ -16,6 +16,7 @@ export function EventsPage() {
   const [searchInput, setSearchInput] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [formats, setFormats] = useState<string[]>([])
+  const [statuses, setStatuses] = useState<number[]>([])
   const [verifiedOnly, setVerifiedOnly] = useState(false)
   const [items, setItems] = useState<Opportunity[]>([])
   const [total, setTotal] = useState(0)
@@ -35,10 +36,11 @@ export function EventsPage() {
       filters: {
         types: ['event'] as OpportunityType[],
         formats,
+        statuses,
         verifiedOnly,
       },
     }),
-    [appliedSearch, formats, selectedCityId, verifiedOnly],
+    [appliedSearch, formats, selectedCityId, statuses, verifiedOnly],
   )
 
   const loadEvents = useCallback(
@@ -79,10 +81,22 @@ export function EventsPage() {
     setFormats((current) => (current.includes(value) ? current.filter((item) => item !== value) : [...current, value]))
   }
 
+  function toggleStatusGroup(values: number[]) {
+    setStatuses((current) => {
+      const hasAll = values.every((value) => current.includes(value))
+      if (hasAll) {
+        return current.filter((value) => !values.includes(value))
+      }
+
+      return Array.from(new Set([...current, ...values]))
+    })
+  }
+
   function handleResetFilters() {
     setSearchInput('')
     setAppliedSearch('')
     setFormats([])
+    setStatuses([])
     setVerifiedOnly(false)
   }
 
@@ -124,7 +138,7 @@ export function EventsPage() {
     }
   }
 
-  const hasFilters = formats.length > 0 || verifiedOnly || Boolean(appliedSearch.trim())
+  const hasFilters = formats.length > 0 || statuses.length > 0 || verifiedOnly || Boolean(appliedSearch.trim())
 
   return (
     <div className="events-page">
@@ -214,6 +228,27 @@ export function EventsPage() {
                 >
                   <CheckCircle2 size={14} />
                   Проверенные
+                </button>
+                <button
+                  type="button"
+                  className={[1, 2].every((status) => statuses.includes(status)) ? 'is-active' : ''}
+                  onClick={() => toggleStatusGroup([1, 2])}
+                >
+                  Запланированные
+                </button>
+                <button
+                  type="button"
+                  className={statuses.includes(3) ? 'is-active' : ''}
+                  onClick={() => toggleStatusGroup([3])}
+                >
+                  Активные
+                </button>
+                <button
+                  type="button"
+                  className={[4, 5, 6, 7].every((status) => statuses.includes(status)) ? 'is-active' : ''}
+                  onClick={() => toggleStatusGroup([4, 5, 6, 7])}
+                >
+                  Закрытые
                 </button>
               </div>
             </div>

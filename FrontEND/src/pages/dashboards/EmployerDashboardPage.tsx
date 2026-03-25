@@ -73,6 +73,21 @@ const applicationStatusLabel: Record<number, string> = {
 }
 
 const applicationStatusUpdateOptions = [2, 3, 4, 5, 6, 7]
+const publishStatusGroupValues = {
+  planned: [1, 2],
+  active: [3],
+  closed: [4, 5, 6, 7],
+} as const
+
+const employerOpportunityStatusLabel: Record<number, string> = {
+  1: 'Запланировано',
+  2: 'На модерации',
+  3: 'Активно',
+  4: 'Закрыто',
+  5: 'Отменено',
+  6: 'Отклонено',
+  7: 'В архиве',
+}
 
 function isAbortError(error: unknown) {
   if (error instanceof DOMException && error.name === 'AbortError') {
@@ -279,6 +294,9 @@ export function EmployerDashboardPage() {
   const [editingOpportunityId, setEditingOpportunityId] = useState<number | null>(null)
   const [loadingOpportunityEditorKey, setLoadingOpportunityEditorKey] = useState<string | null>(null)
   const [deletingOpportunityKey, setDeletingOpportunityKey] = useState<string | null>(null)
+  const [opportunitySearch, setOpportunitySearch] = useState('')
+  const [opportunitySourceFilter, setOpportunitySourceFilter] = useState<'all' | 'vacancy' | 'opportunity'>('all')
+  const [opportunityStatusesFilter, setOpportunityStatusesFilter] = useState<number[]>([])
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -511,6 +529,29 @@ export function EmployerDashboardPage() {
     }
   }, [applicationChats, applications.length, companyStatusText, opportunities.length])
 
+  const filteredOpportunities = useMemo(() => {
+    const normalizedSearch = opportunitySearch.trim().toLowerCase()
+
+    return opportunities.filter((item) => {
+      if (opportunitySourceFilter !== 'all' && item.source !== opportunitySourceFilter) {
+        return false
+      }
+
+      if (opportunityStatusesFilter.length > 0 && !opportunityStatusesFilter.includes(item.status)) {
+        return false
+      }
+
+      if (!normalizedSearch) {
+        return true
+      }
+
+      const haystack = [item.title, item.locationName, ...item.tags].join(' ').toLowerCase()
+      return haystack.includes(normalizedSearch)
+    })
+  }, [opportunities, opportunitySearch, opportunitySourceFilter, opportunityStatusesFilter])
+
+  const hasOpportunityFilters = opportunitySourceFilter !== 'all' || opportunityStatusesFilter.length > 0 || Boolean(opportunitySearch.trim())
+
   const selectedCandidateResume = selectedApplicationDetail?.candidateResume ?? null
 
   function onTabSelect(nextTab: EmployerTabId) {
@@ -520,6 +561,23 @@ export function EmployerDashboardPage() {
     }
 
     setTab(nextTab)
+  }
+
+  function toggleOpportunityStatusGroup(values: number[]) {
+    setOpportunityStatusesFilter((current) => {
+      const hasAll = values.every((value) => current.includes(value))
+      if (hasAll) {
+        return current.filter((value) => !values.includes(value))
+      }
+
+      return Array.from(new Set([...current, ...values]))
+    })
+  }
+
+  function resetOpportunityFilters() {
+    setOpportunitySearch('')
+    setOpportunitySourceFilter('all')
+    setOpportunityStatusesFilter([])
   }
 
   function onCreateFormChange(event: ChangeEvent<HTMLInputElement>) {
@@ -1323,9 +1381,13 @@ export function EmployerDashboardPage() {
             <label>
               Статус
               <select name="status" value={vacancyForm.status} onChange={onVacancyFormChange}>
-                <option value={1}>Черновик</option>
+                <option value={1}>Запланирована</option>
                 <option value={2}>На модерации</option>
                 <option value={3}>Активна</option>
+                <option value={4}>Закрыта</option>
+                <option value={5}>Отменена</option>
+                <option value={6}>Отклонена</option>
+                <option value={7}>В архиве</option>
               </select>
             </label>
             <label>
@@ -1436,9 +1498,13 @@ export function EmployerDashboardPage() {
             <label>
               Статус
               <select name="status" value={opportunityForm.status} onChange={onOpportunityFormChange}>
-                <option value={1}>Черновик</option>
+                <option value={1}>Запланирована</option>
                 <option value={2}>На модерации</option>
                 <option value={3}>Активна</option>
+                <option value={4}>Закрыта</option>
+                <option value={5}>Отменена</option>
+                <option value={6}>Отклонена</option>
+                <option value={7}>В архиве</option>
               </select>
             </label>
             <label>
@@ -1517,20 +1583,77 @@ export function EmployerDashboardPage() {
 
               {tab === 'opportunities' ? <section className="dashboard-section card seeker-profile-panel">
         <h2>Мои возможности</h2>
-        {!opportunities.length ? (
-          <p>У компании пока нет опубликованных возможностей.</p>
+        <div className="employer-opportunity-filters">
+          <label>
+            Поиск
+            <input
+              type="text"
+              value={opportunitySearch}
+              onChange={(event) => setOpportunitySearch(event.target.value)}
+              placeholder="Название, локация или тег"
+            />
+          </label>
+          <div className="employer-opportunity-filters__row">
+            <button type="button" className={`btn btn--ghost ${opportunitySourceFilter === 'all' ? 'is-active' : ''}`} onClick={() => setOpportunitySourceFilter('all')}>
+              Все
+            </button>
+            <button
+              type="button"
+              className={`btn btn--ghost ${opportunitySourceFilter === 'vacancy' ? 'is-active' : ''}`}
+              onClick={() => setOpportunitySourceFilter('vacancy')}
+            >
+              Вакансии
+            </button>
+            <button
+              type="button"
+              className={`btn btn--ghost ${opportunitySourceFilter === 'opportunity' ? 'is-active' : ''}`}
+              onClick={() => setOpportunitySourceFilter('opportunity')}
+            >
+              Мероприятия
+            </button>
+          </div>
+          <div className="employer-opportunity-filters__row">
+            <button
+              type="button"
+              className={`btn btn--ghost ${publishStatusGroupValues.planned.every((status) => opportunityStatusesFilter.includes(status)) ? 'is-active' : ''}`}
+              onClick={() => toggleOpportunityStatusGroup([...publishStatusGroupValues.planned])}
+            >
+              Запланированные
+            </button>
+            <button
+              type="button"
+              className={`btn btn--ghost ${publishStatusGroupValues.active.every((status) => opportunityStatusesFilter.includes(status)) ? 'is-active' : ''}`}
+              onClick={() => toggleOpportunityStatusGroup([...publishStatusGroupValues.active])}
+            >
+              Активные
+            </button>
+            <button
+              type="button"
+              className={`btn btn--ghost ${publishStatusGroupValues.closed.every((status) => opportunityStatusesFilter.includes(status)) ? 'is-active' : ''}`}
+              onClick={() => toggleOpportunityStatusGroup([...publishStatusGroupValues.closed])}
+            >
+              Закрытые
+            </button>
+            <button type="button" className="btn btn--ghost" onClick={resetOpportunityFilters} disabled={!hasOpportunityFilters}>
+              Сброс
+            </button>
+          </div>
+        </div>
+        {!filteredOpportunities.length ? (
+          <p>{hasOpportunityFilters ? 'По текущим фильтрам ничего не найдено.' : 'У компании пока нет опубликованных возможностей.'}</p>
         ) : (
           <div className="favorite-list">
-            {opportunities.map((item) => (
+            {filteredOpportunities.map((item) => (
               <article key={`${item.source}-${item.id}`} className="favorite-card">
                 <div className="favorite-card__head">
                   <div>
                     <h3>{item.title}</h3>
                     <span className="favorite-card__salary">{item.compensationLabel}</span>
                   </div>
-                  <span className="status-chip">{opportunityTypeLabel(item.type)}</span>
+                  <span className="status-chip">{employerOpportunityStatusLabel[item.status] ?? `Status ${item.status}`}</span>
                 </div>
                 <div className="favorite-card__meta">
+                  <span>{opportunityTypeLabel(item.type)}</span>
                   <span>
                     <MapPin size={14} />
                     {item.locationName}

@@ -26,6 +26,7 @@ type VacancyForm = {
   currencyCode: string
   salaryTaxMode: number
   applicationDeadline: string
+  status: number
 }
 
 type EventForm = {
@@ -42,6 +43,7 @@ type EventForm = {
   priceCurrencyCode: string
   participantsCanWrite: boolean
   eventDate: string
+  status: number
 }
 
 const steps = ['Выбор', 'Основные', 'Описание', 'Стоимость и опции', 'Публикация']
@@ -145,6 +147,7 @@ export function VacancyFlowPage() {
     currencyCode: 'RUB',
     salaryTaxMode: 3,
     applicationDeadline: '',
+    status: 1,
   })
 
   const [eventForm, setEventForm] = useState<EventForm>({
@@ -161,6 +164,7 @@ export function VacancyFlowPage() {
     priceCurrencyCode: 'RUB',
     participantsCanWrite: true,
     eventDate: '',
+    status: 1,
   })
 
   const flowType: FlowType = searchParams.get('type') === 'event' ? 'event' : 'vacancy'
@@ -274,7 +278,7 @@ export function VacancyFlowPage() {
     const { name, value } = event.target
     setVacancyForm((state) => ({
       ...state,
-      [name]: name === 'kind' || name === 'format' || name === 'salaryTaxMode' ? Number(value) || 0 : value,
+      [name]: name === 'kind' || name === 'format' || name === 'salaryTaxMode' || name === 'status' ? Number(value) || 0 : value,
     }))
   }
 
@@ -284,7 +288,8 @@ export function VacancyFlowPage() {
 
     setEventForm((state) => ({
       ...state,
-      [name]: name === 'kind' || name === 'format' || name === 'priceType' ? Number(value) || 0 : type === 'checkbox' ? checked : value,
+      [name]:
+        name === 'kind' || name === 'format' || name === 'priceType' || name === 'status' ? Number(value) || 0 : type === 'checkbox' ? checked : value,
     }))
   }
 
@@ -471,7 +476,7 @@ export function VacancyFlowPage() {
           fullDescription: vacancyForm.fullDescription,
           kind: vacancyForm.kind,
           format: vacancyForm.format,
-          status: 2,
+          status: vacancyForm.status,
           mapPoint: vacancyForm.mapPoint,
           salaryFrom: toNumberOrNull(vacancyForm.salaryFrom),
           salaryTo: toNumberOrNull(vacancyForm.salaryTo),
@@ -483,7 +488,7 @@ export function VacancyFlowPage() {
         }
 
         await createEmployerVacancy(payload)
-        setSuccess('Вакансия отправлена на модерацию.')
+        setSuccess('Вакансия сохранена.')
       } else {
         const priceAmount = toNumberOrNull(eventForm.priceAmount)
         const payload = {
@@ -492,7 +497,7 @@ export function VacancyFlowPage() {
           fullDescription: eventForm.fullDescription,
           kind: eventForm.kind,
           format: eventForm.format,
-          status: 2,
+          status: eventForm.status,
           mapPoint: eventForm.mapPoint,
           priceType: eventForm.priceType,
           priceAmount: eventForm.priceType === 1 ? null : priceAmount,
@@ -504,7 +509,7 @@ export function VacancyFlowPage() {
         }
 
         await createEmployerOpportunity(payload)
-        setSuccess('Мероприятие отправлено на модерацию.')
+        setSuccess('Мероприятие сохранено.')
       }
 
       goStep(5)
@@ -767,10 +772,29 @@ export function VacancyFlowPage() {
                 <h2 className="vf-congrats">Проверка перед отправкой</h2>
                 <p className="vf-congrats__text">
                   {isVacancyFlow
-                    ? 'Проверьте заполнение вакансии и отправьте ее на модерацию.'
-                    : 'Проверьте заполнение мероприятия и отправьте его на модерацию.'}
+                    ? 'Проверьте заполнение вакансии, выберите статус и сохраните публикацию.'
+                    : 'Проверьте заполнение мероприятия, выберите статус и сохраните публикацию.'}
                 </p>
                 {success ? <p className="vf-note">Через несколько секунд вы вернетесь на главную страницу.</p> : null}
+                <div className="vf-form-grid">
+                  <label className="vf-field">
+                    <span>Статус публикации</span>
+                    <select
+                      name="status"
+                      value={isVacancyFlow ? vacancyForm.status : eventForm.status}
+                      onChange={isVacancyFlow ? onVacancyFormChange : onEventFormChange}
+                      disabled={isSubmitting}
+                    >
+                      <option value={1}>Запланировано</option>
+                      <option value={2}>На модерации</option>
+                      <option value={3}>Активно</option>
+                      <option value={4}>Закрыто</option>
+                      <option value={5}>Отменено</option>
+                      <option value={6}>Отклонено</option>
+                      <option value={7}>В архиве</option>
+                    </select>
+                  </label>
+                </div>
                 <img className="vf-congrats__image" src="/гордый чел стоит.svg" alt="Иллюстрация публикации" />
                 <div className="vf-actions">
                   <button type="button" className="vf-btn vf-btn--secondary" onClick={prevStep} disabled={isSubmitting}>

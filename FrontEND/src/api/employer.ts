@@ -793,7 +793,7 @@ export function submitEmployerCompanyVerification() {
 }
 
 export async function fetchEmployerVacancies(signal?: AbortSignal) {
-  const response = await getJson<PagedResponse<EmployerVacancyListItemApi>>('/employer/vacancies?Page=1&PageSize=100', { signal })
+  const response = await getJson<PagedResponse<EmployerVacancyListItemApi>>('/employer/vacancies?Page=1&PageSize=100&Statuses=1&Statuses=2&Statuses=3&Statuses=4&Statuses=5&Statuses=6&Statuses=7', { signal })
 
   return (response.items ?? []).map((item): EmployerOpportunity => ({
     id: item.id,
@@ -810,7 +810,7 @@ export async function fetchEmployerVacancies(signal?: AbortSignal) {
 }
 
 export async function fetchEmployerOpportunities(signal?: AbortSignal) {
-  const response = await getJson<PagedResponse<EmployerOpportunityListItemApi>>('/employer/opportunities?Page=1&PageSize=100', { signal })
+  const response = await getJson<PagedResponse<EmployerOpportunityListItemApi>>('/employer/opportunities?Page=1&PageSize=100&Statuses=1&Statuses=2&Statuses=3&Statuses=4&Statuses=5&Statuses=6&Statuses=7', { signal })
 
   return (response.items ?? []).map((item): EmployerOpportunity => ({
     id: item.id,

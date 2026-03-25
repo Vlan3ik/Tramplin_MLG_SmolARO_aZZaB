@@ -3,7 +3,7 @@ import clsx from 'clsx'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Opportunity } from '../../types/opportunity'
-import { typeLabel } from '../../types/opportunity'
+import { opportunityStatusLabel, typeLabel } from '../../types/opportunity'
 import { isFavoriteOpportunity, subscribeToFavoriteOpportunities, toggleFavoriteOpportunity } from '../../utils/favorites'
 
 type OpportunityCardProps = {
@@ -25,6 +25,7 @@ function buildMapLink(opportunity: Opportunity) {
 export function OpportunityCard({ opportunity, compact = false, isApplying = false, isApplied = false, onApply }: OpportunityCardProps) {
   const [isFavorite, setIsFavorite] = useState(() => isFavoriteOpportunity(opportunity.id))
   const favoriteLabel = useMemo(() => (isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'), [isFavorite])
+  const isClosed = opportunity.status >= 4
 
   useEffect(() => {
     const unsubscribe = subscribeToFavoriteOpportunities(() => {
@@ -43,6 +44,7 @@ export function OpportunityCard({ opportunity, compact = false, isApplying = fal
     <article className={clsx('opportunity-card card', compact && 'opportunity-card--compact')}>
       <div className="opportunity-card__top">
         <span className={`badge badge--${opportunity.type}`}>{typeLabel[opportunity.type]}</span>
+        <span className="status-chip">{opportunityStatusLabel[opportunity.status] ?? `Статус ${opportunity.status}`}</span>
         <span className="opportunity-card__compensation">{opportunity.compensation}</span>
       </div>
 
@@ -83,9 +85,9 @@ export function OpportunityCard({ opportunity, compact = false, isApplying = fal
             <MapPinned size={15} />
             На карте
           </a>
-          <button className="btn btn--primary" type="button" disabled={isApplying || isApplied} onClick={() => onApply?.(opportunity)}>
+          <button className="btn btn--primary" type="button" disabled={isApplying || isApplied || isClosed} onClick={() => onApply?.(opportunity)}>
             <Send size={15} />
-            {isApplying ? 'Отправляем...' : isApplied ? 'Отклик отправлен' : opportunity.type === 'event' ? 'Записаться' : 'Откликнуться'}
+            {isApplying ? 'Отправляем...' : isApplied ? 'Отклик отправлен' : isClosed ? 'Закрыто' : opportunity.type === 'event' ? 'Записаться' : 'Откликнуться'}
           </button>
           <button className={clsx('btn btn--icon', isFavorite && 'btn--icon-active')} type="button" aria-label={favoriteLabel} onClick={handleFavoriteToggle}>
             <Bookmark size={16} fill={isFavorite ? 'currentColor' : 'none'} />
