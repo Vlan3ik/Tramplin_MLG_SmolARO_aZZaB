@@ -1,4 +1,4 @@
-import { Building2, Clock3, Globe, Mail, MapPin, MessageSquare, Phone, ShieldCheck, UploadCloud } from 'lucide-react'
+﻿import { Building2, Clock3, Globe, Mail, MapPin, MessageSquare, Phone, ShieldCheck, UploadCloud } from 'lucide-react'
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchCities, fetchLocations, fetchTags } from '../../api/catalog'
@@ -38,20 +38,20 @@ import { formatSkillLevelDisplay } from '../../utils/skill-levels'
 type EmployerTabId = 'overview' | 'company' | 'create' | 'opportunities' | 'applications' | 'verification'
 
 const employerTabs: Array<{ id: EmployerTabId; label: string }> = [
-  { id: 'overview', label: 'Обзор' },
-  { id: 'company', label: 'Профиль компании' },
-  { id: 'create', label: 'Создать возможность' },
-  { id: 'opportunities', label: 'Мои возможности' },
-  { id: 'applications', label: 'Отклики' },
-  { id: 'verification', label: 'Верификация' },
+  { id: 'overview', label: 'РћР±Р·РѕСЂ' },
+  { id: 'company', label: 'РџСЂРѕС„РёР»СЊ РєРѕРјРїР°РЅРёРё' },
+  { id: 'create', label: 'РЎРѕР·РґР°С‚СЊ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ' },
+  { id: 'opportunities', label: 'РњРѕРё РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё' },
+  { id: 'applications', label: 'РћС‚РєР»РёРєРё' },
+  { id: 'verification', label: 'Р’РµСЂРёС„РёРєР°С†РёСЏ' },
 ]
 
 const companyStatusLabel: Record<string, string> = {
-  draft: 'Черновик',
-  pendingverification: 'На верификации',
-  verified: 'Подтверждена',
-  rejected: 'Отклонена',
-  blocked: 'Заблокирована',
+  draft: 'Р§РµСЂРЅРѕРІРёРє',
+  pendingverification: 'РќР° РІРµСЂРёС„РёРєР°С†РёРё',
+  verified: 'РџРѕРґС‚РІРµСЂР¶РґРµРЅР°',
+  rejected: 'РћС‚РєР»РѕРЅРµРЅР°',
+  blocked: 'Р—Р°Р±Р»РѕРєРёСЂРѕРІР°РЅР°',
 }
 
 const companyStatusTone: Record<string, 'success' | 'warning' | 'danger'> = {
@@ -63,13 +63,13 @@ const companyStatusTone: Record<string, 'success' | 'warning' | 'danger'> = {
 }
 
 const applicationStatusLabel: Record<number, string> = {
-  1: 'Новый',
-  2: 'На рассмотрении',
-  3: 'Интервью',
-  4: 'Оффер',
-  5: 'Нанят',
-  6: 'Отклонен',
-  7: 'Отменен',
+  1: 'РќРѕРІС‹Р№',
+  2: 'РќР° СЂР°СЃСЃРјРѕС‚СЂРµРЅРёРё',
+  3: 'РРЅС‚РµСЂРІСЊСЋ',
+  4: 'РћС„С„РµСЂ',
+  5: 'РќР°РЅСЏС‚',
+  6: 'РћС‚РєР»РѕРЅРµРЅ',
+  7: 'РћС‚РјРµРЅРµРЅ',
 }
 
 const applicationStatusUpdateOptions = [2, 3, 4, 5, 6, 7]
@@ -153,7 +153,7 @@ function normalizeCurrencyCode(value: string) {
 
 function locationOptionLabel(location: Location) {
   const addressParts = [location.streetName, location.houseNumber].filter(Boolean)
-  const address = addressParts.length ? addressParts.join(', ') : 'Адрес не указан'
+  const address = addressParts.length ? addressParts.join(', ') : 'РђРґСЂРµСЃ РЅРµ СѓРєР°Р·Р°РЅ'
   return `${location.cityName}: ${address}`
 }
 
@@ -161,7 +161,7 @@ function formatDate(value: string) {
   const date = new Date(value)
 
   if (Number.isNaN(date.getTime())) {
-    return 'Недавно'
+    return 'РќРµРґР°РІРЅРѕ'
   }
 
   return date.toLocaleDateString('ru-RU')
@@ -169,7 +169,7 @@ function formatDate(value: string) {
 
 function formatMoneyRange(min: number | null | undefined, max: number | null | undefined, currencyCode: string | null | undefined) {
   if (min == null && max == null) {
-    return 'По договоренности'
+    return 'РџРѕ РґРѕРіРѕРІРѕСЂРµРЅРЅРѕСЃС‚Рё'
   }
 
   const currency = currencyCode ?? 'RUB'
@@ -180,10 +180,10 @@ function formatMoneyRange(min: number | null | undefined, max: number | null | u
   }
 
   if (min != null) {
-    return `от ${formatter.format(min)} ${currency}`
+    return `РѕС‚ ${formatter.format(min)} ${currency}`
   }
 
-  return `до ${formatter.format(max ?? 0)} ${currency}`
+  return `РґРѕ ${formatter.format(max ?? 0)} ${currency}`
 }
 
 function toLowerSafe(value: string | null | undefined) {
@@ -191,21 +191,21 @@ function toLowerSafe(value: string | null | undefined) {
 }
 
 function opportunityTypeLabel(value: EmployerOpportunity['type']) {
-  if (value === 'internship') return 'Стажировка'
-  if (value === 'mentorship') return 'Менторство'
-  if (value === 'event') return 'Мероприятие'
-  return 'Вакансия'
+  if (value === 'internship') return 'РЎС‚Р°Р¶РёСЂРѕРІРєР°'
+  if (value === 'mentorship') return 'РњРµРЅС‚РѕСЂСЃС‚РІРѕ'
+  if (value === 'event') return 'РњРµСЂРѕРїСЂРёСЏС‚РёРµ'
+  return 'Р’Р°РєР°РЅСЃРёСЏ'
 }
 
 function genderLabel(value: number) {
-  if (value === 1) return 'Мужской'
-  if (value === 2) return 'Женский'
-  return 'Не указан'
+  if (value === 1) return 'РњСѓР¶СЃРєРѕР№'
+  if (value === 2) return 'Р–РµРЅСЃРєРёР№'
+  return 'РќРµ СѓРєР°Р·Р°РЅ'
 }
 
 function formatDateOnly(value: string) {
   if (!value) {
-    return 'Не указана'
+    return 'РќРµ СѓРєР°Р·Р°РЅР°'
   }
 
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
@@ -223,10 +223,10 @@ function formatSkillLevel(value: number) {
 
 function formatYearsExperience(value: number) {
   if (!value) {
-    return 'Опыт не указан'
+    return 'РћРїС‹С‚ РЅРµ СѓРєР°Р·Р°РЅ'
   }
 
-  const suffix = value === 1 ? 'год' : value >= 2 && value <= 4 ? 'года' : 'лет'
+  const suffix = value === 1 ? 'РіРѕРґ' : value >= 2 && value <= 4 ? 'РіРѕРґР°' : 'Р»РµС‚'
   return `${value} ${suffix}`
 }
 
@@ -238,16 +238,16 @@ function formatLinkLabel(kind: string, label: string) {
 
   const normalizedKind = kind.trim()
   if (!normalizedKind) {
-    return 'Ссылка'
+    return 'РЎСЃС‹Р»РєР°'
   }
 
   return normalizedKind.charAt(0).toUpperCase() + normalizedKind.slice(1)
 }
 
 function formatProjectPeriod(startDate: string, endDate: string) {
-  const start = startDate ? formatDateOnly(startDate) : 'не указано'
-  const end = endDate ? formatDateOnly(endDate) : 'по настоящее время'
-  return `${start} — ${end}`
+  const start = startDate ? formatDateOnly(startDate) : 'РЅРµ СѓРєР°Р·Р°РЅРѕ'
+  const end = endDate ? formatDateOnly(endDate) : 'РїРѕ РЅР°СЃС‚РѕСЏС‰РµРµ РІСЂРµРјСЏ'
+  return `${start} вЂ” ${end}`
 }
 
 export function EmployerDashboardPage() {
@@ -302,7 +302,6 @@ export function EmployerDashboardPage() {
     salaryTo: '',
     currencyCode: 'RUB',
     salaryTaxMode: 3,
-    publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
     applicationDeadline: '',
     tagIds: [] as number[],
   })
@@ -320,7 +319,6 @@ export function EmployerDashboardPage() {
     priceAmount: '',
     priceCurrencyCode: 'RUB',
     participantsCanWrite: true,
-    publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
     eventDate: '',
     tagIds: [] as number[],
   })
@@ -372,8 +370,8 @@ export function EmployerDashboardPage() {
       if (chatsResult.status === 'fulfilled') {
         const chats = chatsResult.value.map((chat) => ({
           id: chat.id,
-          title: chat.title?.trim() || `Чат #${chat.id}`,
-          lastMessageText: chat.lastMessage?.text?.trim() || 'Сообщений пока нет',
+          title: chat.title?.trim() || `Р§Р°С‚ #${chat.id}`,
+          lastMessageText: chat.lastMessage?.text?.trim() || 'РЎРѕРѕР±С‰РµРЅРёР№ РїРѕРєР° РЅРµС‚',
           lastMessageAt: chat.lastMessage?.createdAt ?? chat.createdAt,
         }))
 
@@ -422,10 +420,10 @@ export function EmployerDashboardPage() {
         return
       }
 
-      const message = loadError instanceof Error ? loadError.message : 'Не удалось загрузить кабинет работодателя.'
+      const message = loadError instanceof Error ? loadError.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РєР°Р±РёРЅРµС‚ СЂР°Р±РѕС‚РѕРґР°С‚РµР»СЏ.'
       const normalized = message.toLowerCase()
 
-      if (normalized.includes('not found') || normalized.includes('не найден')) {
+      if (normalized.includes('not found') || normalized.includes('РЅРµ РЅР°Р№РґРµРЅ')) {
         setCompany(null)
         setCompanyMissing(true)
         setOpportunities([])
@@ -492,9 +490,9 @@ export function EmployerDashboardPage() {
   }, [opportunityForm.cityId])
 
   const statusCode = toLowerSafe(company?.status)
-  const companyStatusText = companyStatusLabel[statusCode] ?? 'Статус не определен'
+  const companyStatusText = companyStatusLabel[statusCode] ?? 'РЎС‚Р°С‚СѓСЃ РЅРµ РѕРїСЂРµРґРµР»РµРЅ'
   const companyStatusToneClass = companyStatusTone[statusCode] ?? 'warning'
-  const companyName = company?.brandName.trim() || company?.legalName.trim() || 'Компания'
+  const companyName = company?.brandName.trim() || company?.legalName.trim() || 'РљРѕРјРїР°РЅРёСЏ'
 
   const overview = useMemo(() => {
     const now = Date.now()
@@ -609,7 +607,6 @@ export function EmployerDashboardPage() {
       salaryTo: '',
       currencyCode: 'RUB',
       salaryTaxMode: 3,
-      publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
       applicationDeadline: '',
       tagIds: [],
     })
@@ -629,7 +626,6 @@ export function EmployerDashboardPage() {
       priceAmount: '',
       priceCurrencyCode: 'RUB',
       participantsCanWrite: true,
-      publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
       eventDate: '',
       tagIds: [],
     })
@@ -643,10 +639,10 @@ export function EmployerDashboardPage() {
 
     try {
       await createEmployerCompany(createForm)
-      setSuccess('Компания создана. Данные кабинета обновлены.')
+      setSuccess('РљРѕРјРїР°РЅРёСЏ СЃРѕР·РґР°РЅР°. Р”Р°РЅРЅС‹Рµ РєР°Р±РёРЅРµС‚Р° РѕР±РЅРѕРІР»РµРЅС‹.')
       await loadDashboard()
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'Не удалось создать компанию.')
+      setError(createError instanceof Error ? createError.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РєРѕРјРїР°РЅРёСЋ.')
     } finally {
       setCreatingCompany(false)
     }
@@ -656,43 +652,39 @@ export function EmployerDashboardPage() {
     event.preventDefault()
 
     if (!vacancyForm.title.trim()) {
-      setError('Укажите название вакансии.')
+      setError('РЈРєР°Р¶РёС‚Рµ РЅР°Р·РІР°РЅРёРµ РІР°РєР°РЅСЃРёРё.')
       return
     }
 
     if (!vacancyForm.shortDescription.trim()) {
-      setError('Укажите краткое описание вакансии.')
+      setError('РЈРєР°Р¶РёС‚Рµ РєСЂР°С‚РєРѕРµ РѕРїРёСЃР°РЅРёРµ РІР°РєР°РЅСЃРёРё.')
       return
     }
 
     if (!vacancyForm.fullDescription.trim()) {
-      setError('Укажите полное описание вакансии.')
+      setError('РЈРєР°Р¶РёС‚Рµ РїРѕР»РЅРѕРµ РѕРїРёСЃР°РЅРёРµ РІР°РєР°РЅСЃРёРё.')
       return
     }
 
-    const publishAt = toIsoDateTimeFromLocalInput(vacancyForm.publishAt)
-    if (!publishAt) {
-      setError('Укажите корректную дату публикации вакансии.')
-      return
-    }
+    const publishAt = new Date().toISOString()
 
     const applicationDeadline = vacancyForm.applicationDeadline.trim()
       ? toIsoDateTimeFromLocalInput(vacancyForm.applicationDeadline)
       : null
     if (vacancyForm.applicationDeadline.trim() && !applicationDeadline) {
-      setError('Укажите корректный дедлайн откликов.')
+      setError('РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Р№ РґРµРґР»Р°Р№РЅ РѕС‚РєР»РёРєРѕРІ.')
       return
     }
 
-    if (applicationDeadline && Date.parse(applicationDeadline) < Date.parse(publishAt)) {
-      setError('Дедлайн откликов не может быть раньше даты публикации.')
+    if (applicationDeadline && Date.parse(applicationDeadline) < Date.now()) {
+      setError('Р”РµРґР»Р°Р№РЅ РѕС‚РєР»РёРєРѕРІ РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ СЂР°РЅСЊС€Рµ РґР°С‚С‹ РїСѓР±Р»РёРєР°С†РёРё.')
       return
     }
 
     const salaryFrom = toNumberOrNull(vacancyForm.salaryFrom)
     const salaryTo = toNumberOrNull(vacancyForm.salaryTo)
     if (salaryFrom !== null && salaryTo !== null && salaryTo < salaryFrom) {
-      setError('Зарплата "до" должна быть больше или равна зарплате "от".')
+      setError('Р—Р°СЂРїР»Р°С‚Р° "РґРѕ" РґРѕР»Р¶РЅР° Р±С‹С‚СЊ Р±РѕР»СЊС€Рµ РёР»Рё СЂР°РІРЅР° Р·Р°СЂРїР»Р°С‚Рµ "РѕС‚".')
       return
     }
 
@@ -721,17 +713,17 @@ export function EmployerDashboardPage() {
 
       if (editingVacancyId) {
         await updateEmployerVacancy(editingVacancyId, payload)
-        setSuccess('Вакансия обновлена.')
+        setSuccess('Р’Р°РєР°РЅСЃРёСЏ РѕР±РЅРѕРІР»РµРЅР°.')
       } else {
         await createEmployerVacancy(payload)
-        setSuccess('Вакансия создана.')
+        setSuccess('Р’Р°РєР°РЅСЃРёСЏ СЃРѕР·РґР°РЅР°.')
       }
 
       resetVacancyForm()
       setEditingVacancyId(null)
       await loadDashboard()
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : editingVacancyId ? 'Не удалось обновить вакансию.' : 'Не удалось создать вакансию.')
+      setError(createError instanceof Error ? createError.message : editingVacancyId ? 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ РІР°РєР°РЅСЃРёСЋ.' : 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РІР°РєР°РЅСЃРёСЋ.')
     } finally {
       setCreatingVacancy(false)
     }
@@ -741,35 +733,31 @@ export function EmployerDashboardPage() {
     event.preventDefault()
 
     if (!opportunityForm.title.trim()) {
-      setError('Укажите название возможности.')
+      setError('РЈРєР°Р¶РёС‚Рµ РЅР°Р·РІР°РЅРёРµ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё.')
       return
     }
 
     if (!opportunityForm.shortDescription.trim()) {
-      setError('Укажите краткое описание возможности.')
+      setError('РЈРєР°Р¶РёС‚Рµ РєСЂР°С‚РєРѕРµ РѕРїРёСЃР°РЅРёРµ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё.')
       return
     }
 
     if (!opportunityForm.fullDescription.trim()) {
-      setError('Укажите полное описание возможности.')
+      setError('РЈРєР°Р¶РёС‚Рµ РїРѕР»РЅРѕРµ РѕРїРёСЃР°РЅРёРµ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё.')
       return
     }
 
-    const publishAt = toIsoDateTimeFromLocalInput(opportunityForm.publishAt)
-    if (!publishAt) {
-      setError('Укажите корректную дату публикации возможности.')
-      return
-    }
+    const publishAt = new Date().toISOString()
 
     const eventDate = opportunityForm.eventDate.trim() ? toIsoDateTimeFromLocalInput(opportunityForm.eventDate) : null
     if (opportunityForm.eventDate.trim() && !eventDate) {
-      setError('Укажите корректную дату события.')
+      setError('РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅСѓСЋ РґР°С‚Сѓ СЃРѕР±С‹С‚РёСЏ.')
       return
     }
 
     const priceAmount = toNumberOrNull(opportunityForm.priceAmount)
     if ((opportunityForm.priceType === 2 || opportunityForm.priceType === 3) && priceAmount === null) {
-      setError('Для платной или призовой возможности укажите сумму.')
+      setError('Р”Р»СЏ РїР»Р°С‚РЅРѕР№ РёР»Рё РїСЂРёР·РѕРІРѕР№ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё СѓРєР°Р¶РёС‚Рµ СЃСѓРјРјСѓ.')
       return
     }
 
@@ -801,17 +789,17 @@ export function EmployerDashboardPage() {
 
       if (editingOpportunityId) {
         await updateEmployerOpportunity(editingOpportunityId, payload)
-        setSuccess('Возможность обновлена.')
+        setSuccess('Р’РѕР·РјРѕР¶РЅРѕСЃС‚СЊ РѕР±РЅРѕРІР»РµРЅР°.')
       } else {
         await createEmployerOpportunity(payload)
-        setSuccess('Возможность создана.')
+        setSuccess('Р’РѕР·РјРѕР¶РЅРѕСЃС‚СЊ СЃРѕР·РґР°РЅР°.')
       }
 
       resetOpportunityForm()
       setEditingOpportunityId(null)
       await loadDashboard()
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : editingOpportunityId ? 'Не удалось обновить возможность.' : 'Не удалось создать возможность.')
+      setError(createError instanceof Error ? createError.message : editingOpportunityId ? 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ.' : 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ.')
     } finally {
       setCreatingOpportunity(false)
     }
@@ -854,7 +842,6 @@ export function EmployerDashboardPage() {
           salaryTo: detail.salaryTo != null ? String(detail.salaryTo) : '',
           currencyCode: detail.currencyCode ?? 'RUB',
           salaryTaxMode: detail.salaryTaxMode,
-          publishAt: toLocalDateTimeInputValue(detail.publishAt),
           applicationDeadline: detail.applicationDeadline ? toLocalDateTimeInputValue(detail.applicationDeadline) : '',
           tagIds: mapTagNamesToIds(detail.tags),
         })
@@ -891,7 +878,6 @@ export function EmployerDashboardPage() {
           priceAmount: detail.priceAmount != null ? String(detail.priceAmount) : '',
           priceCurrencyCode: detail.priceCurrencyCode ?? 'RUB',
           participantsCanWrite: detail.participantsCanWrite,
-          publishAt: toLocalDateTimeInputValue(detail.publishAt),
           eventDate: detail.eventDate ? toLocalDateTimeInputValue(detail.eventDate) : '',
           tagIds: mapTagNamesToIds(detail.tags),
         })
@@ -902,7 +888,7 @@ export function EmployerDashboardPage() {
 
       navigate(`/vacancy-flow/1?type=${item.source === 'vacancy' ? 'vacancy' : 'event'}`)
     } catch (editError) {
-      setError(editError instanceof Error ? editError.message : 'Не удалось загрузить данные для редактирования.')
+      setError(editError instanceof Error ? editError.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РґР°РЅРЅС‹Рµ РґР»СЏ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ.')
     } finally {
       setLoadingOpportunityEditorKey(null)
     }
@@ -919,8 +905,8 @@ export function EmployerDashboardPage() {
   }
 
   async function onDeleteOpportunity(item: EmployerOpportunity) {
-    const entityLabel = item.source === 'vacancy' ? 'вакансию' : 'возможность'
-    if (typeof window !== 'undefined' && !window.confirm(`Удалить ${entityLabel} "${item.title}"?`)) {
+    const entityLabel = item.source === 'vacancy' ? 'РІР°РєР°РЅСЃРёСЋ' : 'РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ'
+    if (typeof window !== 'undefined' && !window.confirm(`РЈРґР°Р»РёС‚СЊ ${entityLabel} "${item.title}"?`)) {
       return
     }
 
@@ -943,9 +929,9 @@ export function EmployerDashboardPage() {
       }
 
       setOpportunities((state) => state.filter((opportunity) => !(opportunity.id === item.id && opportunity.source === item.source)))
-      setSuccess(item.source === 'vacancy' ? 'Вакансия удалена.' : 'Возможность удалена.')
+      setSuccess(item.source === 'vacancy' ? 'Р’Р°РєР°РЅСЃРёСЏ СѓРґР°Р»РµРЅР°.' : 'Р’РѕР·РјРѕР¶РЅРѕСЃС‚СЊ СѓРґР°Р»РµРЅР°.')
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Не удалось удалить публикацию.')
+      setError(deleteError instanceof Error ? deleteError.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РїСѓР±Р»РёРєР°С†РёСЋ.')
     } finally {
       setDeletingOpportunityKey(null)
     }
@@ -976,9 +962,9 @@ export function EmployerDashboardPage() {
       setSelectedApplicationDetail((state) =>
         state && state.id === application.id ? { ...state, status: nextStatus, updatedAt: new Date().toISOString() } : state,
       )
-      setSuccess(`Статус отклика #${application.id} обновлен.`)
+      setSuccess(`РЎС‚Р°С‚СѓСЃ РѕС‚РєР»РёРєР° #${application.id} РѕР±РЅРѕРІР»РµРЅ.`)
     } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : 'Не удалось обновить статус отклика.')
+      setError(updateError instanceof Error ? updateError.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ СЃС‚Р°С‚СѓСЃ РѕС‚РєР»РёРєР°.')
     } finally {
       setUpdatingApplicationId(null)
     }
@@ -992,7 +978,7 @@ export function EmployerDashboardPage() {
       const detail = await fetchEmployerApplicationDetail(applicationId)
       setSelectedApplicationDetail(detail)
     } catch (detailError) {
-      setError(detailError instanceof Error ? detailError.message : 'Не удалось загрузить данные кандидата.')
+      setError(detailError instanceof Error ? detailError.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РґР°РЅРЅС‹Рµ РєР°РЅРґРёРґР°С‚Р°.')
     } finally {
       setLoadingApplicationDetailId(null)
     }
@@ -1011,10 +997,10 @@ export function EmployerDashboardPage() {
 
     try {
       await updateEmployerCompanyVerification(profileForm)
-      setSuccess('Профиль компании обновлен.')
+      setSuccess('РџСЂРѕС„РёР»СЊ РєРѕРјРїР°РЅРёРё РѕР±РЅРѕРІР»РµРЅ.')
       await loadDashboard()
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Не удалось обновить профиль компании.')
+      setError(saveError instanceof Error ? saveError.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ РїСЂРѕС„РёР»СЊ РєРѕРјРїР°РЅРёРё.')
     } finally {
       setSavingProfile(false)
     }
@@ -1033,10 +1019,10 @@ export function EmployerDashboardPage() {
 
     try {
       await updateEmployerCompanyChatSettings(chatSettingsForm)
-      setSuccess('Чат-настройки компании обновлены.')
+      setSuccess('Р§Р°С‚-РЅР°СЃС‚СЂРѕР№РєРё РєРѕРјРїР°РЅРёРё РѕР±РЅРѕРІР»РµРЅС‹.')
       await loadDashboard()
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Не удалось обновить чат-настройки.')
+      setError(saveError instanceof Error ? saveError.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ С‡Р°С‚-РЅР°СЃС‚СЂРѕР№РєРё.')
     } finally {
       setSavingChatSettings(false)
     }
@@ -1053,10 +1039,10 @@ export function EmployerDashboardPage() {
 
     try {
       await submitEmployerCompanyVerification()
-      setSuccess('Компания отправлена на верификацию.')
+      setSuccess('РљРѕРјРїР°РЅРёСЏ РѕС‚РїСЂР°РІР»РµРЅР° РЅР° РІРµСЂРёС„РёРєР°С†РёСЋ.')
       await loadDashboard()
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Не удалось отправить компанию на верификацию.')
+      setError(submitError instanceof Error ? submitError.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ РєРѕРјРїР°РЅРёСЋ РЅР° РІРµСЂРёС„РёРєР°С†РёСЋ.')
     } finally {
       setSubmittingVerification(false)
     }
@@ -1075,10 +1061,10 @@ export function EmployerDashboardPage() {
 
     try {
       const result = await uploadCompanyLogo(company.id, file)
-      setSuccess(result.url ? 'Логотип загружен. Сохраните профиль, чтобы обновить данные.' : 'Логотип загружен.')
+      setSuccess(result.url ? 'Р›РѕРіРѕС‚РёРї Р·Р°РіСЂСѓР¶РµРЅ. РЎРѕС…СЂР°РЅРёС‚Рµ РїСЂРѕС„РёР»СЊ, С‡С‚РѕР±С‹ РѕР±РЅРѕРІРёС‚СЊ РґР°РЅРЅС‹Рµ.' : 'Р›РѕРіРѕС‚РёРї Р·Р°РіСЂСѓР¶РµРЅ.')
       await loadDashboard()
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : 'Не удалось загрузить логотип.')
+      setError(uploadError instanceof Error ? uploadError.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ Р»РѕРіРѕС‚РёРї.')
     } finally {
       setUploadingLogo(false)
       event.target.value = ''
@@ -1099,34 +1085,34 @@ export function EmployerDashboardPage() {
             </div>
             <div className="seeker-profile-hero__content">
               <h1>{companyName}</h1>
-              <p>Личный кабинет работодателя: профиль компании, публикации, отклики и верификация.</p>
+              <p>Р›РёС‡РЅС‹Р№ РєР°Р±РёРЅРµС‚ СЂР°Р±РѕС‚РѕРґР°С‚РµР»СЏ: РїСЂРѕС„РёР»СЊ РєРѕРјРїР°РЅРёРё, РїСѓР±Р»РёРєР°С†РёРё, РѕС‚РєР»РёРєРё Рё РІРµСЂРёС„РёРєР°С†РёСЏ.</p>
               <div className="seeker-profile-hero__meta">
                 <span className={`status-chip status-chip--${companyStatusToneClass}`}>{companyStatusText}</span>
                 <span>
                   <Globe size={14} />
-                  {company?.websiteUrl || 'Сайт не указан'}
+                  {company?.websiteUrl || 'РЎР°Р№С‚ РЅРµ СѓРєР°Р·Р°РЅ'}
                 </span>
                 <span>
                   <Mail size={14} />
-                  {company?.publicEmail || 'Email не указан'}
+                  {company?.publicEmail || 'Email РЅРµ СѓРєР°Р·Р°РЅ'}
                 </span>
                 <span>
                   <Phone size={14} />
-                  {company?.publicPhone || 'Телефон не указан'}
+                  {company?.publicPhone || 'РўРµР»РµС„РѕРЅ РЅРµ СѓРєР°Р·Р°РЅ'}
                 </span>
               </div>
             </div>
             <div className="seeker-profile-hero__actions">
               <button type="button" className="btn btn--primary" onClick={() => setTab('verification')} disabled={!company}>
                 <ShieldCheck size={16} />
-                Перейти к верификации
+                РџРµСЂРµР№С‚Рё Рє РІРµСЂРёС„РёРєР°С†РёРё
               </button>
             </div>
           </header>
 
           {loading ? (
             <section className="card seeker-profile-state">
-              <p>Загружаем кабинет работодателя...</p>
+              <p>Р—Р°РіСЂСѓР¶Р°РµРј РєР°Р±РёРЅРµС‚ СЂР°Р±РѕС‚РѕРґР°С‚РµР»СЏ...</p>
             </section>
           ) : null}
 
@@ -1135,22 +1121,22 @@ export function EmployerDashboardPage() {
 
           {companyMissing ? (
             <section className="card seeker-profile-panel">
-              <h2>Создание компании</h2>
+              <h2>РЎРѕР·РґР°РЅРёРµ РєРѕРјРїР°РЅРёРё</h2>
               <form className="form-grid form-grid--two" onSubmit={onCreateCompany}>
                 <label>
-                  Юридическое название
+                  Р®СЂРёРґРёС‡РµСЃРєРѕРµ РЅР°Р·РІР°РЅРёРµ
                   <input name="legalName" type="text" value={createForm.legalName} onChange={onCreateFormChange} required />
                 </label>
                 <label>
-                  Бренд
+                  Р‘СЂРµРЅРґ
                   <input name="brandName" type="text" value={createForm.brandName} onChange={onCreateFormChange} />
                 </label>
                 <label className="full-width">
-                  URL логотипа (опционально)
+                  URL Р»РѕРіРѕС‚РёРїР° (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ)
                   <input name="logoUrl" type="url" value={createForm.logoUrl} onChange={onCreateFormChange} />
                 </label>
                 <button type="submit" className="btn btn--primary full-width" disabled={creatingCompany}>
-                  {creatingCompany ? 'Создаем компанию...' : 'Создать компанию'}
+                  {creatingCompany ? 'РЎРѕР·РґР°РµРј РєРѕРјРїР°РЅРёСЋ...' : 'РЎРѕР·РґР°С‚СЊ РєРѕРјРїР°РЅРёСЋ'}
                 </button>
               </form>
             </section>
@@ -1165,48 +1151,48 @@ export function EmployerDashboardPage() {
               </nav>
 
               {tab === 'overview' ? <section className="dashboard-section card seeker-profile-panel">
-        <h2>Обзор</h2>
-        {loading ? <p>Загружаем данные...</p> : null}
+        <h2>РћР±Р·РѕСЂ</h2>
+        {loading ? <p>Р—Р°РіСЂСѓР¶Р°РµРј РґР°РЅРЅС‹Рµ...</p> : null}
         {error ? <div className="auth-feedback auth-feedback--error">{error}</div> : null}
         {success ? <div className="auth-feedback">{success}</div> : null}
         <div className="stat-grid">
           <article>
             <strong>{overview.opportunitiesTotal}</strong>
-            <span>Опубликованных возможностей</span>
+            <span>РћРїСѓР±Р»РёРєРѕРІР°РЅРЅС‹С… РІРѕР·РјРѕР¶РЅРѕСЃС‚РµР№</span>
           </article>
           <article>
             <strong>{overview.responsesTotal}</strong>
-            <span>Откликов</span>
+            <span>РћС‚РєР»РёРєРѕРІ</span>
           </article>
           <article>
             <strong>{overview.responsesRecent}</strong>
-            <span>Активность в чатах за 24 часа</span>
+            <span>РђРєС‚РёРІРЅРѕСЃС‚СЊ РІ С‡Р°С‚Р°С… Р·Р° 24 С‡Р°СЃР°</span>
           </article>
           <article>
             <strong>{overview.status}</strong>
-            <span>Статус компании</span>
+            <span>РЎС‚Р°С‚СѓСЃ РєРѕРјРїР°РЅРёРё</span>
           </article>
         </div>
               </section> : null}
 
               {tab === 'company' ? <section className="dashboard-section card seeker-profile-panel">
-        <h2>Профиль компании</h2>
+        <h2>РџСЂРѕС„РёР»СЊ РєРѕРјРїР°РЅРёРё</h2>
         {companyMissing ? (
           <form className="form-grid form-grid--two" onSubmit={onCreateCompany}>
             <label>
-              Юридическое название
+              Р®СЂРёРґРёС‡РµСЃРєРѕРµ РЅР°Р·РІР°РЅРёРµ
               <input name="legalName" type="text" value={createForm.legalName} onChange={onCreateFormChange} required />
             </label>
             <label>
-              Бренд
+              Р‘СЂРµРЅРґ
               <input name="brandName" type="text" value={createForm.brandName} onChange={onCreateFormChange} />
             </label>
             <label className="full-width">
-              URL логотипа (опционально)
+              URL Р»РѕРіРѕС‚РёРїР° (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ)
               <input name="logoUrl" type="url" value={createForm.logoUrl} onChange={onCreateFormChange} />
             </label>
             <button type="submit" className="btn btn--primary full-width" disabled={creatingCompany}>
-              {creatingCompany ? 'Создаем компанию...' : 'Создать компанию'}
+              {creatingCompany ? 'РЎРѕР·РґР°РµРј РєРѕРјРїР°РЅРёСЋ...' : 'РЎРѕР·РґР°С‚СЊ РєРѕРјРїР°РЅРёСЋ'}
             </button>
           </form>
         ) : (
@@ -1219,28 +1205,28 @@ export function EmployerDashboardPage() {
               </div>
               <label className={`profile-settings-modal__file-button ${uploadingLogo ? 'is-loading' : ''}`}>
                 <UploadCloud size={16} />
-                {uploadingLogo ? 'Загрузка...' : 'Загрузить логотип'}
+                {uploadingLogo ? 'Р—Р°РіСЂСѓР·РєР°...' : 'Р—Р°РіСЂСѓР·РёС‚СЊ Р»РѕРіРѕС‚РёРї'}
                 <input type="file" accept="image/*" onChange={onUploadLogo} disabled={uploadingLogo} />
               </label>
             </div>
 
             <label>
-              Юридическое название
+              Р®СЂРёРґРёС‡РµСЃРєРѕРµ РЅР°Р·РІР°РЅРёРµ
               <input name="legalName" type="text" value={profileForm.legalName} onChange={onProfileFormChange} required />
             </label>
             <label>
-              Брендовое название
+              Р‘СЂРµРЅРґРѕРІРѕРµ РЅР°Р·РІР°РЅРёРµ
               <input name="brandName" type="text" value={profileForm.brandName} onChange={onProfileFormChange} />
             </label>
             <label>
-              Тип компании
+              РўРёРї РєРѕРјРїР°РЅРёРё
               <select name="legalType" value={profileForm.legalType} onChange={onProfileFormChange}>
-                <option value={1}>Юридическое лицо</option>
-                <option value={2}>ИП</option>
+                <option value={1}>Р®СЂРёРґРёС‡РµСЃРєРѕРµ Р»РёС†Рѕ</option>
+                <option value={2}>РРџ</option>
               </select>
             </label>
             <label>
-              Базовый город
+              Р‘Р°Р·РѕРІС‹Р№ РіРѕСЂРѕРґ
               <select name="baseCityId" value={profileForm.baseCityId} onChange={onProfileFormChange}>
                 {cities.map((city) => (
                   <option key={city.id} value={city.id}>
@@ -1250,59 +1236,59 @@ export function EmployerDashboardPage() {
               </select>
             </label>
             <label>
-              ИНН
+              РРќРќ
               <input name="taxId" type="text" value={profileForm.taxId} onChange={onProfileFormChange} />
             </label>
             <label>
-              Регистрационный номер
+              Р РµРіРёСЃС‚СЂР°С†РёРѕРЅРЅС‹Р№ РЅРѕРјРµСЂ
               <input name="registrationNumber" type="text" value={profileForm.registrationNumber} onChange={onProfileFormChange} />
             </label>
             <label>
-              Отрасль
+              РћС‚СЂР°СЃР»СЊ
               <input name="industry" type="text" value={profileForm.industry} onChange={onProfileFormChange} />
             </label>
             <label>
-              Сайт
+              РЎР°Р№С‚
               <input name="websiteUrl" type="url" value={profileForm.websiteUrl} onChange={onProfileFormChange} />
             </label>
             <label>
-              Публичный email
+              РџСѓР±Р»РёС‡РЅС‹Р№ email
               <input name="publicEmail" type="email" value={profileForm.publicEmail} onChange={onProfileFormChange} />
             </label>
             <label>
-              Публичный телефон
+              РџСѓР±Р»РёС‡РЅС‹Р№ С‚РµР»РµС„РѕРЅ
               <input name="publicPhone" type="text" value={profileForm.publicPhone} onChange={onProfileFormChange} />
             </label>
             <label className="full-width">
-              Описание
+              РћРїРёСЃР°РЅРёРµ
               <textarea name="description" rows={4} value={profileForm.description} onChange={onProfileFormChange} />
             </label>
             <button type="submit" className="btn btn--primary full-width" disabled={savingProfile}>
-              {savingProfile ? 'Сохраняем...' : 'Сохранить профиль компании'}
+              {savingProfile ? 'РЎРѕС…СЂР°РЅСЏРµРј...' : 'РЎРѕС…СЂР°РЅРёС‚СЊ РїСЂРѕС„РёР»СЊ РєРѕРјРїР°РЅРёРё'}
             </button>
           </form>
         )}
               </section> : null}
 
               {tab === 'create' ? <section className="dashboard-section card seeker-profile-panel">
-        <h2>Создать возможность</h2>
+        <h2>РЎРѕР·РґР°С‚СЊ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ</h2>
         <div className="employer-flow-entry">
-          <p>Для создания вакансий и мероприятий используйте новый мастер публикации.</p>
+          <p>Р”Р»СЏ СЃРѕР·РґР°РЅРёСЏ РІР°РєР°РЅСЃРёР№ Рё РјРµСЂРѕРїСЂРёСЏС‚РёР№ РёСЃРїРѕР»СЊР·СѓР№С‚Рµ РЅРѕРІС‹Р№ РјР°СЃС‚РµСЂ РїСѓР±Р»РёРєР°С†РёРё.</p>
           <div className="favorite-card__actions">
             <button type="button" className="btn btn--primary" onClick={() => navigate('/vacancy-flow/1?type=vacancy')}>
-              Перейти к созданию вакансии
+              РџРµСЂРµР№С‚Рё Рє СЃРѕР·РґР°РЅРёСЋ РІР°РєР°РЅСЃРёРё
             </button>
             <button type="button" className="btn btn--secondary" onClick={() => navigate('/vacancy-flow/1?type=event')}>
-              Перейти к созданию мероприятия
+              РџРµСЂРµР№С‚Рё Рє СЃРѕР·РґР°РЅРёСЋ РјРµСЂРѕРїСЂРёСЏС‚РёСЏ
             </button>
           </div>
         </div>
         <div className="form-grid form-grid--two">
           <form className="form-grid" onSubmit={onCreateVacancy}>
-            <h3>Новая вакансия</h3>
-            {editingVacancyId ? <p>Редактирование вакансии #{editingVacancyId}</p> : null}
+            <h3>РќРѕРІР°СЏ РІР°РєР°РЅСЃРёСЏ</h3>
+            {editingVacancyId ? <p>Р РµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ РІР°РєР°РЅСЃРёРё #{editingVacancyId}</p> : null}
             <label>
-              Название
+              РќР°Р·РІР°РЅРёРµ
               <input
                 name="title"
                 type="text"
@@ -1312,40 +1298,40 @@ export function EmployerDashboardPage() {
               />
             </label>
             <label>
-              Краткое описание
+              РљСЂР°С‚РєРѕРµ РѕРїРёСЃР°РЅРёРµ
               <textarea name="shortDescription" rows={2} value={vacancyForm.shortDescription} onChange={onVacancyFormChange} required />
             </label>
             <label>
-              Полное описание
+              РџРѕР»РЅРѕРµ РѕРїРёСЃР°РЅРёРµ
               <textarea name="fullDescription" rows={4} value={vacancyForm.fullDescription} onChange={onVacancyFormChange} required />
             </label>
             <label>
-              Вид
+              Р’РёРґ
               <select name="kind" value={vacancyForm.kind} onChange={onVacancyFormChange}>
-                <option value={1}>Стажировка</option>
-                <option value={2}>Работа</option>
+                <option value={1}>РЎС‚Р°Р¶РёСЂРѕРІРєР°</option>
+                <option value={2}>Р Р°Р±РѕС‚Р°</option>
               </select>
             </label>
             <label>
-              Формат
+              Р¤РѕСЂРјР°С‚
               <select name="format" value={vacancyForm.format} onChange={onVacancyFormChange}>
-                <option value={1}>Офис</option>
-                <option value={2}>Гибрид</option>
-                <option value={3}>Удаленно</option>
+                <option value={1}>РћС„РёСЃ</option>
+                <option value={2}>Р“РёР±СЂРёРґ</option>
+                <option value={3}>РЈРґР°Р»РµРЅРЅРѕ</option>
               </select>
             </label>
             <label>
-              Статус
+              РЎС‚Р°С‚СѓСЃ
               <select name="status" value={vacancyForm.status} onChange={onVacancyFormChange}>
-                <option value={1}>Черновик</option>
-                <option value={2}>На модерации</option>
-                <option value={3}>Активна</option>
+                <option value={1}>Р§РµСЂРЅРѕРІРёРє</option>
+                <option value={2}>РќР° РјРѕРґРµСЂР°С†РёРё</option>
+                <option value={3}>РђРєС‚РёРІРЅР°</option>
               </select>
             </label>
             <label>
-              Город
+              Р“РѕСЂРѕРґ
               <select name="cityId" value={vacancyForm.cityId} onChange={onVacancyFormChange}>
-                <option value="">Не выбран</option>
+                <option value="">РќРµ РІС‹Р±СЂР°РЅ</option>
                 {cities.map((city) => (
                   <option key={city.id} value={city.id}>
                     {city.name}
@@ -1354,9 +1340,9 @@ export function EmployerDashboardPage() {
               </select>
             </label>
             <label>
-              Локация
+              Р›РѕРєР°С†РёСЏ
               <select name="locationId" value={vacancyForm.locationId} onChange={onVacancyFormChange} disabled={!vacancyForm.cityId}>
-                <option value="">Не выбрана</option>
+                <option value="">РќРµ РІС‹Р±СЂР°РЅР°</option>
                 {vacancyLocations.map((location) => (
                   <option key={location.id} value={location.id}>
                     {locationOptionLabel(location)}
@@ -1365,35 +1351,31 @@ export function EmployerDashboardPage() {
               </select>
             </label>
             <label>
-              Зарплата от
+              Р—Р°СЂРїР»Р°С‚Р° РѕС‚
               <input name="salaryFrom" type="number" min={0} step="0.01" value={vacancyForm.salaryFrom} onChange={onVacancyFormChange} />
             </label>
             <label>
-              Зарплата до
+              Р—Р°СЂРїР»Р°С‚Р° РґРѕ
               <input name="salaryTo" type="number" min={0} step="0.01" value={vacancyForm.salaryTo} onChange={onVacancyFormChange} />
             </label>
             <label>
-              Валюта
+              Р’Р°Р»СЋС‚Р°
               <input name="currencyCode" type="text" value={vacancyForm.currencyCode} onChange={onVacancyFormChange} maxLength={3} />
             </label>
             <label>
-              Налоговый режим зарплаты
+              РќР°Р»РѕРіРѕРІС‹Р№ СЂРµР¶РёРј Р·Р°СЂРїР»Р°С‚С‹
               <select name="salaryTaxMode" value={vacancyForm.salaryTaxMode} onChange={onVacancyFormChange}>
-                <option value={1}>До вычета налогов</option>
-                <option value={2}>После вычета налогов</option>
-                <option value={3}>Не указано</option>
+                <option value={1}>Р”Рѕ РІС‹С‡РµС‚Р° РЅР°Р»РѕРіРѕРІ</option>
+                <option value={2}>РџРѕСЃР»Рµ РІС‹С‡РµС‚Р° РЅР°Р»РѕРіРѕРІ</option>
+                <option value={3}>РќРµ СѓРєР°Р·Р°РЅРѕ</option>
               </select>
             </label>
             <label>
-              Дата публикации
-              <DateInput name="publishAt" type="datetime-local" value={vacancyForm.publishAt} onChange={onVacancyFormChange} required />
-            </label>
-            <label>
-              Дедлайн откликов
+              Р”РµРґР»Р°Р№РЅ РѕС‚РєР»РёРєРѕРІ
               <DateInput name="applicationDeadline" type="datetime-local" value={vacancyForm.applicationDeadline} onChange={onVacancyFormChange} />
             </label>
             <label>
-              Теги
+              РўРµРіРё
               <TagPicker
                 options={tags.map((tag) => ({ id: tag.id, label: tag.name }))}
                 selectedIds={vacancyForm.tagIds}
@@ -1404,20 +1386,20 @@ export function EmployerDashboardPage() {
               />
             </label>
             <button type="submit" className="btn btn--primary" disabled={!company || creatingVacancy}>
-              {creatingVacancy ? (editingVacancyId ? 'Сохраняем...' : 'Создаем...') : editingVacancyId ? 'Сохранить вакансию' : 'Создать вакансию'}
+              {creatingVacancy ? (editingVacancyId ? 'РЎРѕС…СЂР°РЅСЏРµРј...' : 'РЎРѕР·РґР°РµРј...') : editingVacancyId ? 'РЎРѕС…СЂР°РЅРёС‚СЊ РІР°РєР°РЅСЃРёСЋ' : 'РЎРѕР·РґР°С‚СЊ РІР°РєР°РЅСЃРёСЋ'}
             </button>
             {editingVacancyId ? (
               <button type="button" className="btn btn--ghost" onClick={onCancelVacancyEdit} disabled={creatingVacancy}>
-                Отменить редактирование
+                РћС‚РјРµРЅРёС‚СЊ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ
               </button>
             ) : null}
           </form>
 
           <form className="form-grid" onSubmit={onCreateOpportunity}>
-            <h3>Новая возможность</h3>
-            {editingOpportunityId ? <p>Редактирование возможности #{editingOpportunityId}</p> : null}
+            <h3>РќРѕРІР°СЏ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ</h3>
+            {editingOpportunityId ? <p>Р РµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё #{editingOpportunityId}</p> : null}
             <label>
-              Название
+              РќР°Р·РІР°РЅРёРµ
               <input
                 name="title"
                 type="text"
@@ -1427,42 +1409,42 @@ export function EmployerDashboardPage() {
               />
             </label>
             <label>
-              Краткое описание
+              РљСЂР°С‚РєРѕРµ РѕРїРёСЃР°РЅРёРµ
               <textarea name="shortDescription" rows={2} value={opportunityForm.shortDescription} onChange={onOpportunityFormChange} required />
             </label>
             <label>
-              Полное описание
+              РџРѕР»РЅРѕРµ РѕРїРёСЃР°РЅРёРµ
               <textarea name="fullDescription" rows={4} value={opportunityForm.fullDescription} onChange={onOpportunityFormChange} required />
             </label>
             <label>
-              Вид
+              Р’РёРґ
               <select name="kind" value={opportunityForm.kind} onChange={onOpportunityFormChange}>
-                <option value={1}>Хакатон</option>
-                <option value={2}>День открытых дверей</option>
-                <option value={3}>Лекция</option>
-                <option value={4}>Другое</option>
+                <option value={1}>РҐР°РєР°С‚РѕРЅ</option>
+                <option value={2}>Р”РµРЅСЊ РѕС‚РєСЂС‹С‚С‹С… РґРІРµСЂРµР№</option>
+                <option value={3}>Р›РµРєС†РёСЏ</option>
+                <option value={4}>Р”СЂСѓРіРѕРµ</option>
               </select>
             </label>
             <label>
-              Формат
+              Р¤РѕСЂРјР°С‚
               <select name="format" value={opportunityForm.format} onChange={onOpportunityFormChange}>
-                <option value={1}>Офис</option>
-                <option value={2}>Гибрид</option>
-                <option value={3}>Удаленно</option>
+                <option value={1}>РћС„РёСЃ</option>
+                <option value={2}>Р“РёР±СЂРёРґ</option>
+                <option value={3}>РЈРґР°Р»РµРЅРЅРѕ</option>
               </select>
             </label>
             <label>
-              Статус
+              РЎС‚Р°С‚СѓСЃ
               <select name="status" value={opportunityForm.status} onChange={onOpportunityFormChange}>
-                <option value={1}>Черновик</option>
-                <option value={2}>На модерации</option>
-                <option value={3}>Активна</option>
+                <option value={1}>Р§РµСЂРЅРѕРІРёРє</option>
+                <option value={2}>РќР° РјРѕРґРµСЂР°С†РёРё</option>
+                <option value={3}>РђРєС‚РёРІРЅР°</option>
               </select>
             </label>
             <label>
-              Город
+              Р“РѕСЂРѕРґ
               <select name="cityId" value={opportunityForm.cityId} onChange={onOpportunityFormChange}>
-                <option value="">Не выбран</option>
+                <option value="">РќРµ РІС‹Р±СЂР°РЅ</option>
                 {cities.map((city) => (
                   <option key={city.id} value={city.id}>
                     {city.name}
@@ -1471,9 +1453,9 @@ export function EmployerDashboardPage() {
               </select>
             </label>
             <label>
-              Локация
+              Р›РѕРєР°С†РёСЏ
               <select name="locationId" value={opportunityForm.locationId} onChange={onOpportunityFormChange} disabled={!opportunityForm.cityId}>
-                <option value="">Не выбрана</option>
+                <option value="">РќРµ РІС‹Р±СЂР°РЅР°</option>
                 {opportunityLocations.map((location) => (
                   <option key={location.id} value={location.id}>
                     {locationOptionLabel(location)}
@@ -1482,19 +1464,19 @@ export function EmployerDashboardPage() {
               </select>
             </label>
             <label>
-              Тип цены
+              РўРёРї С†РµРЅС‹
               <select name="priceType" value={opportunityForm.priceType} onChange={onOpportunityFormChange}>
-                <option value={1}>Бесплатно</option>
-                <option value={2}>Платно</option>
-                <option value={3}>Приз</option>
+                <option value={1}>Р‘РµСЃРїР»Р°С‚РЅРѕ</option>
+                <option value={2}>РџР»Р°С‚РЅРѕ</option>
+                <option value={3}>РџСЂРёР·</option>
               </select>
             </label>
             <label>
-              Сумма
+              РЎСѓРјРјР°
               <input name="priceAmount" type="number" min={0} step="0.01" value={opportunityForm.priceAmount} onChange={onOpportunityFormChange} />
             </label>
             <label>
-              Валюта
+              Р’Р°Р»СЋС‚Р°
               <input name="priceCurrencyCode" type="text" value={opportunityForm.priceCurrencyCode} onChange={onOpportunityFormChange} maxLength={3} />
             </label>
             <label className="employer-checkbox">
@@ -1504,18 +1486,14 @@ export function EmployerDashboardPage() {
                 checked={opportunityForm.participantsCanWrite}
                 onChange={onOpportunityFormChange}
               />
-              Участники могут писать в чат
+              РЈС‡Р°СЃС‚РЅРёРєРё РјРѕРіСѓС‚ РїРёСЃР°С‚СЊ РІ С‡Р°С‚
             </label>
             <label>
-              Дата публикации
-              <DateInput name="publishAt" type="datetime-local" value={opportunityForm.publishAt} onChange={onOpportunityFormChange} required />
-            </label>
-            <label>
-              Дата события
+              Р”Р°С‚Р° СЃРѕР±С‹С‚РёСЏ
               <DateInput name="eventDate" type="datetime-local" value={opportunityForm.eventDate} onChange={onOpportunityFormChange} />
             </label>
             <label>
-              Теги
+              РўРµРіРё
               <TagPicker
                 options={tags.map((tag) => ({ id: tag.id, label: tag.name }))}
                 selectedIds={opportunityForm.tagIds}
@@ -1526,11 +1504,11 @@ export function EmployerDashboardPage() {
               />
             </label>
             <button type="submit" className="btn btn--secondary" disabled={!company || creatingOpportunity}>
-              {creatingOpportunity ? (editingOpportunityId ? 'Сохраняем...' : 'Создаем...') : editingOpportunityId ? 'Сохранить возможность' : 'Создать возможность'}
+              {creatingOpportunity ? (editingOpportunityId ? 'РЎРѕС…СЂР°РЅСЏРµРј...' : 'РЎРѕР·РґР°РµРј...') : editingOpportunityId ? 'РЎРѕС…СЂР°РЅРёС‚СЊ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ' : 'РЎРѕР·РґР°С‚СЊ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ'}
             </button>
             {editingOpportunityId ? (
               <button type="button" className="btn btn--ghost" onClick={onCancelOpportunityEdit} disabled={creatingOpportunity}>
-                Отменить редактирование
+                РћС‚РјРµРЅРёС‚СЊ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ
               </button>
             ) : null}
           </form>
@@ -1538,9 +1516,9 @@ export function EmployerDashboardPage() {
               </section> : null}
 
               {tab === 'opportunities' ? <section className="dashboard-section card seeker-profile-panel">
-        <h2>Мои возможности</h2>
+        <h2>РњРѕРё РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё</h2>
         {!opportunities.length ? (
-          <p>У компании пока нет опубликованных возможностей.</p>
+          <p>РЈ РєРѕРјРїР°РЅРёРё РїРѕРєР° РЅРµС‚ РѕРїСѓР±Р»РёРєРѕРІР°РЅРЅС‹С… РІРѕР·РјРѕР¶РЅРѕСЃС‚РµР№.</p>
         ) : (
           <div className="favorite-list">
             {opportunities.map((item) => (
@@ -1559,7 +1537,7 @@ export function EmployerDashboardPage() {
                   </span>
                   <span>
                     <Clock3 size={14} />
-                    Публикация: {formatDate(item.publishAt)}
+                    РџСѓР±Р»РёРєР°С†РёСЏ: {formatDate(item.publishAt)}
                   </span>
                 </div>
                 {item.tags.length ? <p>{item.tags.slice(0, 6).join(', ')}</p> : null}
@@ -1570,7 +1548,7 @@ export function EmployerDashboardPage() {
                     onClick={() => void onEditOpportunity(item)}
                     disabled={loadingOpportunityEditorKey === `${item.source}-${item.id}` || deletingOpportunityKey === `${item.source}-${item.id}`}
                   >
-                    {loadingOpportunityEditorKey === `${item.source}-${item.id}` ? 'Загрузка...' : 'Редактировать'}
+                    {loadingOpportunityEditorKey === `${item.source}-${item.id}` ? 'Р—Р°РіСЂСѓР·РєР°...' : 'Р РµРґР°РєС‚РёСЂРѕРІР°С‚СЊ'}
                   </button>
                   <button
                     type="button"
@@ -1578,7 +1556,7 @@ export function EmployerDashboardPage() {
                     onClick={() => void onDeleteOpportunity(item)}
                     disabled={deletingOpportunityKey === `${item.source}-${item.id}` || loadingOpportunityEditorKey === `${item.source}-${item.id}`}
                   >
-                    {deletingOpportunityKey === `${item.source}-${item.id}` ? 'Удаляем...' : 'Удалить'}
+                    {deletingOpportunityKey === `${item.source}-${item.id}` ? 'РЈРґР°Р»СЏРµРј...' : 'РЈРґР°Р»РёС‚СЊ'}
                   </button>
                 </div>
               </article>
@@ -1588,26 +1566,26 @@ export function EmployerDashboardPage() {
       </section> : null}
 
               {tab === 'applications' ? <section className="dashboard-section card seeker-profile-panel">
-        <h2>Отклики</h2>
+        <h2>РћС‚РєР»РёРєРё</h2>
         {!applications.length ? (
-          <p>Откликов пока нет.</p>
+          <p>РћС‚РєР»РёРєРѕРІ РїРѕРєР° РЅРµС‚.</p>
         ) : (
           <div className="status-table">
             {applications.map((application) => (
               <div key={application.id}>
                 <span>
                   <MessageSquare size={14} />
-                  {application.vacancyTitle} — {application.candidateName}
+                  {application.vacancyTitle} вЂ” {application.candidateName}
                 </span>
                 <div className="employer-application-actions">
-                  <span className="status-chip">{applicationStatusLabel[application.status] ?? `Статус ${application.status}`}</span>
+                  <span className="status-chip">{applicationStatusLabel[application.status] ?? `РЎС‚Р°С‚СѓСЃ ${application.status}`}</span>
                   <select
                     value={String(applicationStatusDrafts[application.id] ?? application.status)}
                     onChange={(event) => onApplicationStatusDraftChange(application.id, Number(event.target.value))}
                     disabled={updatingApplicationId === application.id}
                   >
                     <option value={String(application.status)}>
-                      Текущий: {applicationStatusLabel[application.status] ?? `Статус ${application.status}`}
+                      РўРµРєСѓС‰РёР№: {applicationStatusLabel[application.status] ?? `РЎС‚Р°С‚СѓСЃ ${application.status}`}
                     </option>
                     {applicationStatusUpdateOptions
                       .filter((status) => status !== application.status)
@@ -1623,7 +1601,7 @@ export function EmployerDashboardPage() {
                     disabled={(applicationStatusDrafts[application.id] ?? application.status) === application.status || updatingApplicationId === application.id}
                     onClick={() => void onUpdateApplicationStatus(application)}
                   >
-                    {updatingApplicationId === application.id ? 'Сохраняем...' : 'Обновить статус'}
+                    {updatingApplicationId === application.id ? 'РЎРѕС…СЂР°РЅСЏРµРј...' : 'РћР±РЅРѕРІРёС‚СЊ СЃС‚Р°С‚СѓСЃ'}
                   </button>
                   <button
                     type="button"
@@ -1631,7 +1609,7 @@ export function EmployerDashboardPage() {
                     onClick={() => void onOpenApplicationDetail(application.id)}
                     disabled={loadingApplicationDetailId === application.id}
                   >
-                    {loadingApplicationDetailId === application.id ? 'Загружаем...' : 'Профиль кандидата'}
+                    {loadingApplicationDetailId === application.id ? 'Р—Р°РіСЂСѓР¶Р°РµРј...' : 'РџСЂРѕС„РёР»СЊ РєР°РЅРґРёРґР°С‚Р°'}
                   </button>
                 </div>
               </div>
@@ -1644,9 +1622,9 @@ export function EmployerDashboardPage() {
             <div className="employer-candidate-profile__head">
               <div>
                 <h3>{selectedApplicationDetail.candidateName}</h3>
-                <p className="employer-candidate-profile__subtitle">Отклик на: {selectedApplicationDetail.vacancyTitle}</p>
+                <p className="employer-candidate-profile__subtitle">РћС‚РєР»РёРє РЅР°: {selectedApplicationDetail.vacancyTitle}</p>
               </div>
-              <span className="status-chip">{applicationStatusLabel[selectedApplicationDetail.status] ?? `Статус ${selectedApplicationDetail.status}`}</span>
+              <span className="status-chip">{applicationStatusLabel[selectedApplicationDetail.status] ?? `РЎС‚Р°С‚СѓСЃ ${selectedApplicationDetail.status}`}</span>
             </div>
 
             {selectedCandidateResume ? (
@@ -1663,10 +1641,10 @@ export function EmployerDashboardPage() {
                     <div className="employer-candidate-profile__summary-copy">
                       <strong>{selectedApplicationDetail.candidateName}</strong>
                       <p>@{selectedCandidateResume.username}</p>
-                      <p>{selectedCandidateResume.headline || 'Заголовок резюме не указан'}</p>
+                      <p>{selectedCandidateResume.headline || 'Р—Р°РіРѕР»РѕРІРѕРє СЂРµР·СЋРјРµ РЅРµ СѓРєР°Р·Р°РЅ'}</p>
                       <div className="employer-candidate-profile__chips">
                         <span className={`status-chip status-chip--${selectedCandidateResume.openToWork ? 'success' : 'warning'}`}>
-                          {selectedCandidateResume.openToWork ? 'Открыт к работе' : 'Не ищет работу'}
+                          {selectedCandidateResume.openToWork ? 'РћС‚РєСЂС‹С‚ Рє СЂР°Р±РѕС‚Рµ' : 'РќРµ РёС‰РµС‚ СЂР°Р±РѕС‚Сѓ'}
                         </span>
                         <span className="status-chip">ID: {selectedCandidateResume.userId}</span>
                       </div>
@@ -1675,65 +1653,65 @@ export function EmployerDashboardPage() {
                 </div>
 
                 <div className="employer-candidate-profile__section">
-                  <strong>Личные данные</strong>
+                  <strong>Р›РёС‡РЅС‹Рµ РґР°РЅРЅС‹Рµ</strong>
                   <div className="employer-candidate-profile__facts">
                     <p>
-                      <span>ФИО</span>
+                      <span>Р¤РРћ</span>
                       <strong>
                         {selectedCandidateResume.lastName} {selectedCandidateResume.firstName} {selectedCandidateResume.middleName || ''}
                       </strong>
                     </p>
                     <p>
-                      <span>Дата рождения</span>
+                      <span>Р”Р°С‚Р° СЂРѕР¶РґРµРЅРёСЏ</span>
                       <strong>{formatDateOnly(selectedCandidateResume.birthDate)}</strong>
                     </p>
                     <p>
-                      <span>Пол</span>
+                      <span>РџРѕР»</span>
                       <strong>{genderLabel(selectedCandidateResume.gender)}</strong>
                     </p>
                     <p>
-                      <span>Телефон</span>
-                      <strong>{selectedCandidateResume.phone || 'Не указан'}</strong>
+                      <span>РўРµР»РµС„РѕРЅ</span>
+                      <strong>{selectedCandidateResume.phone || 'РќРµ СѓРєР°Р·Р°РЅ'}</strong>
                     </p>
                     <p>
-                      <span>О себе</span>
-                      <strong>{selectedCandidateResume.about || 'Не заполнено'}</strong>
+                      <span>Рћ СЃРµР±Рµ</span>
+                      <strong>{selectedCandidateResume.about || 'РќРµ Р·Р°РїРѕР»РЅРµРЅРѕ'}</strong>
                     </p>
                   </div>
                 </div>
 
                 <div className="employer-candidate-profile__section">
-                  <strong>Резюме</strong>
+                  <strong>Р РµР·СЋРјРµ</strong>
                   <div className="employer-candidate-profile__facts">
                     <p>
-                      <span>Желаемая должность</span>
-                      <strong>{selectedCandidateResume.desiredPosition || 'Не указана'}</strong>
+                      <span>Р–РµР»Р°РµРјР°СЏ РґРѕР»Р¶РЅРѕСЃС‚СЊ</span>
+                      <strong>{selectedCandidateResume.desiredPosition || 'РќРµ СѓРєР°Р·Р°РЅР°'}</strong>
                     </p>
                     <p>
-                      <span>Суммарный заголовок</span>
-                      <strong>{selectedCandidateResume.headline || 'Не указан'}</strong>
+                      <span>РЎСѓРјРјР°СЂРЅС‹Р№ Р·Р°РіРѕР»РѕРІРѕРє</span>
+                      <strong>{selectedCandidateResume.headline || 'РќРµ СѓРєР°Р·Р°РЅ'}</strong>
                     </p>
                     <p>
-                      <span>Краткое описание</span>
-                      <strong>{selectedCandidateResume.summary || 'Не заполнено'}</strong>
+                      <span>РљСЂР°С‚РєРѕРµ РѕРїРёСЃР°РЅРёРµ</span>
+                      <strong>{selectedCandidateResume.summary || 'РќРµ Р·Р°РїРѕР»РЅРµРЅРѕ'}</strong>
                     </p>
                     <p>
-                      <span>Ожидания по доходу</span>
+                      <span>РћР¶РёРґР°РЅРёСЏ РїРѕ РґРѕС…РѕРґСѓ</span>
                       <strong>{formatMoneyRange(selectedCandidateResume.salaryFrom, selectedCandidateResume.salaryTo, selectedCandidateResume.currencyCode)}</strong>
                     </p>
                     <p>
-                      <span>Дата отклика</span>
+                      <span>Р”Р°С‚Р° РѕС‚РєР»РёРєР°</span>
                       <strong>{formatDate(selectedApplicationDetail.createdAt)}</strong>
                     </p>
                     <p>
-                      <span>Обновлено</span>
+                      <span>РћР±РЅРѕРІР»РµРЅРѕ</span>
                       <strong>{formatDate(selectedApplicationDetail.updatedAt)}</strong>
                     </p>
                   </div>
                 </div>
 
                 <div className="employer-candidate-profile__section employer-candidate-profile__section--wide">
-                  <strong>Навыки</strong>
+                  <strong>РќР°РІС‹РєРё</strong>
                   {selectedCandidateResume.skills.length ? (
                     <div className="employer-candidate-profile__list">
                       {selectedCandidateResume.skills.map((skill) => (
@@ -1747,12 +1725,12 @@ export function EmployerDashboardPage() {
                       ))}
                     </div>
                   ) : (
-                    <p>Навыки не указаны.</p>
+                    <p>РќР°РІС‹РєРё РЅРµ СѓРєР°Р·Р°РЅС‹.</p>
                   )}
                 </div>
 
                 <div className="employer-candidate-profile__section employer-candidate-profile__section--wide">
-                  <strong>Опыт работы</strong>
+                  <strong>РћРїС‹С‚ СЂР°Р±РѕС‚С‹</strong>
                   {selectedCandidateResume.experiences.length ? (
                     <div className="employer-candidate-profile__list">
                       {selectedCandidateResume.experiences.map((experience) => (
@@ -1762,19 +1740,19 @@ export function EmployerDashboardPage() {
                             <span>{experience.companyName}</span>
                           </div>
                           <p>
-                            {formatDateOnly(experience.startDate)} - {experience.isCurrent ? 'по настоящее время' : formatDateOnly(experience.endDate)}
+                            {formatDateOnly(experience.startDate)} - {experience.isCurrent ? 'РїРѕ РЅР°СЃС‚РѕСЏС‰РµРµ РІСЂРµРјСЏ' : formatDateOnly(experience.endDate)}
                           </p>
-                          <p>{experience.description || 'Описание не заполнено'}</p>
+                          <p>{experience.description || 'РћРїРёСЃР°РЅРёРµ РЅРµ Р·Р°РїРѕР»РЅРµРЅРѕ'}</p>
                         </article>
                       ))}
                     </div>
                   ) : (
-                    <p>Опыт работы не указан.</p>
+                    <p>РћРїС‹С‚ СЂР°Р±РѕС‚С‹ РЅРµ СѓРєР°Р·Р°РЅ.</p>
                   )}
                 </div>
 
                 <div className="employer-candidate-profile__section employer-candidate-profile__section--wide">
-                  <strong>Проекты</strong>
+                  <strong>РџСЂРѕРµРєС‚С‹</strong>
                   {selectedCandidateResume.projects.length ? (
                     <div className="employer-candidate-profile__list">
                       {selectedCandidateResume.projects.map((project) => (
@@ -1783,17 +1761,17 @@ export function EmployerDashboardPage() {
                             <strong>{project.title}</strong>
                             <span>{formatProjectPeriod(project.startDate, project.endDate)}</span>
                           </div>
-                          <p>{project.role || 'Роль не указана'}</p>
-                          <p>{project.description || 'Описание не заполнено'}</p>
+                          <p>{project.role || 'Р РѕР»СЊ РЅРµ СѓРєР°Р·Р°РЅР°'}</p>
+                          <p>{project.description || 'РћРїРёСЃР°РЅРёРµ РЅРµ Р·Р°РїРѕР»РЅРµРЅРѕ'}</p>
                           <div className="employer-candidate-profile__links">
                             {project.repoUrl ? (
                               <a href={project.repoUrl} target="_blank" rel="noreferrer">
-                                Репозиторий
+                                Р РµРїРѕР·РёС‚РѕСЂРёР№
                               </a>
                             ) : null}
                             {project.demoUrl ? (
                               <a href={project.demoUrl} target="_blank" rel="noreferrer">
-                                Демо
+                                Р”РµРјРѕ
                               </a>
                             ) : null}
                           </div>
@@ -1801,33 +1779,33 @@ export function EmployerDashboardPage() {
                       ))}
                     </div>
                   ) : (
-                    <p>Проекты не указаны.</p>
+                    <p>РџСЂРѕРµРєС‚С‹ РЅРµ СѓРєР°Р·Р°РЅС‹.</p>
                   )}
                 </div>
 
                 <div className="employer-candidate-profile__section employer-candidate-profile__section--wide">
-                  <strong>Образование</strong>
+                  <strong>РћР±СЂР°Р·РѕРІР°РЅРёРµ</strong>
                   {selectedCandidateResume.education.length ? (
                     <div className="employer-candidate-profile__list">
                       {selectedCandidateResume.education.map((item) => (
                         <article key={item.id} className="employer-candidate-profile__list-item">
                           <div className="employer-candidate-profile__list-item-head">
                             <strong>{item.university}</strong>
-                            <span>{item.graduationYear || 'Год выпуска не указан'}</span>
+                            <span>{item.graduationYear || 'Р“РѕРґ РІС‹РїСѓСЃРєР° РЅРµ СѓРєР°Р·Р°РЅ'}</span>
                           </div>
-                          <p>{item.faculty || 'Факультет не указан'}</p>
-                          <p>{item.specialty || 'Специальность не указана'}</p>
-                          <p>Курс: {item.course || 'Не указан'}</p>
+                          <p>{item.faculty || 'Р¤Р°РєСѓР»СЊС‚РµС‚ РЅРµ СѓРєР°Р·Р°РЅ'}</p>
+                          <p>{item.specialty || 'РЎРїРµС†РёР°Р»СЊРЅРѕСЃС‚СЊ РЅРµ СѓРєР°Р·Р°РЅР°'}</p>
+                          <p>РљСѓСЂСЃ: {item.course || 'РќРµ СѓРєР°Р·Р°РЅ'}</p>
                         </article>
                       ))}
                     </div>
                   ) : (
-                    <p>Образование не указано.</p>
+                    <p>РћР±СЂР°Р·РѕРІР°РЅРёРµ РЅРµ СѓРєР°Р·Р°РЅРѕ.</p>
                   )}
                 </div>
 
                 <div className="employer-candidate-profile__section employer-candidate-profile__section--wide">
-                  <strong>Ссылки</strong>
+                  <strong>РЎСЃС‹Р»РєРё</strong>
                   {selectedCandidateResume.links.length ? (
                     <div className="employer-candidate-profile__links-list">
                       {selectedCandidateResume.links.map((link) => (
@@ -1844,17 +1822,17 @@ export function EmployerDashboardPage() {
                       ))}
                     </div>
                   ) : (
-                    <p>Ссылки не указаны.</p>
+                    <p>РЎСЃС‹Р»РєРё РЅРµ СѓРєР°Р·Р°РЅС‹.</p>
                   )}
                 </div>
               </div>
             ) : (
-              <p>У кандидата пока нет заполненного резюме.</p>
+              <p>РЈ РєР°РЅРґРёРґР°С‚Р° РїРѕРєР° РЅРµС‚ Р·Р°РїРѕР»РЅРµРЅРЅРѕРіРѕ СЂРµР·СЋРјРµ.</p>
             )}
 
             <div className="employer-candidate-profile__actions">
               <button type="button" className="btn btn--ghost" onClick={() => setSelectedApplicationDetail(null)}>
-                Закрыть профиль
+                Р—Р°РєСЂС‹С‚СЊ РїСЂРѕС„РёР»СЊ
               </button>
             </div>
           </article>
@@ -1862,39 +1840,39 @@ export function EmployerDashboardPage() {
       </section> : null}
 
               {tab === 'overview' ? <section className="dashboard-section card seeker-profile-panel">
-        <h2>Аналитика</h2>
+        <h2>РђРЅР°Р»РёС‚РёРєР°</h2>
         <div className="employer-analytics">
           <article>
             <strong>{applicationChats.length}</strong>
-            <span>Всего чатов</span>
+            <span>Р’СЃРµРіРѕ С‡Р°С‚РѕРІ</span>
           </article>
           <article>
             <strong>{applications.length}</strong>
-            <span>Всего откликов</span>
+            <span>Р’СЃРµРіРѕ РѕС‚РєР»РёРєРѕРІ</span>
           </article>
           <article>
             <strong>{applications.filter((item) => item.status === 1 || item.status === 2).length}</strong>
-            <span>В работе</span>
+            <span>Р’ СЂР°Р±РѕС‚Рµ</span>
           </article>
         </div>
               </section> : null}
 
               {tab === 'verification' ? <section className="dashboard-section card seeker-profile-panel">
-        <h2>Верификация</h2>
+        <h2>Р’РµСЂРёС„РёРєР°С†РёСЏ</h2>
         <div className="employer-verification">
           <div className="employer-verification__status">
             <span className={`status-chip status-chip--${companyStatusToneClass}`}>
               <ShieldCheck size={14} />
               {companyStatusText}
             </span>
-            <p>Заполните профиль компании и отправьте данные на модерацию.</p>
+            <p>Р—Р°РїРѕР»РЅРёС‚Рµ РїСЂРѕС„РёР»СЊ РєРѕРјРїР°РЅРёРё Рё РѕС‚РїСЂР°РІСЊС‚Рµ РґР°РЅРЅС‹Рµ РЅР° РјРѕРґРµСЂР°С†РёСЋ.</p>
             <button type="button" className="btn btn--primary" onClick={() => void onSubmitVerification()} disabled={submittingVerification || !company}>
-              {submittingVerification ? 'Отправляем...' : 'Отправить на верификацию'}
+              {submittingVerification ? 'РћС‚РїСЂР°РІР»СЏРµРј...' : 'РћС‚РїСЂР°РІРёС‚СЊ РЅР° РІРµСЂРёС„РёРєР°С†РёСЋ'}
             </button>
           </div>
 
           <form className="form-grid" onSubmit={onSaveChatSettings}>
-            <h3>Чат-настройки</h3>
+            <h3>Р§Р°С‚-РЅР°СЃС‚СЂРѕР№РєРё</h3>
             <label className="employer-checkbox">
               <input
                 type="checkbox"
@@ -1902,10 +1880,10 @@ export function EmployerDashboardPage() {
                 checked={chatSettingsForm.autoGreetingEnabled}
                 onChange={onChatSettingsChange}
               />
-              Включить авто-приветствие
+              Р’РєР»СЋС‡РёС‚СЊ Р°РІС‚Рѕ-РїСЂРёРІРµС‚СЃС‚РІРёРµ
             </label>
             <label>
-              Текст авто-приветствия
+              РўРµРєСЃС‚ Р°РІС‚Рѕ-РїСЂРёРІРµС‚СЃС‚РІРёСЏ
               <textarea name="autoGreetingText" rows={2} value={chatSettingsForm.autoGreetingText} onChange={onChatSettingsChange} />
             </label>
             <label className="employer-checkbox">
@@ -1915,28 +1893,28 @@ export function EmployerDashboardPage() {
                 checked={chatSettingsForm.outsideHoursEnabled}
                 onChange={onChatSettingsChange}
               />
-              Отвечать вне рабочего времени
+              РћС‚РІРµС‡Р°С‚СЊ РІРЅРµ СЂР°Р±РѕС‡РµРіРѕ РІСЂРµРјРµРЅРё
             </label>
             <label>
-              Сообщение вне рабочего времени
+              РЎРѕРѕР±С‰РµРЅРёРµ РІРЅРµ СЂР°Р±РѕС‡РµРіРѕ РІСЂРµРјРµРЅРё
               <textarea name="outsideHoursText" rows={2} value={chatSettingsForm.outsideHoursText} onChange={onChatSettingsChange} />
             </label>
             <div className="form-grid form-grid--two">
               <label>
-                Таймзона
+                РўР°Р№РјР·РѕРЅР°
                 <input name="workingHoursTimezone" type="text" value={chatSettingsForm.workingHoursTimezone} onChange={onChatSettingsChange} />
               </label>
               <label>
-                Начало рабочего дня
+                РќР°С‡Р°Р»Рѕ СЂР°Р±РѕС‡РµРіРѕ РґРЅСЏ
                 <input name="workingHoursFrom" type="time" value={chatSettingsForm.workingHoursFrom} onChange={onChatSettingsChange} />
               </label>
               <label>
-                Конец рабочего дня
+                РљРѕРЅРµС† СЂР°Р±РѕС‡РµРіРѕ РґРЅСЏ
                 <input name="workingHoursTo" type="time" value={chatSettingsForm.workingHoursTo} onChange={onChatSettingsChange} />
               </label>
             </div>
             <button type="submit" className="btn btn--secondary" disabled={savingChatSettings || !company}>
-              {savingChatSettings ? 'Сохраняем...' : 'Сохранить чат-настройки'}
+              {savingChatSettings ? 'РЎРѕС…СЂР°РЅСЏРµРј...' : 'РЎРѕС…СЂР°РЅРёС‚СЊ С‡Р°С‚-РЅР°СЃС‚СЂРѕР№РєРё'}
             </button>
           </form>
         </div>
@@ -1945,15 +1923,15 @@ export function EmployerDashboardPage() {
           <div className="employer-company-contacts">
             <span>
               <Globe size={14} />
-              {company.websiteUrl || 'Сайт не указан'}
+              {company.websiteUrl || 'РЎР°Р№С‚ РЅРµ СѓРєР°Р·Р°РЅ'}
             </span>
             <span>
               <Mail size={14} />
-              {company.publicEmail || 'Email не указан'}
+              {company.publicEmail || 'Email РЅРµ СѓРєР°Р·Р°РЅ'}
             </span>
             <span>
               <Phone size={14} />
-              {company.publicPhone || 'Телефон не указан'}
+              {company.publicPhone || 'РўРµР»РµС„РѕРЅ РЅРµ СѓРєР°Р·Р°РЅ'}
             </span>
           </div>
         ) : null}
@@ -1966,3 +1944,4 @@ export function EmployerDashboardPage() {
     </div>
   )
 }
+

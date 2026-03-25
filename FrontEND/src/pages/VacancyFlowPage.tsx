@@ -23,7 +23,6 @@ type VacancyForm = {
   salaryTo: string
   currencyCode: string
   salaryTaxMode: number
-  publishAt: string
   applicationDeadline: string
 }
 
@@ -40,31 +39,11 @@ type EventForm = {
   priceAmount: string
   priceCurrencyCode: string
   participantsCanWrite: boolean
-  publishAt: string
   eventDate: string
 }
 
 const steps = ['Выбор', 'Основные', 'Описание', 'Стоимость и опции', 'Публикация']
 const validSteps = new Set(['1', '2', '3', '4', '5'])
-
-function toLocalDateTimeInputValue(value: string) {
-  if (!value) {
-    return ''
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ''
-  }
-
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-
-  return `${year}-${month}-${day}T${hours}:${minutes}`
-}
 
 function toIsoDateTimeFromLocalInput(value: string) {
   const normalized = value.trim()
@@ -162,7 +141,6 @@ export function VacancyFlowPage() {
     salaryTo: '',
     currencyCode: 'RUB',
     salaryTaxMode: 3,
-    publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
     applicationDeadline: '',
   })
 
@@ -179,7 +157,6 @@ export function VacancyFlowPage() {
     priceAmount: '',
     priceCurrencyCode: 'RUB',
     participantsCanWrite: true,
-    publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
     eventDate: '',
   })
 
@@ -383,11 +360,6 @@ export function VacancyFlowPage() {
       }
 
       if (stepNumber >= 4) {
-        const publishAt = toIsoDateTimeFromLocalInput(vacancyForm.publishAt)
-        if (!publishAt) {
-          return 'Укажите корректную дату публикации вакансии.'
-        }
-
         const applicationDeadline = vacancyForm.applicationDeadline.trim()
           ? toIsoDateTimeFromLocalInput(vacancyForm.applicationDeadline)
           : null
@@ -396,7 +368,7 @@ export function VacancyFlowPage() {
           return 'Укажите корректный дедлайн откликов.'
         }
 
-        if (applicationDeadline && Date.parse(applicationDeadline) < Date.parse(publishAt)) {
+        if (applicationDeadline && Date.parse(applicationDeadline) < Date.now()) {
           return 'Дедлайн откликов не может быть раньше даты публикации.'
         }
 
@@ -423,11 +395,6 @@ export function VacancyFlowPage() {
       }
 
       if (stepNumber >= 4) {
-        const publishAt = toIsoDateTimeFromLocalInput(eventForm.publishAt)
-        if (!publishAt) {
-          return 'Укажите корректную дату публикации мероприятия.'
-        }
-
         const eventDate = eventForm.eventDate.trim() ? toIsoDateTimeFromLocalInput(eventForm.eventDate) : null
         if (eventForm.eventDate.trim() && !eventDate) {
           return 'Укажите корректную дату мероприятия.'
@@ -469,6 +436,8 @@ export function VacancyFlowPage() {
     setIsSubmitting(true)
 
     try {
+      const publishAt = new Date().toISOString()
+
       if (isVacancyFlow) {
         const payload = {
           title: vacancyForm.title,
@@ -483,7 +452,7 @@ export function VacancyFlowPage() {
           salaryTo: toNumberOrNull(vacancyForm.salaryTo),
           currencyCode: normalizeCurrencyCode(vacancyForm.currencyCode),
           salaryTaxMode: vacancyForm.salaryTaxMode,
-          publishAt: toIsoDateTimeFromLocalInput(vacancyForm.publishAt),
+          publishAt,
           applicationDeadline: vacancyForm.applicationDeadline.trim() ? toIsoDateTimeFromLocalInput(vacancyForm.applicationDeadline) : null,
           tagIds: vacancyForm.tagIds,
         }
@@ -505,7 +474,7 @@ export function VacancyFlowPage() {
           priceAmount: eventForm.priceType === 1 ? null : priceAmount,
           priceCurrencyCode: eventForm.priceType === 1 ? null : normalizeCurrencyCode(eventForm.priceCurrencyCode),
           participantsCanWrite: eventForm.participantsCanWrite,
-          publishAt: toIsoDateTimeFromLocalInput(eventForm.publishAt),
+          publishAt,
           eventDate: eventForm.eventDate.trim() ? toIsoDateTimeFromLocalInput(eventForm.eventDate) : null,
           tagIds: eventForm.tagIds,
         }
@@ -731,10 +700,6 @@ export function VacancyFlowPage() {
                       </select>
                     </label>
                     <label className="vf-field">
-                      <span>Дата публикации</span>
-                      <DateInput type="datetime-local" name="publishAt" value={vacancyForm.publishAt} onChange={onVacancyFormChange} />
-                    </label>
-                    <label className="vf-field">
                       <span>Дедлайн откликов</span>
                       <DateInput type="datetime-local" name="applicationDeadline" value={vacancyForm.applicationDeadline} onChange={onVacancyFormChange} />
                     </label>
@@ -756,10 +721,6 @@ export function VacancyFlowPage() {
                     <label className="vf-field">
                       <span>Валюта</span>
                       <input type="text" name="priceCurrencyCode" value={eventForm.priceCurrencyCode} onChange={onEventFormChange} maxLength={3} />
-                    </label>
-                    <label className="vf-field">
-                      <span>Дата публикации</span>
-                      <DateInput type="datetime-local" name="publishAt" value={eventForm.publishAt} onChange={onEventFormChange} />
                     </label>
                     <label className="vf-field">
                       <span>Дата события</span>
