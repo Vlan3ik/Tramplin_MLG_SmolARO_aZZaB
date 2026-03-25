@@ -144,18 +144,17 @@ export function LoginPage() {
   }
 
   return (
-    <section className="auth-screen container">
-      <div className="auth-form card auth-form--single">
-        <div className="brand">
-          <span className="brand__dot" />
-          Трамплин
-        </div>
-        <h1>Авторизация</h1>
-        <p>Войдите в аккаунт, чтобы продолжить работу с возможностями платформы.</p>
+    <section className="auth-layout auth-layout--login">
+      <img className="auth-layout__art auth-layout__art--left" src="/regauthphoto.svg" alt="" aria-hidden="true" />
+      <img className="auth-layout__art auth-layout__art--right" src="/regauthphoto2.svg" alt="" aria-hidden="true" />
 
-        <form className="form-grid" onSubmit={handleSubmit}>
-          <label>
-            Email
+      <div className="auth-panel auth-panel--compact">
+        <h1 className="auth-panel__title">Авторизация</h1>
+        <p className="auth-panel__subtitle">Войдите в аккаунт, чтобы продолжить работу с возможностями платформы.</p>
+
+        <form className="auth-form-grid" onSubmit={handleSubmit}>
+          <label className="auth-field">
+            <span>Email</span>
             <input
               name="email"
               type="email"
@@ -165,9 +164,10 @@ export function LoginPage() {
               autoComplete="email"
             />
           </label>
-          <label>
-            Пароль
-            <div className="password-field">
+
+          <label className="auth-field">
+            <span>Пароль</span>
+            <div className="auth-password">
               <input
                 name="password"
                 type={isPasswordVisible ? 'text' : 'password'}
@@ -178,7 +178,7 @@ export function LoginPage() {
               />
               <button
                 type="button"
-                className="password-field__toggle"
+                className="auth-password__toggle"
                 onClick={() => setIsPasswordVisible((currentState) => !currentState)}
                 aria-label={isPasswordVisible ? 'Скрыть пароль' : 'Показать пароль'}
                 aria-pressed={isPasswordVisible}
@@ -190,17 +190,18 @@ export function LoginPage() {
 
           {errorMessage ? <div className="auth-feedback auth-feedback--error">{errorMessage}</div> : null}
 
-          <button type="submit" className="btn btn--primary" disabled={isSubmitting}>
+          <button type="submit" className="auth-action auth-action--primary" disabled={isSubmitting}>
             {isSubmitting ? 'Входим...' : 'Войти'}
           </button>
-          <button type="button" className="btn btn--secondary" disabled={isVkSubmitting} onClick={handleVkLogin}>
+
+          <button type="button" className="auth-action auth-action--vk" disabled={isVkSubmitting} onClick={handleVkLogin}>
             {isVkSubmitting ? 'VK...' : 'Войти через VK'}
           </button>
         </form>
 
-        <div className="auth-links">
+        <div className="auth-footer-links">
           <Link to="/register">Нет аккаунта? Зарегистрироваться</Link>
-          <Link to="/dashboard/curator" className="curator-link">
+          <Link to="/dashboard/curator" className="auth-footer-links__muted">
             Вход куратора
           </Link>
         </div>
