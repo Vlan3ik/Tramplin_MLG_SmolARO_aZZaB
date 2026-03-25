@@ -56,9 +56,8 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
             await EnsureRoleAsync(seeker.Id, PlatformRole.Seeker, now);
         }
 
-        await SeedSeekerProfilesAsync(seekers);
-
         var cities = await EnsureCitiesAsync();
+        await SeedSeekerProfilesAsync(seekers, cities);
         var locations = await EnsureLocationsAsync(cities);
         var tags = await EnsureTagsAsync();
 
@@ -360,7 +359,7 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         await dbContext.SaveChangesAsync();
     }
 
-    private async Task SeedSeekerProfilesAsync(IReadOnlyList<User> seekers)
+    private async Task SeedSeekerProfilesAsync(IReadOnlyList<User> seekers, IReadOnlyDictionary<string, City> cities)
     {
         var lastNames = new[]
         {
@@ -388,6 +387,10 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
             "Максимовна", "Геннадьевич", "Анатольевна", "Григорьевич", "Михайловна",
             "Валерьевич", "Константиновна", "Федорович", "Юрьевна", "Степанович"
         };
+        var cityCodes = new[]
+        {
+            "MOW", "LED", "SMO", "KZN", "EKB", "NVS"
+        };
 
         for (var i = 0; i < seekers.Count; i++)
         {
@@ -397,7 +400,8 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
                 lastNames[i % lastNames.Length],
                 firstNames[i % firstNames.Length],
                 middleNames[i % middleNames.Length],
-                $"+7-900-200-{i / 10:00}-{i % 10:00}");
+                $"+7-900-200-{i / 10:00}-{i % 10:00}",
+                cities[cityCodes[i % cityCodes.Length]].Id);
         }
     }
 
@@ -988,9 +992,10 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         await dbContext.SaveChangesAsync();
     }
 
-    private async Task EnsureSeekerProfileAsync(long userId, string lastName, string firstName, string middleName, string phone)
+    private async Task EnsureSeekerProfileAsync(long userId, string lastName, string firstName, string middleName, string phone, long cityId)
     {
-        if (!await dbContext.CandidateProfiles.AnyAsync(x => x.UserId == userId))
+        var profile = await dbContext.CandidateProfiles.FirstOrDefaultAsync(x => x.UserId == userId);
+        if (profile is null)
         {
             dbContext.CandidateProfiles.Add(new CandidateProfile
             {
@@ -999,9 +1004,15 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
                 FirstName = firstName,
                 MiddleName = middleName,
                 Phone = phone,
+                CityId = cityId,
                 About = "Соискатель в IT-сфере",
                 AvatarUrl = "/api/media/user-avatars/system/seeker.svg"
             });
+            await dbContext.SaveChangesAsync();
+        }
+        else if (profile.CityId is null)
+        {
+            profile.CityId = cityId;
             await dbContext.SaveChangesAsync();
         }
 

@@ -18,7 +18,8 @@ import {
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { createApplication } from '../../api/applications'
-import { fetchTags } from '../../api/catalog'
+import { fetchCities, fetchTags } from '../../api/catalog'
+import { createDirectChat } from '../../api/chats'
 import { fetchCompanies } from '../../api/companies'
 import {
   fetchMe,
@@ -50,10 +51,9 @@ import { TopServiceBar } from '../../components/layout/TopServiceBar'
 import { DateInput } from '../../components/forms/DateInput'
 import { TagPicker } from '../../components/forms/TagPicker'
 import { API_ORIGIN } from '../../config/api'
-import { useCity } from '../../contexts/CityContext'
 import { useApplications } from '../../hooks/useApplications'
 import { useAuth } from '../../hooks/useAuth'
-import type { TagListItem } from '../../types/catalog'
+import type { City, TagListItem } from '../../types/catalog'
 import type { Company } from '../../types/company'
 import type { CandidateGender, SeekerProfile, SeekerSettings } from '../../types/me'
 import type { Opportunity } from '../../types/opportunity'
@@ -76,6 +76,7 @@ type ProfileFormState = {
   birthDate: string
   gender: ProfileGenderValue
   phone: string
+  cityId: string
   about: string
   avatarUrl: string
 }
@@ -203,7 +204,7 @@ const PRIVACY_SCOPE_AUTHORIZED_USERS = 3
 const PORTFOLIO_COLLABORATION_VACANCY = 2
 const PORTFOLIO_COLLABORATION_OPPORTUNITY = 3
 const MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024
-const DEFAULT_PROFILE_CITY = 'Нижний Тагил'
+const DEFAULT_PROFILE_CITY = 'Город не указан'
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -343,6 +344,7 @@ function createProfileForm(profile: SeekerProfile): ProfileFormState {
     birthDate: profile.birthDate ?? '',
     gender: normalizeProfileGender(profile.gender),
     phone: profile.phone ? formatPhone(profile.phone) : '',
+    cityId: profile.cityId ? String(profile.cityId) : '',
     about: profile.about ?? '',
     avatarUrl: profile.avatarUrl ?? '',
   }
@@ -625,6 +627,8 @@ function mapPublicProfileToSeekerProfile(publicProfile: PublicProfile): SeekerPr
     birthDate: publicProfile.birthDate,
     gender: publicProfile.gender === 1 || publicProfile.gender === 2 ? publicProfile.gender : 0,
     phone: publicProfile.phone,
+    cityId: publicProfile.cityId,
+    city: publicProfile.city,
     about: publicProfile.about,
     avatarUrl: publicProfile.avatarUrl,
   }
@@ -640,6 +644,22 @@ function mapPublicProfileToSeekerResume(publicProfile: PublicProfile): SeekerRes
     salaryFrom: resume?.salaryFrom ?? null,
     salaryTo: resume?.salaryTo ?? null,
     currencyCode: resume?.currencyCode || 'RUB',
+    skills: (resume?.skills ?? []).map((skill) => ({
+      tagId: skill.tagId,
+      tagName: skill.tagName,
+      level: normalizeSkillLevel(skill.level ?? 1),
+      yearsExperience: normalizeYearsExperience(skill.yearsExperience ?? 0),
+    })),
+    experiences: (resume?.experiences ?? []).map((experience) => ({
+      id: experience.id,
+      companyId: experience.companyId,
+      companyName: experience.companyName || '',
+      position: experience.position || '',
+      description: experience.description || '',
+      startDate: experience.startDate || '',
+      endDate: experience.endDate || '',
+      isCurrent: Boolean(experience.isCurrent),
+    })),
     projects: (resume?.projects ?? []).map((project) => ({
       id: project.id,
       title: project.title || 'Проект без названия',
@@ -651,6 +671,20 @@ function mapPublicProfileToSeekerResume(publicProfile: PublicProfile): SeekerRes
       demoUrl: project.demoUrl || '',
       mainPhotoUrl: null,
       isPrivate: false,
+    })),
+    education: (resume?.education ?? []).map((education) => ({
+      id: education.id,
+      university: education.university || '',
+      faculty: education.faculty || '',
+      specialty: education.specialty || '',
+      course: education.course ?? 0,
+      graduationYear: education.graduationYear ?? 0,
+    })),
+    links: (resume?.links ?? []).map((link) => ({
+      id: link.id,
+      kind: link.kind || 'other',
+      url: link.url || '',
+      label: link.label || '',
     })),
   }
 }
@@ -951,13 +985,13 @@ export function SeekerDashboardPage() {
   const publicUsername = routeUsername?.trim() ?? ''
   const isPublicReadOnlyMode = Boolean(publicUsername)
   const { session, signIn } = useAuth()
-  const { selectedCity } = useCity()
   const { applications, hasApplied, isLoading: loadingApplications, error: applicationsError } = useApplications(!isPublicReadOnlyMode)
   const [tab, setTab] = useState<TabId>('profile')
   const [step, setStep] = useState(0)
   const [profile, setProfile] = useState<SeekerProfile | null>(null)
   const [resume, setResume] = useState<SeekerResume>(initialResume())
   const [resumeCompanies, setResumeCompanies] = useState<Company[]>([])
+  const [cities, setCities] = useState<City[]>([])
   const [tags, setTags] = useState<TagListItem[]>([])
   const [favoriteOpportunities, setFavoriteOpportunities] = useState<Opportunity[]>([])
   const [favoriteIds, setFavoriteIds] = useState<number[]>(() => getFavoriteOpportunityIds())
@@ -978,6 +1012,7 @@ export function SeekerDashboardPage() {
     birthDate: '',
     gender: '',
     phone: '',
+    cityId: '',
     about: '',
     avatarUrl: '',
   })
@@ -1011,6 +1046,7 @@ export function SeekerDashboardPage() {
   const [savingPortfolio, setSavingPortfolio] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingBanner, setUploadingBanner] = useState(false)
+  const [startingChat, setStartingChat] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [profileVisibility, setProfileVisibility] = useState<ProfileVisibilityMode>('public')
   const [seekerSettings, setSeekerSettings] = useState<SeekerSettings | null>(null)
@@ -1075,9 +1111,14 @@ export function SeekerDashboardPage() {
       setProfileBannerUrl(null)
       setIsPublicProfileHidden(false)
 
-      const [profileResult, portfolioResult] = await Promise.allSettled([
+      const followingPromise = session?.accessToken
+        ? fetchMyFollowingSubscriptions(controller.signal)
+        : Promise.resolve([] as SubscriptionUser[])
+
+      const [profileResult, portfolioResult, followingResult] = await Promise.allSettled([
         fetchPublicProfileByUsername(publicUsername, controller.signal),
         fetchPublicPortfolioProjects(publicUsername, controller.signal),
+        followingPromise,
       ])
 
       if (controller.signal.aborted) {
@@ -1114,6 +1155,12 @@ export function SeekerDashboardPage() {
         setPortfolioError(portfolioResult.reason instanceof Error ? portfolioResult.reason.message : 'Не удалось загрузить портфолио.')
       }
 
+      if (followingResult.status === 'fulfilled') {
+        setFollowingUsers(followingResult.value)
+      } else if (!isAbortError(followingResult.reason)) {
+        setFollowingUsers([])
+      }
+
       if (!controller.signal.aborted) {
         setLoadingProfile(false)
         setLoadingResume(false)
@@ -1134,11 +1181,12 @@ export function SeekerDashboardPage() {
         ? fetchPublicPortfolioProjects(session.user.username, controller.signal)
         : Promise.resolve([] as PublicPortfolioProjectCard[])
 
-      const [meResult, profileResult, resumeResult, settingsResult, tagsResult, companiesResult, followingResult, followersResult, portfolioResult] = await Promise.allSettled([
+      const [meResult, profileResult, resumeResult, settingsResult, citiesResult, tagsResult, companiesResult, followingResult, followersResult, portfolioResult] = await Promise.allSettled([
         fetchMe(controller.signal),
         fetchSeekerProfile(controller.signal),
         fetchSeekerResume(controller.signal),
         fetchSeekerSettings(controller.signal),
+        fetchCities(controller.signal),
         fetchTags(controller.signal),
         fetchCompanies({ page: 1, pageSize: 100, verifiedOnly: true }, controller.signal),
         fetchMyFollowingSubscriptions(controller.signal),
@@ -1206,6 +1254,10 @@ export function SeekerDashboardPage() {
       if (portfolioResult.status === 'rejected' && !isAbortError(portfolioResult.reason)) {
         setPortfolioProjectCards([])
         setPortfolioError(portfolioResult.reason instanceof Error ? portfolioResult.reason.message : 'Не удалось загрузить портфолио.')
+      }
+
+      if (citiesResult.status === 'fulfilled') {
+        setCities(citiesResult.value)
       }
 
       if (tagsResult.status === 'fulfilled') {
@@ -1495,7 +1547,7 @@ export function SeekerDashboardPage() {
   const avatarFormUrl = useMemo(() => resolveAvatarUrl(profileForm.avatarUrl), [profileForm.avatarUrl])
   const bannerUrl = useMemo(() => resolveAvatarUrl(profileBannerUrl), [profileBannerUrl])
   const displayName = useMemo(() => [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || 'Профиль соискателя', [profile])
-  const profileCityName = useMemo(() => selectedCity?.name?.trim() || DEFAULT_PROFILE_CITY, [selectedCity?.name])
+  const profileCityName = useMemo(() => profile?.city?.trim() || DEFAULT_PROFILE_CITY, [profile?.city])
   const profileSpecialization = useMemo(() => detectSpecialization(resume), [resume])
   const profileRoleTitle = useMemo(() => `${profileSpecialization} ${profileCityName}`.trim(), [profileSpecialization, profileCityName])
   const avatarFallback = useMemo(() => (profile?.firstName?.charAt(0) || profile?.lastName?.charAt(0) || 'P').toUpperCase(), [profile])
@@ -1512,6 +1564,12 @@ export function SeekerDashboardPage() {
 
     return currentUsername !== profileUsername
   }, [profile?.username, session?.user?.username])
+  const foreignProfileUserId = isForeignProfile && profile?.userId ? profile.userId : null
+  const isFollowingForeignProfile = useMemo(
+    () => (foreignProfileUserId ? followingUserIds.has(foreignProfileUserId) : false),
+    [foreignProfileUserId, followingUserIds],
+  )
+  const isForeignSubscriptionLoading = foreignProfileUserId ? Boolean(subscriptionActionLoading[foreignProfileUserId]) : false
   const availableProfilePanels = useMemo(
     () => (isPublicReadOnlyMode ? profilePanels.filter((item) => item.id !== 'subscriptions') : profilePanels),
     [isPublicReadOnlyMode],
@@ -1700,6 +1758,7 @@ export function SeekerDashboardPage() {
     setProfileError('')
 
     try {
+      const selectedProfileCity = cities.find((item) => String(item.id) === profileForm.cityId)
       const payload = {
         firstName: profileForm.firstName.trim(),
         lastName: profileForm.lastName.trim(),
@@ -1707,6 +1766,8 @@ export function SeekerDashboardPage() {
         birthDate: toNullable(profileForm.birthDate),
         gender: profileForm.gender ? (Number(profileForm.gender) as CandidateGender) : null,
         phone: toNullable(profileForm.phone),
+        cityId: profileForm.cityId ? Number(profileForm.cityId) : null,
+        city: selectedProfileCity?.name ?? null,
         about: toNullable(profileForm.about),
         avatarUrl: toNullable(profileForm.avatarUrl),
       }
@@ -2158,6 +2219,10 @@ export function SeekerDashboardPage() {
     if (!userId) {
       return
     }
+    if (!session?.accessToken) {
+      setSubscriptionsError('Чтобы подписаться, нужно авторизоваться.')
+      return
+    }
 
     setSubscriptionsError('')
     setSubscriptionActionLoading((current) => ({ ...current, [userId]: true }))
@@ -2181,6 +2246,30 @@ export function SeekerDashboardPage() {
       setSubscriptionsError(error instanceof Error ? error.message : 'Не удалось обновить подписку.')
     } finally {
       setSubscriptionActionLoading((current) => ({ ...current, [userId]: false }))
+    }
+  }
+
+  async function onStartDirectChat() {
+    if (!foreignProfileUserId) {
+      return
+    }
+    if (!session?.accessToken) {
+      setSubscriptionsError('Чтобы написать в чат, нужно авторизоваться.')
+      return
+    }
+
+    setSubscriptionsError('')
+    setStartingChat(true)
+
+    try {
+      const chatId = await createDirectChat(foreignProfileUserId)
+      window.dispatchEvent(new Event('tramplin:chat-refresh'))
+      window.dispatchEvent(new CustomEvent('tramplin:chat-open', { detail: { chatId } }))
+      setSuccess('Чат открыт.')
+    } catch (error) {
+      setSubscriptionsError(error instanceof Error ? error.message : 'Не удалось открыть чат.')
+    } finally {
+      setStartingChat(false)
     }
   }
 
@@ -2547,7 +2636,45 @@ export function SeekerDashboardPage() {
                       </Link>
                     </>
                   ) : null}
-                  {isForeignProfile ? <button type="button" className="seeker-profile-hero-exact__action seeker-profile-hero-exact__subscribe">Подписаться</button> : null}
+                  {isForeignProfile ? (
+                    <>
+                      <button
+                        type="button"
+                        className="seeker-profile-hero-exact__action seeker-profile-hero-exact__subscribe"
+                        disabled={isForeignSubscriptionLoading || !foreignProfileUserId}
+                        onClick={() => void onToggleSubscription(foreignProfileUserId)}
+                      >
+                        {isForeignSubscriptionLoading ? 'Обновляем...' : isFollowingForeignProfile ? 'Вы подписаны' : 'Подписаться'}
+                      </button>
+                      <button
+                        type="button"
+                        className="seeker-profile-hero-exact__action"
+                        disabled={startingChat || !foreignProfileUserId}
+                        onClick={() => void onStartDirectChat()}
+                      >
+                        {startingChat ? 'Открываем чат...' : 'Написать в чат'}
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              ) : isForeignProfile ? (
+                <div className="seeker-profile-hero-exact__actions">
+                  <button
+                    type="button"
+                    className="seeker-profile-hero-exact__action seeker-profile-hero-exact__subscribe"
+                    disabled={isForeignSubscriptionLoading || !foreignProfileUserId}
+                    onClick={() => void onToggleSubscription(foreignProfileUserId)}
+                  >
+                    {isForeignSubscriptionLoading ? 'Обновляем...' : isFollowingForeignProfile ? 'Вы подписаны' : 'Подписаться'}
+                  </button>
+                  <button
+                    type="button"
+                    className="seeker-profile-hero-exact__action"
+                    disabled={startingChat || !foreignProfileUserId}
+                    onClick={() => void onStartDirectChat()}
+                  >
+                    {startingChat ? 'Открываем чат...' : 'Написать в чат'}
+                  </button>
                 </div>
               ) : null}
             </header>
@@ -2820,6 +2947,7 @@ export function SeekerDashboardPage() {
                       <div className="seeker-profile-info-list">
                         <p><UserRound size={16} /><span>ФИО</span><strong>{displayName}</strong></p>
                         <p><MapPin size={16} /><span>Логин</span><strong>{profile?.username || 'Не указан'}</strong></p>
+                        <p><MapPin size={16} /><span>Город проживания</span><strong>{profile?.city || 'Не указан'}</strong></p>
                         <p><Building2 size={16} /><span>Позиция</span><strong>{profileRoleTitle}</strong></p>
                         <p><CalendarClock size={16} /><span>Дата рождения</span><strong>{profile?.birthDate || 'Не указана'}</strong></p>
                         <p>
@@ -2998,6 +3126,17 @@ export function SeekerDashboardPage() {
                 <label>Дата рождения<DateInput type="date" value={profileForm.birthDate} onChange={(e) => setProfileForm((s) => ({ ...s, birthDate: e.target.value }))} max={getTodayDateInputValue()} /></label>
                 <label>Пол<select value={profileForm.gender} onChange={(e) => setProfileForm((s) => ({ ...s, gender: e.target.value as ProfileGenderValue }))}>{profileGenderOptions.map((option) => <option key={option.value || 'unknown'} value={option.value}>{option.label}</option>)}</select></label>
                 <label>Телефон<input value={profileForm.phone} onChange={(e) => setProfileForm((s) => ({ ...s, phone: formatPhone(e.target.value) }))} placeholder="+7 (___) ___-__-__" maxLength={18} /></label>
+                <label>
+                  Город проживания
+                  <select value={profileForm.cityId} onChange={(e) => setProfileForm((s) => ({ ...s, cityId: e.target.value }))}>
+                    <option value="">Не указан</option>
+                    {cities.map((item) => (
+                      <option key={`profile-city-${item.id}`} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <label className="full-width">О себе<textarea rows={4} value={profileForm.about} onChange={(e) => setProfileForm((s) => ({ ...s, about: e.target.value }))} /></label>
               </div>
               <section className="profile-settings-modal__privacy">

@@ -108,13 +108,15 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
         }
 
         var city = opportunity.City ?? opportunity.Location?.City;
+        var locationLatitude = opportunity.Location is not null ? (decimal?)opportunity.Location.GeoPoint.Y : city?.Latitude;
+        var locationLongitude = opportunity.Location is not null ? (decimal?)opportunity.Location.GeoPoint.X : city?.Longitude;
         var locationDto = city is null
             ? null
             : new LocationDto(
                 city.Id,
                 city.CityName,
-                city.Latitude,
-                city.Longitude,
+                locationLatitude,
+                locationLongitude,
                 opportunity.Location?.StreetName,
                 opportunity.Location?.HouseNumber);
 

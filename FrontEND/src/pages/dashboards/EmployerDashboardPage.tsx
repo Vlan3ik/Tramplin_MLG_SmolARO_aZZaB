@@ -306,6 +306,7 @@ export function EmployerDashboardPage() {
     brandName: '',
     logoUrl: '',
   })
+  const [createLogoFile, setCreateLogoFile] = useState<File | null>(null)
 
   const [vacancyForm, setVacancyForm] = useState({
     title: '',
@@ -585,6 +586,11 @@ export function EmployerDashboardPage() {
     setCreateForm((state) => ({ ...state, [name]: value }))
   }
 
+  function onCreateLogoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null
+    setCreateLogoFile(file)
+  }
+
   function onProfileFormChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     const { name, value } = event.target
     setProfileForm((state) => ({
@@ -696,7 +702,12 @@ export function EmployerDashboardPage() {
     setCreatingCompany(true)
 
     try {
-      await createEmployerCompany(createForm)
+      const createdCompany = await createEmployerCompany(createForm)
+      if (createLogoFile) {
+        const companyId = createdCompany.companyId ?? (await fetchEmployerCompany()).id
+        await uploadCompanyLogo(companyId, createLogoFile)
+        setCreateLogoFile(null)
+      }
       setSuccess('Компания создана. Данные кабинета обновлены.')
       await loadDashboard()
     } catch (createError) {
@@ -1190,8 +1201,9 @@ export function EmployerDashboardPage() {
                   <input name="brandName" type="text" value={createForm.brandName} onChange={onCreateFormChange} />
                 </label>
                 <label className="full-width">
-                  URL логотипа (опционально)
-                  <input name="logoUrl" type="url" value={createForm.logoUrl} onChange={onCreateFormChange} />
+                  Логотип (опционально)
+                  <input type="file" accept="image/*" onChange={onCreateLogoChange} disabled={creatingCompany} />
+                  {createLogoFile ? <small>{createLogoFile.name}</small> : null}
                 </label>
                 <button type="submit" className="btn btn--primary full-width" disabled={creatingCompany}>
                   {creatingCompany ? 'Создаем компанию...' : 'Создать компанию'}
@@ -1246,8 +1258,9 @@ export function EmployerDashboardPage() {
               <input name="brandName" type="text" value={createForm.brandName} onChange={onCreateFormChange} />
             </label>
             <label className="full-width">
-              URL логотипа (опционально)
-              <input name="logoUrl" type="url" value={createForm.logoUrl} onChange={onCreateFormChange} />
+              Логотип (опционально)
+              <input type="file" accept="image/*" onChange={onCreateLogoChange} disabled={creatingCompany} />
+              {createLogoFile ? <small>{createLogoFile.name}</small> : null}
             </label>
             <button type="submit" className="btn btn--primary full-width" disabled={creatingCompany}>
               {creatingCompany ? 'Создаем компанию...' : 'Создать компанию'}

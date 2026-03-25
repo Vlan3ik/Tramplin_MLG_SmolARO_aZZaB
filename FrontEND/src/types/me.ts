@@ -9,6 +9,8 @@ export type SeekerProfile = {
   birthDate: string | null
   gender: CandidateGender
   phone: string | null
+  cityId: number | null
+  city: string | null
   about: string | null
   avatarUrl: string | null
 }
@@ -20,6 +22,8 @@ export type UpdateSeekerProfileRequest = {
   birthDate: string | null
   gender: CandidateGender | null
   phone: string | null
+  cityId: number | null
+  city?: string | null
   about: string | null
   avatarUrl: string | null
 }
