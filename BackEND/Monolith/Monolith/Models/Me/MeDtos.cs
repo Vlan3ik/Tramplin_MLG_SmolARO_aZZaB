@@ -11,6 +11,8 @@ public record UpdateProfileRequest(
     DateOnly? BirthDate,
     CandidateGender? Gender,
     string? Phone,
+    long? CityId,
+    string? City,
     string? About,
     string? AvatarUrl);
 
@@ -23,6 +25,8 @@ public record ProfileResponse(
     DateOnly? BirthDate,
     CandidateGender Gender,
     string? Phone,
+    long? CityId,
+    string? City,
     string? About,
     string? AvatarUrl);
 
@@ -184,6 +188,8 @@ public record PublicProfileResponse(
     DateOnly? BirthDate,
     CandidateGender? Gender,
     string? Phone,
+    long? CityId,
+    string? City,
     string? About,
     string? AvatarUrl,
     string? ProfileBannerUrl,

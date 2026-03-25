@@ -9,6 +9,40 @@ export type PublicProfileResumeProject = {
   demoUrl: string | null
 }
 
+export type PublicProfileResumeSkill = {
+  tagId: number
+  tagName: string
+  level: number | null
+  yearsExperience: number | null
+}
+
+export type PublicProfileResumeExperience = {
+  id: number
+  companyId: number | null
+  companyName: string
+  position: string
+  description: string | null
+  startDate: string | null
+  endDate: string | null
+  isCurrent: boolean
+}
+
+export type PublicProfileResumeEducation = {
+  id: number
+  university: string
+  faculty: string | null
+  specialty: string | null
+  course: number | null
+  graduationYear: number | null
+}
+
+export type PublicProfileResumeLink = {
+  id: number
+  kind: string
+  url: string
+  label: string | null
+}
+
 export type PublicProfileResume = {
   headline: string | null
   desiredPosition: string | null
@@ -16,7 +50,11 @@ export type PublicProfileResume = {
   salaryFrom: number | null
   salaryTo: number | null
   currencyCode: string | null
+  skills: PublicProfileResumeSkill[]
+  experiences: PublicProfileResumeExperience[]
   projects: PublicProfileResumeProject[]
+  education: PublicProfileResumeEducation[]
+  links: PublicProfileResumeLink[]
 }
 
 export type PublicProfileStats = {
@@ -42,6 +80,8 @@ export type PublicProfile = {
   birthDate: string | null
   gender: number | null
   phone: string | null
+  cityId: number | null
+  city: string | null
   about: string | null
   avatarUrl: string | null
   profileBannerUrl: string | null

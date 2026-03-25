@@ -16,7 +16,17 @@ public interface IReverseGeocodingService
 
 public sealed record ResolvedLocationResult(long CityId, long LocationId);
 
+public sealed record ResolvedAddressResult(
+    string? CountryCode,
+    string? RegionName,
+    string? CityName,
+    string? StreetName,
+    string? HouseNumber,
+    decimal? Latitude,
+    decimal? Longitude);
+
 public interface IEmployerLocationService
 {
     Task<ResolvedLocationResult?> ResolveOrCreateAsync(decimal latitude, decimal longitude, CancellationToken cancellationToken);
+    Task<ResolvedAddressResult?> ResolveAddressAsync(decimal latitude, decimal longitude, CancellationToken cancellationToken);
 }

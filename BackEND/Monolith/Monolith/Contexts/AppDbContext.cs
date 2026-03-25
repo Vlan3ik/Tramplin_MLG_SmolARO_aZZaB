@@ -91,11 +91,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.BirthDate).HasColumnName("birth_date");
             entity.Property(x => x.Gender).HasColumnName("gender");
             entity.Property(x => x.Phone).HasColumnName("phone").HasMaxLength(30);
+            entity.Property(x => x.CityId).HasColumnName("city_id");
             entity.Property(x => x.About).HasColumnName("about");
             entity.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(500);
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasOne(x => x.User).WithOne(x => x.CandidateProfile).HasForeignKey<CandidateProfile>(x => x.UserId);
+            entity.HasOne(x => x.City).WithMany().HasForeignKey(x => x.CityId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<CandidatePrivacySettings>(entity =>

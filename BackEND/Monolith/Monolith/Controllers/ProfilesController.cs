@@ -37,6 +37,7 @@ public class ProfilesController(AppDbContext dbContext) : ControllerBase
         var profile = await dbContext.CandidateProfiles
             .AsNoTracking()
             .Include(x => x.User)
+            .Include(x => x.City)
             .FirstOrDefaultAsync(x => x.User.Username == normalized, cancellationToken);
         if (profile is null)
         {
@@ -67,6 +68,8 @@ public class ProfilesController(AppDbContext dbContext) : ControllerBase
             canViewProfile ? profile.BirthDate : null,
             canViewProfile ? profile.Gender : null,
             canViewProfile && settings.ShowContactsInResume ? profile.Phone : null,
+            canViewProfile ? profile.CityId : null,
+            canViewProfile ? profile.City?.CityName : null,
             canViewProfile ? profile.About : null,
             canViewProfile ? profile.AvatarUrl : null,
             canViewProfile ? profile.User.ProfileBannerUrl : null,

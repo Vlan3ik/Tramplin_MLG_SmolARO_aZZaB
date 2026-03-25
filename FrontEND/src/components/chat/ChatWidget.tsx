@@ -118,6 +118,7 @@ export function ChatWidget() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [pendingOpenChatId, setPendingOpenChatId] = useState<number | null>(null)
 
   const chatsInFlightRef = useRef(false)
   const historyInFlightByChatRef = useRef<Record<number, boolean>>({})
@@ -328,16 +329,47 @@ export function ChatWidget() {
       }
     }
 
+    const onChatOpen = (event: Event) => {
+      const customEvent = event as CustomEvent<{ chatId?: number }>
+      const chatId = customEvent.detail?.chatId
+      if (typeof chatId === 'number' && Number.isFinite(chatId)) {
+        setPendingOpenChatId(chatId)
+      }
+      setIsOpen(true)
+      void loadChats({ force: true })
+    }
+
     window.addEventListener('tramplin:chat-refresh', onChatRefresh as EventListener)
+    window.addEventListener('tramplin:chat-open', onChatOpen as EventListener)
     document.addEventListener('visibilitychange', onVisibilityChange)
     window.addEventListener('focus', onFocus)
 
     return () => {
       window.removeEventListener('tramplin:chat-refresh', onChatRefresh as EventListener)
+      window.removeEventListener('tramplin:chat-open', onChatOpen as EventListener)
       document.removeEventListener('visibilitychange', onVisibilityChange)
       window.removeEventListener('focus', onFocus)
     }
   }, [isAuthenticated, isOpen, loadChats])
+
+  useEffect(() => {
+    if (!pendingOpenChatId) {
+      return
+    }
+
+    if (!isOpen) {
+      setIsOpen(true)
+      return
+    }
+
+    const targetExists = chats.some((chat) => chat.id === pendingOpenChatId)
+    if (!targetExists) {
+      return
+    }
+
+    setActiveChatId(pendingOpenChatId)
+    setPendingOpenChatId(null)
+  }, [chats, isOpen, pendingOpenChatId])
 
   useEffect(() => {
     if (!isAuthenticated || !isOpen) {

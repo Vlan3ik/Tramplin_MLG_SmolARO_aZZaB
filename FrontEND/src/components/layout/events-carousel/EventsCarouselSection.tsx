@@ -18,6 +18,7 @@ const eventsQuery: {
   filters: {
     types: ['event'],
     formats: [],
+    statuses: [],
     verifiedOnly: false,
   },
 }

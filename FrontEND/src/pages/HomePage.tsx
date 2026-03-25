@@ -23,6 +23,7 @@ import { EventsCarouselSection } from '../components/layout/events-carousel/Even
 const defaultFilters: OpportunityFilters = {
   types: [],
   formats: [],
+  statuses: [],
   verifiedOnly: false,
 }
 
@@ -193,6 +194,13 @@ export function HomePage() {
     }))
   }
 
+  function handleStatusesChange(statuses: number[]) {
+    setFilters((current) => ({
+      ...current,
+      statuses,
+    }))
+  }
+
   function handleResetFilters() {
     setFilters(defaultFilters)
     setSearchInput('')
@@ -200,6 +208,12 @@ export function HomePage() {
   }
 
   async function handleApply(opportunity: Opportunity) {
+    if (opportunity.status >= 4) {
+      setActionError(true)
+      setActionMessage('Отклик недоступен: карточка закрыта.')
+      return
+    }
+
     if (!session?.accessToken || !session.user?.id) {
       setActionError(true)
       setActionMessage('Для отклика нужно войти как соискатель.')
@@ -284,6 +298,7 @@ export function HomePage() {
               filters={filters}
               onTypesChange={handleTypesChange}
               onFormatsChange={handleFormatsChange}
+              onStatusesChange={handleStatusesChange}
               onVerifiedOnlyChange={handleVerifiedOnlyChange}
               onReset={handleResetFilters}
             />
