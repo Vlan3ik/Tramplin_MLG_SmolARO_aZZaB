@@ -1,6 +1,6 @@
 ﻿import { MessageCircle, Send, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fetchChatHistory, fetchChatMessages, fetchEmployerChatDetail, fetchEmployerChats, fetchMyChats, markChatRead, sendChatMessage } from '../../api/chats'
+import { fetchChatDetail, fetchChatMessages, fetchEmployerChatDetail, fetchEmployerChats, fetchMyChats, markChatRead, sendChatMediaMessage, sendChatMessage } from '../../api/chats'
 import { fetchEmployerApplications } from '../../api/employer'
 import { useAuth } from '../../hooks/useAuth'
 import { PlatformRole } from '../../types/auth'
@@ -43,34 +43,64 @@ function formatChatTime(value: string) {
   })
 }
 
-function formatChatDate(value: string) {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
+function formatFileSize(sizeBytes: number | null | undefined) {
+  if (!sizeBytes || sizeBytes <= 0) {
     return ''
   }
 
-  return date.toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-  })
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`
+  }
+
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function truncate(value: string | null | undefined, limit = 70) {
+  const normalized = (value ?? '').trim()
+  if (!normalized) {
+    return 'Без сообщений'
+  }
+
+  return normalized.length > limit ? `${normalized.slice(0, limit - 1)}…` : normalized
+}
+
+function getMessagePreview(message: ChatMessage | null | undefined) {
+  if (!message) {
+    return 'Без сообщений'
+  }
+
+  const text = message.text?.trim()
+  if (text) {
+    return truncate(text)
+  }
+
+  if (!message.attachments.length) {
+    return 'Без сообщений'
+  }
+
+  const first = message.attachments[0]
+  if (first.type === 1) {
+    return 'Изображение'
+  }
+  if (first.type === 2) {
+    return 'Видео'
+  }
+  if (first.type === 4) {
+    return first.vacancy?.title?.trim() || 'Карточка вакансии'
+  }
+  if (first.type === 5) {
+    return first.opportunity?.title?.trim() || 'Карточка мероприятия'
+  }
+  return first.fileName?.trim() || 'Файл'
 }
 
 function getFallbackDirectChatTitle(chat: ChatListItem, currentUserId: number | undefined) {
   const companionId = chat.participantIds.find((id) => id !== currentUserId)
   return companionId ? `Пользователь #${companionId}` : `Личный чат #${chat.id}`
-}
-
-function getChatSubjectTypeLabel(chat: ChatListItem) {
-  if (chat.type === 2) {
-    return 'Вакансия'
-  }
-
-  if (chat.type === 3) {
-    return 'Мероприятие'
-  }
-
-  return 'Личный чат'
 }
 
 function getChatSubjectTitle(chat: ChatListItem, currentUserId: number | undefined) {
@@ -150,6 +180,7 @@ export function ChatWidget() {
   const [errorMessage, setErrorMessage] = useState('')
   const [pendingOpenChatId, setPendingOpenChatId] = useState<number | null>(null)
   const [chatVacancyById, setChatVacancyById] = useState<Record<number, { vacancyId: number; vacancyTitle: string }>>({})
+  const [chatLinkedCardById, setChatLinkedCardById] = useState<Record<number, any>>({})
 
   const chatsInFlightRef = useRef(false)
   const historyInFlightByChatRef = useRef<Record<number, boolean>>({})
@@ -159,6 +190,7 @@ export function ChatWidget() {
 
   const activeChatIdRef = useRef<number | null>(activeChatId)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     activeChatIdRef.current = activeChatId
@@ -182,17 +214,60 @@ export function ChatWidget() {
 
     return null
   }, [activeChat, chatVacancyById])
+  const activeLinkedCard = useMemo(() => {
+    if (!activeChatId) {
+      return null
+    }
+    return chatLinkedCardById[activeChatId] ?? null
+  }, [activeChatId, chatLinkedCardById])
+  const activeOpportunityLink = useMemo(() => {
+    const opportunity = activeLinkedCard?.opportunity
+    if (!opportunity?.opportunityId) {
+      return null
+    }
+
+    return {
+      opportunityId: opportunity.opportunityId,
+      title: opportunity.title ?? 'Мероприятие',
+    }
+  }, [activeLinkedCard])
+  const activeApplicationVacancyLink = useMemo(() => {
+    const vacancy = activeLinkedCard?.applicationEmployer?.vacancy ?? activeLinkedCard?.applicationSeeker?.vacancy
+    if (!vacancy?.vacancyId) {
+      return null
+    }
+
+    return {
+      vacancyId: vacancy.vacancyId,
+      title: vacancy.title ?? 'Вакансия',
+    }
+  }, [activeLinkedCard])
+  const activeTopVacancyLink = activeVacancyLink ?? activeApplicationVacancyLink
   const activeChatHeaderTitle = useMemo(() => {
     if (!activeChat) {
       return ''
     }
 
-    if (activeVacancyLink?.title) {
-      return activeVacancyLink.title
+    if (activeTopVacancyLink?.title) {
+      return activeTopVacancyLink.title
     }
 
     return getChatSubjectTitle(activeChat, currentUserId)
-  }, [activeChat, activeVacancyLink, currentUserId])
+  }, [activeChat, activeTopVacancyLink, currentUserId])
+  const activeDirectUsername = useMemo(() => {
+    if (!activeChat || activeChat.type !== 1) {
+      return null
+    }
+
+    for (let index = activeMessages.length - 1; index >= 0; index -= 1) {
+      const message = activeMessages[index]
+      if (message.senderUserId !== currentUserId && message.senderUsername?.trim()) {
+        return message.senderUsername.trim()
+      }
+    }
+
+    return null
+  }, [activeChat, activeMessages, currentUserId])
 
   useEffect(() => {
     if (!isOpen || !activeChatId) {
@@ -299,9 +374,10 @@ export function ChatWidget() {
       setIsLoadingMessages(true)
 
       try {
-        const history = isEmployerSession
-          ? (await fetchEmployerChatDetail(chatId, undefined, 50, signal)).history
-          : await fetchChatHistory(chatId, undefined, 50, signal)
+        const detail = isEmployerSession
+          ? await fetchEmployerChatDetail(chatId, undefined, 50, signal)
+          : await fetchChatDetail(chatId, undefined, 50, signal)
+        const history = detail.history
         const response = history.messages
 
         const latest = response[response.length - 1]
@@ -310,6 +386,10 @@ export function ChatWidget() {
         setMessagesByChat((currentState) => ({
           ...currentState,
           [chatId]: response,
+        }))
+        setChatLinkedCardById((current) => ({
+          ...current,
+          [chatId]: detail.linkedCard ?? null,
         }))
 
         await tryMarkRead(chatId, latest)
@@ -543,6 +623,46 @@ export function ChatWidget() {
     }
   }
 
+  async function handleUploadMedia(files: FileList | null) {
+    if (!activeChatId || !files || files.length === 0 || isSending) {
+      return
+    }
+
+    setIsSending(true)
+    setErrorMessage('')
+
+    try {
+      const formData = new FormData()
+      for (const file of Array.from(files)) {
+        formData.append('files', file)
+      }
+      if (messageInput.trim()) {
+        formData.append('text', messageInput.trim())
+      }
+
+      const sentMessage = await sendChatMediaMessage(activeChatId, formData)
+      latestMessageIdByChatRef.current[activeChatId] = Math.max(latestMessageIdByChatRef.current[activeChatId] ?? 0, sentMessage.id)
+
+      setMessagesByChat((currentState) => {
+        const currentMessages = currentState[activeChatId] ?? []
+        return {
+          ...currentState,
+          [activeChatId]: mergeMessages(currentMessages, [sentMessage]),
+        }
+      })
+
+      setMessageInput('')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      void loadChats({ force: true })
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Не удалось отправить медиа.')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   if (!isAuthenticated) {
     return null
   }
@@ -573,10 +693,8 @@ export function ChatWidget() {
                   className={`chat-widget__list-item ${chat.id === activeChatId ? 'is-active' : ''}`}
                   onClick={() => setActiveChatId(chat.id)}
                 >
-                  <em className="chat-widget__list-subject-type">{getChatSubjectTypeLabel(chat)}</em>
                   <strong>{getChatTitle(chat)}</strong>
-                  <span>{chat.lastMessage?.text || 'Без сообщений'}</span>
-                  <small>{chat.lastMessage ? `${formatChatDate(chat.lastMessage.createdAt)} ${formatChatTime(chat.lastMessage.createdAt)}` : ''}</small>
+                  <span>{getMessagePreview(chat.lastMessage)}</span>
                 </button>
               ))}
             </aside>
@@ -587,17 +705,32 @@ export function ChatWidget() {
                   <div className="chat-widget__thread-head">
                     <div className="chat-widget__thread-head-title">
                       <strong>{activeChatHeaderTitle}</strong>
-                      <span>{getChatSubjectTypeLabel(activeChat)}</span>
+                      {activeDirectUsername ? (
+                        <button type="button" className="chat-widget__thread-link" onClick={() => navigate(`/dashboard/seeker/${encodeURIComponent(activeDirectUsername)}`)}>
+                          Профиль пользователя
+                        </button>
+                      ) : null}
                     </div>
-                    {activeVacancyLink ? (
+                    {activeOpportunityLink ? (
                       <button
                         type="button"
                         className="chat-widget__thread-vacancy"
-                        onClick={() => navigate(`/opportunity/${activeVacancyLink.vacancyId}`)}
+                        onClick={() => navigate(`/opportunity/${activeOpportunityLink.opportunityId}`)}
+                        title="Открыть карточку мероприятия"
+                      >
+                        <span>Мероприятие</span>
+                        <strong>{activeOpportunityLink.title}</strong>
+                      </button>
+                    ) : null}
+                    {activeTopVacancyLink ? (
+                      <button
+                        type="button"
+                        className="chat-widget__thread-vacancy"
+                        onClick={() => navigate(`/opportunity/${activeTopVacancyLink.vacancyId}`)}
                         title="Открыть карточку вакансии"
                       >
                         <span>Вакансия</span>
-                        <strong>{activeVacancyLink.title}</strong>
+                        <strong>{activeTopVacancyLink.title}</strong>
                       </button>
                     ) : null}
                   </div>
@@ -623,6 +756,57 @@ export function ChatWidget() {
                               {usernameLabel ? <span>{usernameLabel}</span> : null}
                             </div>
                             <p>{message.text}</p>
+                            {message.attachments.map((attachment) => {
+                              if (attachment.type === 1 && attachment.url) {
+                                return (
+                                  <a key={`a-${attachment.id}`} className="chat-widget__media-thumb" href={attachment.url} target="_blank" rel="noreferrer">
+                                    <img src={attachment.url} alt={attachment.fileName ?? 'image'} />
+                                  </a>
+                                )
+                              }
+
+                              if (attachment.type === 2 && attachment.url) {
+                                return <video key={`a-${attachment.id}`} className="chat-widget__media-video" src={attachment.url} controls />
+                              }
+
+                              if (attachment.type === 3 && attachment.url) {
+                                return (
+                                  <a key={`a-${attachment.id}`} className="chat-widget__media-file" href={attachment.url} target="_blank" rel="noreferrer">
+                                    {attachment.fileName ?? 'Файл'} {formatFileSize(attachment.sizeBytes)}
+                                  </a>
+                                )
+                              }
+
+                              if (attachment.type === 4 && attachment.vacancy) {
+                                return (
+                                  <button
+                                    key={`a-${attachment.id}`}
+                                    type="button"
+                                    className="chat-widget__thread-vacancy chat-widget__attachment-card"
+                                    onClick={() => navigate(`/opportunity/${attachment.vacancy?.vacancyId}`)}
+                                  >
+                                    <span>Рекомендация вакансии</span>
+                                    <strong>{attachment.vacancy.title}</strong>
+                                  </button>
+                                )
+                              }
+
+                              if (attachment.type === 5 && attachment.opportunity) {
+                                return (
+                                  <button
+                                    key={`a-${attachment.id}`}
+                                    type="button"
+                                    className="chat-widget__thread-vacancy chat-widget__attachment-card"
+                                    onClick={() => navigate(`/opportunity/${attachment.opportunity?.opportunityId}`)}
+                                  >
+                                    <span>Рекомендация мероприятия</span>
+                                    <strong>{attachment.opportunity.title}</strong>
+                                  </button>
+                                )
+                              }
+
+                              return null
+                            })}
                             <small>{formatChatTime(message.createdAt)}</small>
                           </div>
                         </article>
@@ -630,6 +814,7 @@ export function ChatWidget() {
                     })}
                   </div>
                   <div className="chat-widget__composer">
+                    <input ref={fileInputRef} type="file" multiple className="chat-widget__file-input" onChange={(event) => void handleUploadMedia(event.target.files)} />
                     <input
                       value={messageInput}
                       onChange={(event) => setMessageInput(event.target.value)}

@@ -399,6 +399,14 @@ public class EmployerVacanciesController(
         dbContext.ChatMessages.Add(message);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        dbContext.ChatMessageAttachments.Add(new ChatMessageAttachment
+        {
+            MessageId = message.Id,
+            Type = ChatMessageAttachmentType.VacancyCard,
+            VacancyId = vacancy.Id
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+
         await chatCache.InvalidateUserListAsync(membership.UserId, cancellationToken);
         await chatCache.InvalidateUserListAsync(request.CandidateUserId, cancellationToken);
         await chatCache.InvalidateChatHistoryAsync(directChatId.Value, cancellationToken);
@@ -420,7 +428,25 @@ public class EmployerVacanciesController(
                 sender.AvatarUrl,
                 message.Text,
                 message.IsSystem,
-                message.CreatedAt),
+                message.CreatedAt,
+                [new ChatMessageAttachmentDto(
+                    0,
+                    ChatMessageAttachmentType.VacancyCard,
+                    null,
+                    null,
+                    null,
+                    null,
+                    new VacancyLinkedCardDto(
+                        vacancy.Id,
+                        vacancy.Title,
+                        vacancy.Kind,
+                        vacancy.Format,
+                        vacancy.Status,
+                        vacancy.SalaryTaxMode,
+                        vacancy.SalaryFrom,
+                        vacancy.SalaryTo,
+                        vacancy.CurrencyCode),
+                    null)]),
             cancellationToken);
 
         return Created(string.Empty, new EmployerVacancyInviteResponse(directChatId.Value, message.Id));

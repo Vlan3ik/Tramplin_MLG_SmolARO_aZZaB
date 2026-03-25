@@ -12,4 +12,5 @@ public class ChatMessage
     public Chat Chat { get; set; } = null!;
     public User SenderUser { get; set; } = null!;
     public List<ChatMessageRead> Reads { get; set; } = new();
+    public List<ChatMessageAttachment> Attachments { get; set; } = new();
 }

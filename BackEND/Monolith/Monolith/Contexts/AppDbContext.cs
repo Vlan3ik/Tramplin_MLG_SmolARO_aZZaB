@@ -41,6 +41,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Chat> Chats => Set<Chat>();
     public DbSet<ChatParticipant> ChatParticipants => Set<ChatParticipant>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<ChatMessageAttachment> ChatMessageAttachments => Set<ChatMessageAttachment>();
     public DbSet<ChatMessageRead> ChatMessageReads => Set<ChatMessageRead>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -636,6 +637,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(x => new { x.ChatId, x.CreatedAt });
             entity.HasOne(x => x.Chat).WithMany(x => x.Messages).HasForeignKey(x => x.ChatId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.SenderUser).WithMany(x => x.ChatMessages).HasForeignKey(x => x.SenderUserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChatMessageAttachment>(entity =>
+        {
+            entity.ToTable("chat_message_attachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.MessageId).HasColumnName("message_id");
+            entity.Property(x => x.Type).HasColumnName("type");
+            entity.Property(x => x.Url).HasColumnName("url").HasMaxLength(500);
+            entity.Property(x => x.MimeType).HasColumnName("mime_type").HasMaxLength(200);
+            entity.Property(x => x.FileName).HasColumnName("file_name").HasMaxLength(255);
+            entity.Property(x => x.SizeBytes).HasColumnName("size_bytes");
+            entity.Property(x => x.VacancyId).HasColumnName("vacancy_id");
+            entity.Property(x => x.OpportunityId).HasColumnName("opportunity_id");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => x.MessageId);
+            entity.HasIndex(x => x.VacancyId);
+            entity.HasIndex(x => x.OpportunityId);
+            entity.HasOne(x => x.Message).WithMany(x => x.Attachments).HasForeignKey(x => x.MessageId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Vacancy).WithMany().HasForeignKey(x => x.VacancyId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Opportunity).WithMany().HasForeignKey(x => x.OpportunityId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ChatMessageRead>(entity =>

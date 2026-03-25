@@ -9,6 +9,7 @@ using Monolith.Models.Chat;
 using Monolith.Models.Common;
 using Monolith.Services.Chats;
 using Monolith.Services.Common;
+using Monolith.Services.Storage;
 
 namespace Monolith.Controllers;
 
@@ -16,8 +17,28 @@ namespace Monolith.Controllers;
 [Authorize]
 [Route("chats")]
 [Produces("application/json")]
-public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubContext, IChatCacheService chatCache) : ControllerBase
+public class ChatsController(
+    AppDbContext dbContext,
+    IHubContext<ChatHub> hubContext,
+    IChatCacheService chatCache,
+    IObjectStorageService storageService) : ControllerBase
 {
+    private const long MaxAttachmentSizeBytes = 10 * 1024 * 1024;
+    private static readonly HashSet<string> AllowedImageTypes =
+    [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+        "image/svg+xml"
+    ];
+    private static readonly HashSet<string> AllowedVideoTypes =
+    [
+        "video/mp4",
+        "video/webm",
+        "video/ogg",
+        "video/quicktime"
+    ];
     /// <summary>
     /// Возвращает список чатов текущего пользователя.
     /// </summary>
@@ -72,7 +93,35 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
                         m.SenderUser.AvatarUrl,
                         m.Text,
                         m.IsSystem,
-                        m.CreatedAt))
+                        m.CreatedAt,
+                        m.Attachments
+                            .OrderBy(a => a.Id)
+                            .Select(a => new ChatMessageAttachmentProjection(
+                                a.Id,
+                                a.Type,
+                                a.Url,
+                                a.MimeType,
+                                a.FileName,
+                                a.SizeBytes,
+                                a.VacancyId,
+                                a.Vacancy != null ? a.Vacancy.Title : null,
+                                a.Vacancy != null ? (VacancyKind?)a.Vacancy.Kind : null,
+                                a.Vacancy != null ? (WorkFormat?)a.Vacancy.Format : null,
+                                a.Vacancy != null ? (OpportunityStatus?)a.Vacancy.Status : null,
+                                a.Vacancy != null ? (SalaryTaxMode?)a.Vacancy.SalaryTaxMode : null,
+                                a.Vacancy != null ? a.Vacancy.SalaryFrom : null,
+                                a.Vacancy != null ? a.Vacancy.SalaryTo : null,
+                                a.Vacancy != null ? a.Vacancy.CurrencyCode : null,
+                                a.OpportunityId,
+                                a.Opportunity != null ? a.Opportunity.Title : null,
+                                a.Opportunity != null ? (OpportunityKind?)a.Opportunity.Kind : null,
+                                a.Opportunity != null ? (WorkFormat?)a.Opportunity.Format : null,
+                                a.Opportunity != null ? (OpportunityStatus?)a.Opportunity.Status : null,
+                                a.Opportunity != null ? a.Opportunity.EventDate : null,
+                                a.Opportunity != null ? (PriceType?)a.Opportunity.PriceType : null,
+                                a.Opportunity != null ? a.Opportunity.PriceAmount : null,
+                                a.Opportunity != null ? a.Opportunity.PriceCurrencyCode : null))
+                            .ToArray()))
                     .FirstOrDefault()))
             .ToListAsync(cancellationToken);
 
@@ -298,7 +347,41 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
                 x.SenderUser.AvatarUrl,
                 x.Text,
                 x.IsSystem,
-                x.CreatedAt))
+                x.CreatedAt,
+                x.Attachments
+                    .OrderBy(a => a.Id)
+                    .Select(a => new ChatMessageAttachmentDto(
+                        a.Id,
+                        a.Type,
+                        a.Url,
+                        a.MimeType,
+                        a.FileName,
+                        a.SizeBytes,
+                        a.VacancyId == null || a.Vacancy == null
+                            ? null
+                            : new VacancyLinkedCardDto(
+                                a.VacancyId.Value,
+                                a.Vacancy.Title,
+                                a.Vacancy.Kind,
+                                a.Vacancy.Format,
+                                a.Vacancy.Status,
+                                a.Vacancy.SalaryTaxMode,
+                                a.Vacancy.SalaryFrom,
+                                a.Vacancy.SalaryTo,
+                                a.Vacancy.CurrencyCode),
+                        a.OpportunityId == null || a.Opportunity == null
+                            ? null
+                            : new OpportunityLinkedCardDto(
+                                a.OpportunityId.Value,
+                                a.Opportunity.Title,
+                                a.Opportunity.Kind,
+                                a.Opportunity.Format,
+                                a.Opportunity.Status,
+                                a.Opportunity.EventDate,
+                                a.Opportunity.PriceType,
+                                a.Opportunity.PriceAmount,
+                                a.Opportunity.PriceCurrencyCode)))
+                    .ToArray()))
             .ToListAsync(cancellationToken);
         return Ok(messages);
     }
@@ -369,10 +452,236 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
             sender.AvatarUrl,
             message.Text,
             message.IsSystem,
-            message.CreatedAt);
+            message.CreatedAt,
+            []);
 
         await hubContext.Clients.Group(ChatHub.GroupName(chatId)).SendAsync("new", dto, cancellationToken);
         return Created(string.Empty, dto);
+    }
+
+    [HttpPost("{chatId:long}/messages/media")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(ChatMessageDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ChatMessageDto>> SendMediaMessage(
+        long chatId,
+        [FromForm] List<IFormFile> files,
+        [FromForm] string? text,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (!await IsParticipant(chatId, userId, cancellationToken))
+        {
+            return this.ToNotFoundError("chats.not_found", "Chat not found.");
+        }
+
+        if (files is null || files.Count == 0)
+        {
+            return this.ToBadRequestError("chats.media.files_required", "At least one file is required.");
+        }
+
+        var validationError = ValidateFiles(files);
+        if (validationError is not null)
+        {
+            return BadRequest(validationError);
+        }
+
+        var chatMeta = await dbContext.Chats
+            .AsNoTracking()
+            .Where(x => x.Id == chatId)
+            .Select(x => new { x.Type, x.OpportunityId })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (chatMeta is null)
+        {
+            return this.ToNotFoundError("chats.not_found", "Chat not found.");
+        }
+
+        if (chatMeta.Type == ChatType.Opportunity && chatMeta.OpportunityId is not null)
+        {
+            var canSend = await CanSendToOpportunityChat(chatMeta.OpportunityId.Value, userId, cancellationToken);
+            if (!canSend)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse("chats.opportunity.write_forbidden", "Writing in this event chat is disabled."));
+            }
+        }
+
+        var normalizedText = text?.Trim() ?? string.Empty;
+        var message = new ChatMessage
+        {
+            ChatId = chatId,
+            SenderUserId = userId,
+            Text = normalizedText,
+            IsSystem = false
+        };
+        dbContext.ChatMessages.Add(message);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var attachments = new List<ChatMessageAttachment>(files.Count);
+        foreach (var file in files)
+        {
+            await using var stream = file.OpenReadStream();
+            var extension = ResolveExtension(file);
+            var objectKey = await storageService.UploadImageAsync(
+                stream,
+                file.Length,
+                file.ContentType,
+                $"chat-media/{chatId}",
+                extension,
+                cancellationToken);
+
+            attachments.Add(new ChatMessageAttachment
+            {
+                MessageId = message.Id,
+                Type = ResolveAttachmentType(file.ContentType),
+                Url = $"/api/media/{objectKey}",
+                MimeType = file.ContentType,
+                FileName = file.FileName,
+                SizeBytes = file.Length
+            });
+        }
+
+        dbContext.ChatMessageAttachments.AddRange(attachments);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await chatCache.InvalidateChatHistoryAsync(chatId, cancellationToken);
+        await InvalidateChatListForParticipants(chatId, cancellationToken);
+
+        var dto = await dbContext.ChatMessages
+            .AsNoTracking()
+            .Where(x => x.Id == message.Id)
+            .Select(ToMessageDtoExpression())
+            .FirstAsync(cancellationToken);
+
+        await hubContext.Clients.Group(ChatHub.GroupName(chatId)).SendAsync("new", dto, cancellationToken);
+        return Created(string.Empty, dto);
+    }
+
+    [HttpPost("share/vacancy")]
+    [ProducesResponseType(typeof(ShareVacancyToUserResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ShareVacancyToUserResponse>> ShareVacancyToUser(ShareVacancyToUserRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (request.TargetUserId == userId)
+        {
+            return this.ToBadRequestError("chats.share.self", "Cannot share vacancy with self.");
+        }
+
+        var targetExists = await dbContext.Users.AnyAsync(x => x.Id == request.TargetUserId, cancellationToken);
+        if (!targetExists)
+        {
+            return this.ToNotFoundError("chats.share.target_not_found", "Target user not found.");
+        }
+
+        var vacancy = await dbContext.Vacancies
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.VacancyId, cancellationToken);
+        if (vacancy is null)
+        {
+            return this.ToNotFoundError("chats.share.vacancy_not_found", "Vacancy not found.");
+        }
+
+        var chatId = await EnsureDirectChat(userId, request.TargetUserId, cancellationToken);
+        var messageText = string.IsNullOrWhiteSpace(request.Text)
+            ? $"Рекомендую посмотреть вакансию \"{vacancy.Title}\"."
+            : request.Text.Trim();
+
+        var message = new ChatMessage
+        {
+            ChatId = chatId,
+            SenderUserId = userId,
+            Text = messageText,
+            IsSystem = true
+        };
+        dbContext.ChatMessages.Add(message);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        dbContext.ChatMessageAttachments.Add(new ChatMessageAttachment
+        {
+            MessageId = message.Id,
+            Type = ChatMessageAttachmentType.VacancyCard,
+            VacancyId = vacancy.Id
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await chatCache.InvalidateChatHistoryAsync(chatId, cancellationToken);
+        await chatCache.InvalidateUserListAsync(userId, cancellationToken);
+        await chatCache.InvalidateUserListAsync(request.TargetUserId, cancellationToken);
+
+        var dto = await dbContext.ChatMessages
+            .AsNoTracking()
+            .Where(x => x.Id == message.Id)
+            .Select(ToMessageDtoExpression())
+            .FirstAsync(cancellationToken);
+
+        await hubContext.Clients.Group(ChatHub.GroupName(chatId)).SendAsync("new", dto, cancellationToken);
+        return Created(string.Empty, new ShareVacancyToUserResponse(chatId, dto));
+    }
+
+    [HttpPost("share/opportunity")]
+    [ProducesResponseType(typeof(ShareVacancyToUserResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ShareVacancyToUserResponse>> ShareOpportunityToUser(ShareOpportunityToUserRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (request.TargetUserId == userId)
+        {
+            return this.ToBadRequestError("chats.share.self", "Cannot share opportunity with self.");
+        }
+
+        var targetExists = await dbContext.Users.AnyAsync(x => x.Id == request.TargetUserId, cancellationToken);
+        if (!targetExists)
+        {
+            return this.ToNotFoundError("chats.share.target_not_found", "Target user not found.");
+        }
+
+        var opportunity = await dbContext.Opportunities
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.OpportunityId, cancellationToken);
+        if (opportunity is null)
+        {
+            return this.ToNotFoundError("chats.share.opportunity_not_found", "Opportunity not found.");
+        }
+
+        var chatId = await EnsureDirectChat(userId, request.TargetUserId, cancellationToken);
+        var messageText = string.IsNullOrWhiteSpace(request.Text)
+            ? $"Рекомендую посмотреть мероприятие \"{opportunity.Title}\"."
+            : request.Text.Trim();
+
+        var message = new ChatMessage
+        {
+            ChatId = chatId,
+            SenderUserId = userId,
+            Text = messageText,
+            IsSystem = true
+        };
+        dbContext.ChatMessages.Add(message);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        dbContext.ChatMessageAttachments.Add(new ChatMessageAttachment
+        {
+            MessageId = message.Id,
+            Type = ChatMessageAttachmentType.OpportunityCard,
+            OpportunityId = opportunity.Id
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await chatCache.InvalidateChatHistoryAsync(chatId, cancellationToken);
+        await chatCache.InvalidateUserListAsync(userId, cancellationToken);
+        await chatCache.InvalidateUserListAsync(request.TargetUserId, cancellationToken);
+
+        var dto = await dbContext.ChatMessages
+            .AsNoTracking()
+            .Where(x => x.Id == message.Id)
+            .Select(ToMessageDtoExpression())
+            .FirstAsync(cancellationToken);
+
+        await hubContext.Clients.Group(ChatHub.GroupName(chatId)).SendAsync("new", dto, cancellationToken);
+        return Created(string.Empty, new ShareVacancyToUserResponse(chatId, dto));
     }
 
     /// <summary>
@@ -465,16 +774,7 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         var chunk = await query
             .OrderByDescending(x => x.Id)
             .Take(limit + 1)
-            .Select(x => new ChatMessageDto(
-                x.Id,
-                x.ChatId,
-                x.SenderUserId,
-                x.SenderUser.DisplayName,
-                x.SenderUser.Username,
-                x.SenderUser.AvatarUrl,
-                x.Text,
-                x.IsSystem,
-                x.CreatedAt))
+            .Select(ToMessageDtoExpression())
             .ToListAsync(cancellationToken);
 
         var hasMore = chunk.Count > limit;
@@ -501,6 +801,143 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         }
     }
 
+    private static System.Linq.Expressions.Expression<Func<ChatMessage, ChatMessageDto>> ToMessageDtoExpression()
+        => x => new ChatMessageDto(
+            x.Id,
+            x.ChatId,
+            x.SenderUserId,
+            x.SenderUser.DisplayName,
+            x.SenderUser.Username,
+            x.SenderUser.AvatarUrl,
+            x.Text,
+            x.IsSystem,
+            x.CreatedAt,
+            x.Attachments
+                .OrderBy(a => a.Id)
+                .Select(a => new ChatMessageAttachmentDto(
+                    a.Id,
+                    a.Type,
+                    a.Url,
+                    a.MimeType,
+                    a.FileName,
+                    a.SizeBytes,
+                    a.VacancyId == null || a.Vacancy == null
+                        ? null
+                        : new VacancyLinkedCardDto(
+                            a.VacancyId.Value,
+                            a.Vacancy.Title,
+                            a.Vacancy.Kind,
+                            a.Vacancy.Format,
+                            a.Vacancy.Status,
+                            a.Vacancy.SalaryTaxMode,
+                            a.Vacancy.SalaryFrom,
+                            a.Vacancy.SalaryTo,
+                            a.Vacancy.CurrencyCode),
+                    a.OpportunityId == null || a.Opportunity == null
+                        ? null
+                        : new OpportunityLinkedCardDto(
+                            a.OpportunityId.Value,
+                            a.Opportunity.Title,
+                            a.Opportunity.Kind,
+                            a.Opportunity.Format,
+                            a.Opportunity.Status,
+                            a.Opportunity.EventDate,
+                            a.Opportunity.PriceType,
+                            a.Opportunity.PriceAmount,
+                            a.Opportunity.PriceCurrencyCode)))
+                .ToArray());
+
+    private ErrorResponse? ValidateFiles(IReadOnlyCollection<IFormFile> files)
+    {
+        foreach (var file in files)
+        {
+            if (file.Length <= 0)
+            {
+                return new ErrorResponse("chats.media.file_empty", "One of files is empty.");
+            }
+
+            if (file.Length > MaxAttachmentSizeBytes)
+            {
+                return new ErrorResponse("chats.media.file_too_large", "File size exceeds 10 MB.");
+            }
+
+            var contentType = (file.ContentType ?? string.Empty).Trim().ToLowerInvariant();
+            var isImage = AllowedImageTypes.Contains(contentType);
+            var isVideo = AllowedVideoTypes.Contains(contentType);
+            var isGenericFile = !string.IsNullOrWhiteSpace(contentType) && !contentType.StartsWith("image/") && !contentType.StartsWith("video/");
+
+            if (!isImage && !isVideo && !isGenericFile)
+            {
+                return new ErrorResponse("chats.media.content_type_invalid", "Unsupported media type.");
+            }
+        }
+
+        return null;
+    }
+
+    private static ChatMessageAttachmentType ResolveAttachmentType(string? contentTypeRaw)
+    {
+        var contentType = (contentTypeRaw ?? string.Empty).Trim().ToLowerInvariant();
+        if (AllowedImageTypes.Contains(contentType) || contentType.StartsWith("image/"))
+        {
+            return ChatMessageAttachmentType.Image;
+        }
+
+        if (AllowedVideoTypes.Contains(contentType) || contentType.StartsWith("video/"))
+        {
+            return ChatMessageAttachmentType.Video;
+        }
+
+        return ChatMessageAttachmentType.File;
+    }
+
+    private static string ResolveExtension(IFormFile file)
+    {
+        var ext = Path.GetExtension(file.FileName)?.Trim('.').ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(ext))
+        {
+            return ext;
+        }
+
+        return file.ContentType.ToLowerInvariant() switch
+        {
+            "image/jpeg" => "jpg",
+            "image/png" => "png",
+            "image/webp" => "webp",
+            "image/gif" => "gif",
+            "image/svg+xml" => "svg",
+            "video/mp4" => "mp4",
+            "video/webm" => "webm",
+            "video/ogg" => "ogg",
+            "video/quicktime" => "mov",
+            _ => "bin"
+        };
+    }
+
+    private async Task<long> EnsureDirectChat(long userId, long targetUserId, CancellationToken cancellationToken)
+    {
+        var existingChatId = await dbContext.Chats
+            .Where(x => x.Type == ChatType.Direct)
+            .Where(x => x.Participants.Any(p => p.UserId == userId) && x.Participants.Any(p => p.UserId == targetUserId))
+            .Select(x => (long?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (existingChatId is not null)
+        {
+            return existingChatId.Value;
+        }
+
+        var chat = new Chat { Type = ChatType.Direct };
+        dbContext.Chats.Add(chat);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        dbContext.ChatParticipants.AddRange(
+            new ChatParticipant { ChatId = chat.Id, UserId = userId },
+            new ChatParticipant { ChatId = chat.Id, UserId = targetUserId });
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return chat.Id;
+    }
+
     private static ChatMessageDto ToDto(ChatMessageProjection projection) => new(
         projection.Id,
         projection.ChatId,
@@ -510,7 +947,41 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         projection.SenderAvatarUrl,
         projection.Text,
         projection.IsSystem,
-        projection.CreatedAt);
+        projection.CreatedAt,
+        projection.Attachments.Select(ToAttachmentDto).ToArray());
+
+    private static ChatMessageAttachmentDto ToAttachmentDto(ChatMessageAttachmentProjection projection)
+        => new(
+            projection.Id,
+            projection.Type,
+            projection.Url,
+            projection.MimeType,
+            projection.FileName,
+            projection.SizeBytes,
+            projection.VacancyId is null || string.IsNullOrWhiteSpace(projection.VacancyTitle) || projection.VacancyKind is null || projection.VacancyFormat is null || projection.VacancyStatus is null || projection.VacancySalaryTaxMode is null
+                ? null
+                : new VacancyLinkedCardDto(
+                    projection.VacancyId.Value,
+                    projection.VacancyTitle,
+                    projection.VacancyKind.Value,
+                    projection.VacancyFormat.Value,
+                    projection.VacancyStatus.Value,
+                    projection.VacancySalaryTaxMode.Value,
+                    projection.VacancySalaryFrom,
+                    projection.VacancySalaryTo,
+                    projection.VacancyCurrencyCode),
+            projection.OpportunityId is null || string.IsNullOrWhiteSpace(projection.OpportunityTitle) || projection.OpportunityKind is null || projection.OpportunityFormat is null || projection.OpportunityStatus is null || projection.OpportunityPriceType is null
+                ? null
+                : new OpportunityLinkedCardDto(
+                    projection.OpportunityId.Value,
+                    projection.OpportunityTitle,
+                    projection.OpportunityKind.Value,
+                    projection.OpportunityFormat.Value,
+                    projection.OpportunityStatus.Value,
+                    projection.OpportunityEventDate,
+                    projection.OpportunityPriceType.Value,
+                    projection.OpportunityPriceAmount,
+                    projection.OpportunityPriceCurrencyCode));
 
     private static ChatLinkedCardDto? BuildLinkedCard(Chat chat, long currentUserId)
     {
@@ -705,5 +1176,32 @@ public class ChatsController(AppDbContext dbContext, IHubContext<ChatHub> hubCon
         string? SenderAvatarUrl,
         string Text,
         bool IsSystem,
-        DateTimeOffset CreatedAt);
+        DateTimeOffset CreatedAt,
+        ChatMessageAttachmentProjection[] Attachments);
+
+    private sealed record ChatMessageAttachmentProjection(
+        long Id,
+        ChatMessageAttachmentType Type,
+        string? Url,
+        string? MimeType,
+        string? FileName,
+        long? SizeBytes,
+        long? VacancyId,
+        string? VacancyTitle,
+        VacancyKind? VacancyKind,
+        WorkFormat? VacancyFormat,
+        OpportunityStatus? VacancyStatus,
+        SalaryTaxMode? VacancySalaryTaxMode,
+        decimal? VacancySalaryFrom,
+        decimal? VacancySalaryTo,
+        string? VacancyCurrencyCode,
+        long? OpportunityId,
+        string? OpportunityTitle,
+        OpportunityKind? OpportunityKind,
+        WorkFormat? OpportunityFormat,
+        OpportunityStatus? OpportunityStatus,
+        DateTimeOffset? OpportunityEventDate,
+        PriceType? OpportunityPriceType,
+        decimal? OpportunityPriceAmount,
+        string? OpportunityPriceCurrencyCode);
 }

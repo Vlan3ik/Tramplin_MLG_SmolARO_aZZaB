@@ -2,7 +2,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { createApplication } from '../api/applications'
+import { shareOpportunityToUser, shareVacancyToUser } from '../api/chats'
+import { fetchMyContacts } from '../api/contacts'
 import { fetchHomeOpportunities, fetchOpportunityDetailById, participateInOpportunity } from '../api/opportunities'
+import { fetchMyFollowerSubscriptions, fetchMyFollowingSubscriptions } from '../api/subscriptions'
 import { OpportunityLocationMap } from '../components/home/OpportunityLocationMap'
 import { OpportunityCard } from '../components/home/OpportunityCard'
 import { useApplications } from '../hooks/useApplications'
@@ -52,6 +55,9 @@ export function OpportunityDetailsPage() {
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState(false)
   const [eventParticipating, setEventParticipating] = useState(false)
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+  const [shareContacts, setShareContacts] = useState<Array<{ userId: number; username: string | null }>>([])
+  const [selectedShareUserId, setSelectedShareUserId] = useState<number | null>(null)
 
   const opportunityId = Number(id)
 
@@ -205,16 +211,62 @@ export function OpportunityDetailsPage() {
       return
     }
 
+    if (!session?.accessToken) {
+      setActionError(true)
+      setActionMessage('Чтобы поделиться, нужно авторизоваться.')
+      return
+    }
+
+    setIsShareModalOpen(true)
     setIsSharing(true)
 
     try {
-      const url = window.location.href
-      await navigator.clipboard.writeText(url)
-      setActionError(false)
-      setActionMessage('Ссылка скопирована.')
+      const [contacts, following, followers] = await Promise.all([fetchMyContacts(), fetchMyFollowingSubscriptions(), fetchMyFollowerSubscriptions()])
+      const allUsers = [
+        ...contacts.map((item) => ({ userId: item.userId, username: item.username ?? null })),
+        ...following.map((item) => ({ userId: item.userId, username: item.username ?? null })),
+        ...followers.map((item) => ({ userId: item.userId, username: item.username ?? null })),
+      ]
+      const uniqueById = new Map<number, { userId: number; username: string | null }>()
+      for (const user of allUsers) {
+        if (!uniqueById.has(user.userId)) {
+          uniqueById.set(user.userId, user)
+        }
+      }
+      const mapped = Array.from(uniqueById.values()).sort((a, b) => (a.username ?? '').localeCompare(b.username ?? '', 'ru'))
+      setShareContacts(mapped)
+      setSelectedShareUserId((current) => current ?? mapped[0]?.userId ?? null)
+      if (!mapped.length) {
+        setActionError(true)
+        setActionMessage('Нет доступных получателей: добавьте контакты или подпишитесь на пользователей.')
+      }
     } catch {
       setActionError(true)
-      setActionMessage('Не удалось скопировать ссылку.')
+      setActionMessage('Не удалось загрузить контакты для отправки.')
+    } finally {
+      setIsSharing(false)
+    }
+  }
+
+  async function submitShare() {
+    if (!opportunity || !selectedShareUserId) {
+      return
+    }
+
+    setIsSharing(true)
+    try {
+      const isEvent = opportunity.type !== 'vacancy' && opportunity.type !== 'internship'
+      const result = isEvent
+        ? await shareOpportunityToUser(selectedShareUserId, opportunity.id)
+        : await shareVacancyToUser(selectedShareUserId, opportunity.id)
+      window.dispatchEvent(new Event('tramplin:chat-refresh'))
+      window.dispatchEvent(new CustomEvent('tramplin:chat-open', { detail: { chatId: result.chatId } }))
+      setIsShareModalOpen(false)
+      setActionError(false)
+      setActionMessage(isEvent ? 'Мероприятие отправлено в чат.' : 'Вакансия отправлена в чат.')
+    } catch (error) {
+      setActionError(true)
+      setActionMessage(error instanceof Error ? error.message : 'Не удалось отправить в чат.')
     } finally {
       setIsSharing(false)
     }
@@ -274,7 +326,7 @@ export function OpportunityDetailsPage() {
             Открыть карту
           </a>
           <button className="btn btn--ghost" type="button" onClick={() => void handleShare()} disabled={isSharing}>
-            {isSharing ? 'Копируем...' : 'Поделиться'}
+            {isSharing ? 'Загрузка...' : 'Поделиться'}
           </button>
           <div className="status-line status-line--success">
             <CheckCircle2 size={14} />
@@ -370,6 +422,32 @@ export function OpportunityDetailsPage() {
           )}
         </section>
       </div>
+
+      {isShareModalOpen ? (
+        <div className="profile-settings-modal" role="dialog" aria-modal="true" aria-labelledby="share-vacancy-title">
+          <div className="profile-settings-modal__content card">
+            <h2 id="share-vacancy-title">{opportunity.type === 'vacancy' || opportunity.type === 'internship' ? 'Поделиться вакансией' : 'Поделиться мероприятием'}</h2>
+            <p>Выберите получателя из контактов и подписок.</p>
+            <select value={selectedShareUserId == null ? '' : String(selectedShareUserId)} onChange={(event) => setSelectedShareUserId(event.target.value ? Number(event.target.value) : null)}>
+              <option value="">Выберите пользователя</option>
+              {shareContacts.map((contact) => (
+                <option key={`share-user-${contact.userId}`} value={contact.userId}>
+                  {contact.username ?? `Пользователь #${contact.userId}`}
+                </option>
+              ))}
+            </select>
+            {!shareContacts.length ? <p>Список получателей пуст.</p> : null}
+            <div className="profile-settings-modal__actions">
+              <button type="button" className="btn btn--ghost" onClick={() => setIsShareModalOpen(false)} disabled={isSharing}>
+                Отмена
+              </button>
+              <button type="button" className="btn btn--primary" onClick={() => void submitShare()} disabled={isSharing || !selectedShareUserId}>
+                {isSharing ? 'Отправляем...' : 'Отправить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }

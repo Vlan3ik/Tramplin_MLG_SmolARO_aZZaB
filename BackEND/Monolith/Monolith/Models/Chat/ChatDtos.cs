@@ -20,7 +20,18 @@ public record ChatMessageDto(
     string? SenderAvatarUrl,
     string Text,
     bool IsSystem,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    IReadOnlyCollection<ChatMessageAttachmentDto> Attachments);
+
+public record ChatMessageAttachmentDto(
+    long Id,
+    ChatMessageAttachmentType Type,
+    string? Url,
+    string? MimeType,
+    string? FileName,
+    long? SizeBytes,
+    VacancyLinkedCardDto? Vacancy,
+    OpportunityLinkedCardDto? Opportunity);
 
 public record ChatHistoryPageDto(
     long ChatId,
@@ -37,6 +48,20 @@ public record CreateApplicationRequest(
     PlatformRole InitiatorRole);
 
 public record SendChatMessageRequest(string Text);
+
+public record ShareVacancyToUserRequest(
+    long TargetUserId,
+    long VacancyId,
+    string? Text);
+
+public record ShareOpportunityToUserRequest(
+    long TargetUserId,
+    long OpportunityId,
+    string? Text);
+
+public record ShareVacancyToUserResponse(
+    long ChatId,
+    ChatMessageDto Message);
 
 public record MarkChatReadRequest(long MessageId);
 

@@ -153,7 +153,19 @@ public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub>
 
         var settings = await dbContext.CompanyChatSettings.FirstOrDefaultAsync(x => x.CompanyId == request.CompanyId, cancellationToken);
         ChatMessage? greeting = null;
-        if (settings?.AutoGreetingEnabled == true && !string.IsNullOrWhiteSpace(settings.AutoGreetingText))
+        if (request.InitiatorRole == PlatformRole.Employer)
+        {
+            var sender = participants.FirstOrDefault(x => x.UserId != request.CandidateUserId)?.UserId ?? request.CandidateUserId;
+            greeting = new ChatMessage
+            {
+                ChatId = chat.Id,
+                SenderUserId = sender,
+                Text = $"Компания приглашает вас на вакансию \"{vacancy.Title}\".",
+                IsSystem = true
+            };
+            dbContext.ChatMessages.Add(greeting);
+        }
+        else if (settings?.AutoGreetingEnabled == true && !string.IsNullOrWhiteSpace(settings.AutoGreetingText))
         {
             var sender = participants.FirstOrDefault(x => x.UserId != request.CandidateUserId)?.UserId ?? request.CandidateUserId;
             greeting = new ChatMessage
@@ -167,6 +179,19 @@ public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub>
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        ChatMessageAttachment? inviteCardAttachment = null;
+        if (greeting is not null && request.InitiatorRole == PlatformRole.Employer)
+        {
+            inviteCardAttachment = new ChatMessageAttachment
+            {
+                MessageId = greeting.Id,
+                Type = ChatMessageAttachmentType.VacancyCard,
+                VacancyId = vacancy.Id
+            };
+            dbContext.ChatMessageAttachments.Add(inviteCardAttachment);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         foreach (var participantId in participants.Select(x => x.UserId).Distinct())
         {
@@ -192,7 +217,27 @@ public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub>
                 sender?.AvatarUrl,
                 greeting.Text,
                 greeting.IsSystem,
-                greeting.CreatedAt), cancellationToken);
+                greeting.CreatedAt,
+                inviteCardAttachment is null
+                    ? []
+                    : [new ChatMessageAttachmentDto(
+                        inviteCardAttachment.Id,
+                        ChatMessageAttachmentType.VacancyCard,
+                        null,
+                        null,
+                        null,
+                        null,
+                        new VacancyLinkedCardDto(
+                            vacancy.Id,
+                            vacancy.Title,
+                            vacancy.Kind,
+                            vacancy.Format,
+                            vacancy.Status,
+                            vacancy.SalaryTaxMode,
+                            vacancy.SalaryFrom,
+                            vacancy.SalaryTo,
+                            vacancy.CurrencyCode),
+                        null)]), cancellationToken);
         }
 
         return Created(string.Empty, new { applicationId = app.Id, chatId = chat.Id });

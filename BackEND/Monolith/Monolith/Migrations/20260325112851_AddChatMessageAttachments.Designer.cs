@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Monolith.Contexts;
 using NetTopologySuite.Geometries;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Monolith.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260325112851_AddChatMessageAttachments")]
+    partial class AddChatMessageAttachments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -704,10 +707,6 @@ namespace Monolith.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("mime_type");
 
-                    b.Property<long?>("OpportunityId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("opportunity_id");
-
                     b.Property<long?>("SizeBytes")
                         .HasColumnType("bigint")
                         .HasColumnName("size_bytes");
@@ -728,8 +727,6 @@ namespace Monolith.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("MessageId");
-
-                    b.HasIndex("OpportunityId");
 
                     b.HasIndex("VacancyId");
 
@@ -2017,19 +2014,12 @@ namespace Monolith.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Monolith.Entities.Opportunity", "Opportunity")
-                        .WithMany()
-                        .HasForeignKey("OpportunityId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("Monolith.Entities.Vacancy", "Vacancy")
                         .WithMany()
                         .HasForeignKey("VacancyId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Message");
-
-                    b.Navigation("Opportunity");
 
                     b.Navigation("Vacancy");
                 });
