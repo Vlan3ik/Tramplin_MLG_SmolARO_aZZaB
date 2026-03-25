@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { fetchTags } from '../api/catalog'
 import { fetchResumeDiscovery } from '../api/resumes'
 import { followUser, unfollowUser } from '../api/subscriptions'
+import { TagPicker } from '../components/forms/TagPicker'
 import { useAuth } from '../hooks/useAuth'
 import type { TagListItem } from '../types/catalog'
 import type { ResumeDiscoveryItem } from '../types/resumes'
@@ -120,13 +121,6 @@ export function ResumesPage() {
 
     return () => controller.abort()
   }, [openToWorkFilter, onlyFollowed, page, salaryFromInput, salaryToInput, searchApplied, selectedTagIds])
-
-  function toggleTag(tagId: number) {
-    setPage(1)
-    setSelectedTagIds((state) =>
-      state.includes(tagId) ? state.filter((id) => id !== tagId) : [...state, tagId],
-    )
-  }
 
   function applySearch() {
     setPage(1)
@@ -277,16 +271,17 @@ export function ResumesPage() {
           Только мои подписки
         </label>
         <div className="resumes-page__tag-list">
-          {tags.slice(0, 30).map((tag) => (
-            <button
-              key={tag.id}
-              type="button"
-              className={`pill ${selectedTagIds.includes(tag.id) ? 'pill--favorite' : ''}`}
-              onClick={() => toggleTag(tag.id)}
-            >
-              {tag.name}
-            </button>
-          ))}
+          <TagPicker
+            options={tags.map((tag) => ({ id: tag.id, label: tag.name }))}
+            selectedIds={selectedTagIds}
+            onChange={(next) => {
+              setPage(1)
+              setSelectedTagIds(next)
+            }}
+            placeholder="Выберите теги"
+            searchPlaceholder="Поиск по тегам..."
+            emptyMessage="Теги не найдены"
+          />
         </div>
       </article>
 

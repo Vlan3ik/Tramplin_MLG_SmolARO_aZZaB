@@ -1,8 +1,12 @@
 ﻿import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { fetchCities, fetchLocations, fetchTags } from '../api/catalog'
+import { fetchCities, fetchTags } from '../api/catalog'
 import { createEmployerOpportunity, createEmployerVacancy } from '../api/employer'
-import type { City, Location, TagListItem } from '../types/catalog'
+import { reverseGeocode, type ReverseGeocodeResult } from '../api/map'
+import { MapPointPicker, type MapPoint } from '../components/forms/MapPointPicker'
+import { DateInput } from '../components/forms/DateInput'
+import { TagPicker } from '../components/forms/TagPicker'
+import type { City, TagListItem } from '../types/catalog'
 import './VacancyFlowPage.css'
 
 type Step = 1 | 2 | 3 | 4 | 5
@@ -12,8 +16,8 @@ type VacancyForm = {
   title: string
   kind: number
   format: number
-  cityId: string
-  locationId: string
+  mapPoint: MapPoint | null
+  addressText: string
   tagIds: number[]
   shortDescription: string
   fullDescription: string
@@ -21,7 +25,6 @@ type VacancyForm = {
   salaryTo: string
   currencyCode: string
   salaryTaxMode: number
-  publishAt: string
   applicationDeadline: string
 }
 
@@ -29,8 +32,8 @@ type EventForm = {
   title: string
   kind: number
   format: number
-  cityId: string
-  locationId: string
+  mapPoint: MapPoint | null
+  addressText: string
   tagIds: number[]
   shortDescription: string
   fullDescription: string
@@ -38,31 +41,11 @@ type EventForm = {
   priceAmount: string
   priceCurrencyCode: string
   participantsCanWrite: boolean
-  publishAt: string
   eventDate: string
 }
 
 const steps = ['Выбор', 'Основные', 'Описание', 'Стоимость и опции', 'Публикация']
 const validSteps = new Set(['1', '2', '3', '4', '5'])
-
-function toLocalDateTimeInputValue(value: string) {
-  if (!value) {
-    return ''
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ''
-  }
-
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-
-  return `${year}-${month}-${day}T${hours}:${minutes}`
-}
 
 function toIsoDateTimeFromLocalInput(value: string) {
   const normalized = value.trim()
@@ -97,17 +80,12 @@ function normalizeCurrencyCode(value: string) {
   return normalized || null
 }
 
-function parseSelectedNumberOptions(options: HTMLOptionsCollection) {
-  return Array.from(options)
-    .filter((option) => option.selected)
-    .map((option) => Number(option.value))
-    .filter((value) => Number.isInteger(value) && value > 0)
-}
+function formatAddress(geo: ReverseGeocodeResult) {
+  const address = [geo.countryCode, geo.regionName, geo.cityName, geo.streetName, geo.houseNumber]
+    .filter((part) => part && String(part).trim())
+    .join(', ')
 
-function locationOptionLabel(location: Location) {
-  const addressParts = [location.streetName, location.houseNumber].filter(Boolean)
-  const address = addressParts.length ? addressParts.join(', ') : 'Адрес не указан'
-  return `${location.cityName}: ${address}`
+  return address || 'Адрес не определен'
 }
 
 type StepperProps = {
@@ -146,10 +124,9 @@ export function VacancyFlowPage() {
 
   const [cities, setCities] = useState<City[]>([])
   const [tags, setTags] = useState<TagListItem[]>([])
-  const [vacancyLocations, setVacancyLocations] = useState<Location[]>([])
-  const [eventLocations, setEventLocations] = useState<Location[]>([])
   const [loadingCatalogs, setLoadingCatalogs] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isResolvingAddress, setIsResolvingAddress] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [eventChatEnabled, setEventChatEnabled] = useState(true)
@@ -158,8 +135,8 @@ export function VacancyFlowPage() {
     title: '',
     kind: 2,
     format: 2,
-    cityId: '',
-    locationId: '',
+    mapPoint: null,
+    addressText: '',
     tagIds: [],
     shortDescription: '',
     fullDescription: '',
@@ -167,7 +144,6 @@ export function VacancyFlowPage() {
     salaryTo: '',
     currencyCode: 'RUB',
     salaryTaxMode: 3,
-    publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
     applicationDeadline: '',
   })
 
@@ -175,8 +151,8 @@ export function VacancyFlowPage() {
     title: '',
     kind: 4,
     format: 2,
-    cityId: '',
-    locationId: '',
+    mapPoint: null,
+    addressText: '',
     tagIds: [],
     shortDescription: '',
     fullDescription: '',
@@ -184,7 +160,6 @@ export function VacancyFlowPage() {
     priceAmount: '',
     priceCurrencyCode: 'RUB',
     participantsCanWrite: true,
-    publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
     eventDate: '',
   })
 
@@ -225,56 +200,6 @@ export function VacancyFlowPage() {
   }, [])
 
   useEffect(() => {
-    const cityId = Number(vacancyForm.cityId)
-    if (!Number.isInteger(cityId) || cityId <= 0) {
-      setVacancyLocations([])
-      return
-    }
-
-    let active = true
-    void fetchLocations(cityId)
-      .then((items) => {
-        if (active) {
-          setVacancyLocations(items)
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setVacancyLocations([])
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [vacancyForm.cityId])
-
-  useEffect(() => {
-    const cityId = Number(eventForm.cityId)
-    if (!Number.isInteger(cityId) || cityId <= 0) {
-      setEventLocations([])
-      return
-    }
-
-    let active = true
-    void fetchLocations(cityId)
-      .then((items) => {
-        if (active) {
-          setEventLocations(items)
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setEventLocations([])
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [eventForm.cityId])
-
-  useEffect(() => {
     setEventForm((state) => ({
       ...state,
       participantsCanWrite: eventChatEnabled,
@@ -295,9 +220,22 @@ export function VacancyFlowPage() {
     }
   }, [currentStep, navigate, success])
 
-  const locationOptions = useMemo(() => {
-    return isVacancyFlow ? vacancyLocations : eventLocations
-  }, [eventLocations, isVacancyFlow, vacancyLocations])
+  const mapCenter = useMemo<[number, number]>(() => {
+    if (isVacancyFlow && vacancyForm.mapPoint) {
+      return [vacancyForm.mapPoint.longitude, vacancyForm.mapPoint.latitude]
+    }
+
+    if (!isVacancyFlow && eventForm.mapPoint) {
+      return [eventForm.mapPoint.longitude, eventForm.mapPoint.latitude]
+    }
+
+    const baseCity = cities.find((city) => city.latitude != null && city.longitude != null)
+    if (baseCity?.latitude != null && baseCity.longitude != null) {
+      return [baseCity.longitude, baseCity.latitude]
+    }
+
+    return [37.6156, 55.7522]
+  }, [cities, eventForm.mapPoint, isVacancyFlow, vacancyForm.mapPoint])
 
   if (!step || !validSteps.has(step)) {
     return <Navigate to="/vacancy-flow/1" replace />
@@ -337,7 +275,6 @@ export function VacancyFlowPage() {
     setVacancyForm((state) => ({
       ...state,
       [name]: name === 'kind' || name === 'format' || name === 'salaryTaxMode' ? Number(value) || 0 : value,
-      ...(name === 'cityId' ? { locationId: '' } : {}),
     }))
   }
 
@@ -348,21 +285,76 @@ export function VacancyFlowPage() {
     setEventForm((state) => ({
       ...state,
       [name]: name === 'kind' || name === 'format' || name === 'priceType' ? Number(value) || 0 : type === 'checkbox' ? checked : value,
-      ...(name === 'cityId' ? { locationId: '' } : {}),
     }))
   }
 
-  function onVacancyTagsChange(event: ChangeEvent<HTMLSelectElement>) {
+  async function resolveAddress(point: MapPoint) {
+    setIsResolvingAddress(true)
+    try {
+      const geo = await reverseGeocode(point.latitude, point.longitude)
+      return formatAddress(geo)
+    } catch {
+      return `Координаты: ${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}`
+    } finally {
+      setIsResolvingAddress(false)
+    }
+  }
+
+  function onVacancyMapPointChange(point: MapPoint) {
+    setError('')
     setVacancyForm((state) => ({
       ...state,
-      tagIds: parseSelectedNumberOptions(event.target.options),
+      mapPoint: point,
+      addressText: `Координаты: ${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}`,
+    }))
+
+    void resolveAddress(point).then((addressText) => {
+      setVacancyForm((state) => {
+        if (!state.mapPoint) {
+          return state
+        }
+
+        const samePoint =
+          state.mapPoint.latitude === point.latitude && state.mapPoint.longitude === point.longitude
+
+        return samePoint ? { ...state, addressText } : state
+      })
+    })
+  }
+
+  function onEventMapPointChange(point: MapPoint) {
+    setError('')
+    setEventForm((state) => ({
+      ...state,
+      mapPoint: point,
+      addressText: `Координаты: ${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}`,
+    }))
+
+    void resolveAddress(point).then((addressText) => {
+      setEventForm((state) => {
+        if (!state.mapPoint) {
+          return state
+        }
+
+        const samePoint =
+          state.mapPoint.latitude === point.latitude && state.mapPoint.longitude === point.longitude
+
+        return samePoint ? { ...state, addressText } : state
+      })
+    })
+  }
+
+  function onVacancyTagsChange(values: number[]) {
+    setVacancyForm((state) => ({
+      ...state,
+      tagIds: values,
     }))
   }
 
-  function onEventTagsChange(event: ChangeEvent<HTMLSelectElement>) {
+  function onEventTagsChange(values: number[]) {
     setEventForm((state) => ({
       ...state,
-      tagIds: parseSelectedNumberOptions(event.target.options),
+      tagIds: values,
     }))
   }
 
@@ -376,6 +368,9 @@ export function VacancyFlowPage() {
         if (!vacancyForm.title.trim()) {
           return 'Укажите название вакансии.'
         }
+        if (!vacancyForm.mapPoint) {
+          return 'Выберите локацию на карте.'
+        }
       }
 
       if (stepNumber >= 3) {
@@ -388,11 +383,6 @@ export function VacancyFlowPage() {
       }
 
       if (stepNumber >= 4) {
-        const publishAt = toIsoDateTimeFromLocalInput(vacancyForm.publishAt)
-        if (!publishAt) {
-          return 'Укажите корректную дату публикации вакансии.'
-        }
-
         const applicationDeadline = vacancyForm.applicationDeadline.trim()
           ? toIsoDateTimeFromLocalInput(vacancyForm.applicationDeadline)
           : null
@@ -401,7 +391,7 @@ export function VacancyFlowPage() {
           return 'Укажите корректный дедлайн откликов.'
         }
 
-        if (applicationDeadline && Date.parse(applicationDeadline) < Date.parse(publishAt)) {
+        if (applicationDeadline && Date.parse(applicationDeadline) < Date.now()) {
           return 'Дедлайн откликов не может быть раньше даты публикации.'
         }
 
@@ -416,6 +406,9 @@ export function VacancyFlowPage() {
         if (!eventForm.title.trim()) {
           return 'Укажите название мероприятия.'
         }
+        if (!eventForm.mapPoint) {
+          return 'Выберите локацию на карте.'
+        }
       }
 
       if (stepNumber >= 3) {
@@ -428,11 +421,6 @@ export function VacancyFlowPage() {
       }
 
       if (stepNumber >= 4) {
-        const publishAt = toIsoDateTimeFromLocalInput(eventForm.publishAt)
-        if (!publishAt) {
-          return 'Укажите корректную дату публикации мероприятия.'
-        }
-
         const eventDate = eventForm.eventDate.trim() ? toIsoDateTimeFromLocalInput(eventForm.eventDate) : null
         if (eventForm.eventDate.trim() && !eventDate) {
           return 'Укажите корректную дату мероприятия.'
@@ -474,6 +462,8 @@ export function VacancyFlowPage() {
     setIsSubmitting(true)
 
     try {
+      const publishAt = new Date().toISOString()
+
       if (isVacancyFlow) {
         const payload = {
           title: vacancyForm.title,
@@ -482,13 +472,12 @@ export function VacancyFlowPage() {
           kind: vacancyForm.kind,
           format: vacancyForm.format,
           status: 2,
-          cityId: vacancyForm.cityId.trim() ? Number(vacancyForm.cityId) : null,
-          locationId: vacancyForm.locationId.trim() ? Number(vacancyForm.locationId) : null,
+          mapPoint: vacancyForm.mapPoint,
           salaryFrom: toNumberOrNull(vacancyForm.salaryFrom),
           salaryTo: toNumberOrNull(vacancyForm.salaryTo),
           currencyCode: normalizeCurrencyCode(vacancyForm.currencyCode),
           salaryTaxMode: vacancyForm.salaryTaxMode,
-          publishAt: toIsoDateTimeFromLocalInput(vacancyForm.publishAt),
+          publishAt,
           applicationDeadline: vacancyForm.applicationDeadline.trim() ? toIsoDateTimeFromLocalInput(vacancyForm.applicationDeadline) : null,
           tagIds: vacancyForm.tagIds,
         }
@@ -504,13 +493,12 @@ export function VacancyFlowPage() {
           kind: eventForm.kind,
           format: eventForm.format,
           status: 2,
-          cityId: eventForm.cityId.trim() ? Number(eventForm.cityId) : null,
-          locationId: eventForm.locationId.trim() ? Number(eventForm.locationId) : null,
+          mapPoint: eventForm.mapPoint,
           priceType: eventForm.priceType,
           priceAmount: eventForm.priceType === 1 ? null : priceAmount,
           priceCurrencyCode: eventForm.priceType === 1 ? null : normalizeCurrencyCode(eventForm.priceCurrencyCode),
           participantsCanWrite: eventForm.participantsCanWrite,
-          publishAt: toIsoDateTimeFromLocalInput(eventForm.publishAt),
+          publishAt,
           eventDate: eventForm.eventDate.trim() ? toIsoDateTimeFromLocalInput(eventForm.eventDate) : null,
           tagIds: eventForm.tagIds,
         }
@@ -613,53 +601,36 @@ export function VacancyFlowPage() {
                     )}
                   </label>
 
-                  <label className="vf-field">
-                    <span>Город</span>
-                    <select
-                      name="cityId"
-                      value={isVacancyFlow ? vacancyForm.cityId : eventForm.cityId}
-                      onChange={isVacancyFlow ? onVacancyFormChange : onEventFormChange}
-                    >
-                      <option value="">Не выбран</option>
-                      {cities.map((city) => (
-                        <option key={city.id} value={city.id}>
-                          {city.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="vf-field">
-                    <span>Локация</span>
-                    <select
-                      name="locationId"
-                      value={isVacancyFlow ? vacancyForm.locationId : eventForm.locationId}
-                      onChange={isVacancyFlow ? onVacancyFormChange : onEventFormChange}
-                      disabled={!(isVacancyFlow ? vacancyForm.cityId : eventForm.cityId)}
-                    >
-                      <option value="">Не выбрана</option>
-                      {locationOptions.map((location) => (
-                        <option key={location.id} value={location.id}>
-                          {locationOptionLabel(location)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="vf-field vf-field--full">
+                    <span>Локация на карте</span>
+                    <MapPointPicker
+                      className="vf-map-picker"
+                      value={isVacancyFlow ? vacancyForm.mapPoint : eventForm.mapPoint}
+                      onChange={isVacancyFlow ? onVacancyMapPointChange : onEventMapPointChange}
+                      defaultCenter={mapCenter}
+                      defaultZoom={11}
+                    />
+                    <p className="vf-map-hint">Кликните по карте, чтобы выбрать точку.</p>
+                    <p className="vf-map-address">
+                      {isResolvingAddress
+                        ? 'Определяем адрес...'
+                        : isVacancyFlow
+                          ? vacancyForm.addressText || 'Адрес пока не выбран'
+                          : eventForm.addressText || 'Адрес пока не выбран'}
+                    </p>
+                  </div>
 
                   <label className="vf-field vf-field--full">
                     <span>Теги</span>
-                    <select
-                      multiple
-                      value={(isVacancyFlow ? vacancyForm.tagIds : eventForm.tagIds).map(String)}
+                    <TagPicker
+                      className="vf-tag-picker"
+                      options={tags.map((tag) => ({ id: tag.id, label: tag.name }))}
+                      selectedIds={isVacancyFlow ? vacancyForm.tagIds : eventForm.tagIds}
                       onChange={isVacancyFlow ? onVacancyTagsChange : onEventTagsChange}
-                      className="vf-select-multiple"
-                    >
-                      {tags.map((tag) => (
-                        <option key={tag.id} value={tag.id}>
-                          {tag.name}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Выберите теги"
+                      searchPlaceholder="Поиск по тегам..."
+                      emptyMessage="Теги не найдены"
+                    />
                   </label>
                 </div>
                 <p className="vf-note vf-note--moderation">After submit, the card is sent to moderation automatically.</p>
@@ -739,12 +710,8 @@ export function VacancyFlowPage() {
                       </select>
                     </label>
                     <label className="vf-field">
-                      <span>Дата публикации</span>
-                      <input type="datetime-local" name="publishAt" value={vacancyForm.publishAt} onChange={onVacancyFormChange} />
-                    </label>
-                    <label className="vf-field">
                       <span>Дедлайн откликов</span>
-                      <input type="datetime-local" name="applicationDeadline" value={vacancyForm.applicationDeadline} onChange={onVacancyFormChange} />
+                      <DateInput type="datetime-local" name="applicationDeadline" value={vacancyForm.applicationDeadline} onChange={onVacancyFormChange} />
                     </label>
                   </div>
                 ) : (
@@ -766,12 +733,8 @@ export function VacancyFlowPage() {
                       <input type="text" name="priceCurrencyCode" value={eventForm.priceCurrencyCode} onChange={onEventFormChange} maxLength={3} />
                     </label>
                     <label className="vf-field">
-                      <span>Дата публикации</span>
-                      <input type="datetime-local" name="publishAt" value={eventForm.publishAt} onChange={onEventFormChange} />
-                    </label>
-                    <label className="vf-field">
                       <span>Дата события</span>
-                      <input type="datetime-local" name="eventDate" value={eventForm.eventDate} onChange={onEventFormChange} />
+                      <DateInput type="datetime-local" name="eventDate" value={eventForm.eventDate} onChange={onEventFormChange} />
                     </label>
 
                     <div className="vf-switch-row">

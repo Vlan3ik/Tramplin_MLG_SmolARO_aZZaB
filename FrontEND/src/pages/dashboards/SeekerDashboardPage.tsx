@@ -47,6 +47,8 @@ import { fetchMyFollowerSubscriptions, fetchMyFollowingSubscriptions, followUser
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
+import { DateInput } from '../../components/forms/DateInput'
+import { TagPicker } from '../../components/forms/TagPicker'
 import { API_ORIGIN } from '../../config/api'
 import { useCity } from '../../contexts/CityContext'
 import { useApplications } from '../../hooks/useApplications'
@@ -814,8 +816,8 @@ function PortfolioProjectModal({
           <div className="form-grid form-grid--two">
             <label>Название проекта<input value={projectForm.title} onChange={(e) => onProjectFormChange({ ...projectForm, title: e.target.value })} /></label>
             <label>Роль<input value={projectForm.role} onChange={(e) => onProjectFormChange({ ...projectForm, role: e.target.value })} /></label>
-            <label>Дата начала<input type="date" value={projectForm.startDate} onChange={(e) => onProjectFormChange({ ...projectForm, startDate: e.target.value })} /></label>
-            <label>Дата окончания<input type="date" value={projectForm.endDate} onChange={(e) => onProjectFormChange({ ...projectForm, endDate: e.target.value })} /></label>
+            <label>Дата начала<DateInput type="date" value={projectForm.startDate} onChange={(e) => onProjectFormChange({ ...projectForm, startDate: e.target.value })} /></label>
+            <label>Дата окончания<DateInput type="date" value={projectForm.endDate} onChange={(e) => onProjectFormChange({ ...projectForm, endDate: e.target.value })} /></label>
             <label>Repo URL<input value={projectForm.repoUrl} onChange={(e) => onProjectFormChange({ ...projectForm, repoUrl: e.target.value })} /></label>
             <label>Demo URL<input value={projectForm.demoUrl} onChange={(e) => onProjectFormChange({ ...projectForm, demoUrl: e.target.value })} /></label>
             <label className="full-width resume-privacy-toggle">
@@ -2230,7 +2232,18 @@ export function SeekerDashboardPage() {
                     {step === 1 ? (
                       <div className="resume-step-body">
                         <div className="form-grid form-grid--two">
-                          <label>Скилл<select value={skillTagId ?? ''} onChange={(e) => setSkillTagId(e.target.value ? Number(e.target.value) : null)}><option value="">Выберите скилл</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select></label>
+                          <label>
+                            Скилл
+                            <TagPicker
+                              options={tags.map((tag) => ({ id: tag.id, label: tag.name }))}
+                              selectedIds={skillTagId ? [skillTagId] : []}
+                              onChange={(next) => setSkillTagId(next.length ? next[0] : null)}
+                              placeholder="Выберите скилл"
+                              searchPlaceholder="Поиск скилла..."
+                              emptyMessage="Скиллы не найдены"
+                              multiple={false}
+                            />
+                          </label>
                           <label>
                             Уровень
                             <select value={normalizeSkillLevel(skillLevel)} onChange={(e) => setSkillLevel(e.target.value)}>
@@ -2291,10 +2304,10 @@ export function SeekerDashboardPage() {
                               <option value="yes">Да</option>
                             </select>
                           </label>
-                          <label>Дата начала<input type="date" value={experienceForm.startDate} onChange={(e) => setExperienceForm((s) => ({ ...s, startDate: e.target.value }))} /></label>
+                          <label>Дата начала<DateInput type="date" value={experienceForm.startDate} onChange={(e) => setExperienceForm((s) => ({ ...s, startDate: e.target.value }))} /></label>
                           <label>
                             Дата окончания
-                            <input
+                            <DateInput
                               type="date"
                               value={experienceForm.endDate}
                               disabled={experienceForm.isCurrent}
@@ -2982,7 +2995,7 @@ export function SeekerDashboardPage() {
                 <label>Имя *<input value={profileForm.firstName} onChange={(e) => setProfileForm((s) => ({ ...s, firstName: e.target.value }))} /></label>
                 <label>Фамилия *<input value={profileForm.lastName} onChange={(e) => setProfileForm((s) => ({ ...s, lastName: e.target.value }))} /></label>
                 <label>Отчество<input value={profileForm.middleName} onChange={(e) => setProfileForm((s) => ({ ...s, middleName: e.target.value }))} /></label>
-                <label>Дата рождения<input type="date" value={profileForm.birthDate} onChange={(e) => setProfileForm((s) => ({ ...s, birthDate: e.target.value }))} max={getTodayDateInputValue()} /></label>
+                <label>Дата рождения<DateInput type="date" value={profileForm.birthDate} onChange={(e) => setProfileForm((s) => ({ ...s, birthDate: e.target.value }))} max={getTodayDateInputValue()} /></label>
                 <label>Пол<select value={profileForm.gender} onChange={(e) => setProfileForm((s) => ({ ...s, gender: e.target.value as ProfileGenderValue }))}>{profileGenderOptions.map((option) => <option key={option.value || 'unknown'} value={option.value}>{option.label}</option>)}</select></label>
                 <label>Телефон<input value={profileForm.phone} onChange={(e) => setProfileForm((s) => ({ ...s, phone: formatPhone(e.target.value) }))} placeholder="+7 (___) ___-__-__" maxLength={18} /></label>
                 <label className="full-width">О себе<textarea rows={4} value={profileForm.about} onChange={(e) => setProfileForm((s) => ({ ...s, about: e.target.value }))} /></label>

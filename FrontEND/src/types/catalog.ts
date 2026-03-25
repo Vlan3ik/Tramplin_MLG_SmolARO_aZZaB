@@ -27,6 +27,8 @@ export type Location = {
   id: number
   cityId: number
   cityName: string
+  latitude: number | null
+  longitude: number | null
   streetName: string
   houseNumber: string
 }
