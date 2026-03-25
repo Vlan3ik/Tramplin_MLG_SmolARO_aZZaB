@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Building2, Globe, Link2, Mail, MapPin, Phone, ShieldCheck } from 'lucide-react'
+import { BriefcaseBusiness, Building2, Check, Globe, Link2, Mail, MapPin, Phone, ShieldCheck } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { fetchCompanyById } from '../api/companies'
@@ -31,22 +31,24 @@ function formatAbsoluteDate(value: string | null | undefined) {
 
 function CompanyOpportunityRow({ opportunity }: { opportunity: CompanyOpportunity }) {
   return (
-    <article className="company-opportunity-row">
-      <div className="company-opportunity-row__head">
-        <strong>{opportunity.title ?? 'Без названия'}</strong>
-        <span className="status-chip">{opportunity.typeLabel}</span>
+    <article className="company-profile-opportunity-row">
+      <div>
+        <h3>{opportunity.title ?? 'Без названия'}</h3>
+        <p>
+          {opportunity.formatLabel} • Опубликовано: {formatAbsoluteDate(opportunity.publishAt)}
+        </p>
       </div>
-      <div className="company-opportunity-row__meta">
-        <span>{opportunity.formatLabel}</span>
-        <span>•</span>
-        <span>Опубликовано: {formatAbsoluteDate(opportunity.publishAt)}</span>
+      <div className="company-profile-opportunity-row__right">
+        <span>{opportunity.typeLabel}</span>
+        <Link className="btn btn--ghost" to={`/opportunity/${opportunity.id}`}>
+          Открыть
+        </Link>
       </div>
-      <Link className="btn btn--ghost" to={`/opportunity/${opportunity.id}`}>
-        Открыть возможность
-      </Link>
     </article>
   )
 }
+
+type CompanyTab = 'info' | 'opportunities'
 
 export function CompanyPage() {
   const { id } = useParams()
@@ -59,6 +61,7 @@ export function CompanyPage() {
   const [companyDetail, setCompanyDetail] = useState<CompanyDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+  const [activeTab, setActiveTab] = useState<CompanyTab>('info')
 
   useEffect(() => {
     if (!companyId) {
@@ -108,128 +111,149 @@ export function CompanyPage() {
   }
 
   const displayName = companyDetail.displayName
+  const subtitle = [companyDetail.industry, companyDetail.cityName].filter(Boolean).join(' ')
+  const socialLinks = companyDetail.links.filter((link) => Boolean(link.url)).slice(0, 4)
+  const hasPrimaryContacts = Boolean(companyDetail.publicEmail || companyDetail.publicPhone || companyDetail.websiteUrl || companyDetail.links.length)
 
   return (
-    <section className="container company-page">
-      <nav className="breadcrumbs">
-        <Link to="/">Главная</Link>
-        <span>/</span>
-        <Link to="/companies">Компании</Link>
-        <span>/</span>
-        <span>{displayName}</span>
-      </nav>
-
-      <header className="company-hero card">
-        <div className="company-hero__logo">
-          {companyDetail.logoUrl ? <img src={companyDetail.logoUrl} alt={`${displayName} logo`} /> : <span>{getInitials(displayName)}</span>}
-        </div>
-
-        <div className="company-hero__main">
-          <h1>{displayName}</h1>
-          <p>{companyDetail.industry ? `Отрасль: ${companyDetail.industry}` : 'Отрасль не указана'}</p>
-          <div className="company-hero__meta">
+    <section className="company-profile-page">
+      <header className="company-profile-hero">
+        <div className="company-profile-hero__inner">
+          <p className="company-profile-hero__subtitle">{subtitle || 'Профиль компании'}</p>
+          <div className="company-profile-hero__avatar">
+            {companyDetail.logoUrl ? <img src={companyDetail.logoUrl} alt={`${displayName} logo`} /> : <span>{getInitials(displayName)}</span>}
             {companyDetail.verified ? (
-              <span className="status-chip status-chip--success">
-                <ShieldCheck size={14} />
-                Компания верифицирована
+              <span className="company-profile-hero__verified">
+                <Check size={16} />
               </span>
-            ) : (
-              <span className="status-chip">Ожидает верификацию</span>
-            )}
-            <span className="status-chip">Активные возможности: {companyDetail.activeOpportunities.length}</span>
+            ) : null}
+          </div>
+          <h1 className="company-profile-hero__name">{displayName}</h1>
+          <div className="company-profile-hero__left">
+            <div className="company-profile-hero__socials">
+              {socialLinks.length ? (
+                socialLinks.map((link, index) => (
+                  <a key={`${link.url ?? 'link'}-${index}`} href={link.url ?? '#'} target="_blank" rel="noreferrer" title={link.label ?? link.url ?? 'Ссылка'}>
+                    <Link2 size={18} />
+                  </a>
+                ))
+              ) : (
+                <span>Ссылки не указаны</span>
+              )}
+            </div>
+          </div>
+          <div className="company-profile-hero__actions">
+            <button type="button">Подписаться</button>
           </div>
         </div>
       </header>
 
-      <section className="company-layout">
-        <article className="card company-panel">
-          <h2>О компании</h2>
-          <p>{companyDetail.description || 'Описание не заполнено.'}</p>
+      <div className="container company-profile-page__content">
+        <nav className="company-profile-tabs">
+          <button type="button" className={activeTab === 'info' ? 'is-active' : ''} onClick={() => setActiveTab('info')}>
+            Информация
+          </button>
+          <button type="button" className={activeTab === 'opportunities' ? 'is-active' : ''} onClick={() => setActiveTab('opportunities')}>
+            Активные возможности
+          </button>
+        </nav>
 
-          <div className="company-info-grid">
-            <div className="company-fact">
-              <MapPin size={16} />
-              <div>
-                <strong>Город</strong>
-                <span>{companyDetail.cityName || 'Не указано'}</span>
+        {activeTab === 'info' ? (
+          <section className="company-profile-info">
+            <article className="company-profile-card">
+              <h2>Инфо</h2>
+              <div className="company-profile-fact-list">
+                <div><span>Город</span><strong>{companyDetail.cityName || 'Не указан'}</strong></div>
+                <div><span>Юридические данные</span><strong>{companyDetail.legalName || 'Не указаны'}</strong></div>
+                <div><span>Бренд</span><strong>{companyDetail.brandName || displayName}</strong></div>
+                <div><span>Отрасль</span><strong>{companyDetail.industry || 'Не указана'}</strong></div>
+                <div>
+                  <span>Статус</span>
+                  <strong className={companyDetail.verified ? 'is-verified' : ''}>
+                    {companyDetail.verified ? 'Верифицирована' : 'На верификации'}
+                  </strong>
+                </div>
               </div>
-            </div>
-            <div className="company-fact">
-              <Building2 size={16} />
-              <div>
-                <strong>Юридические данные</strong>
-                <span>{companyDetail.legalName || 'Не указано'}</span>
-              </div>
-            </div>
-            <div className="company-fact">
-              <BriefcaseBusiness size={16} />
-              <div>
-                <strong>Бренд</strong>
-                <span>{companyDetail.brandName || 'Не указано'}</span>
-              </div>
-            </div>
-            <div className="company-fact">
-              <Globe size={16} />
-              <div>
-                <strong>Сайт</strong>
-                {companyDetail.websiteUrl ? (
-                  <a href={companyDetail.websiteUrl} target="_blank" rel="noreferrer">
-                    {companyDetail.websiteUrl}
-                  </a>
+
+              <h3>О компании</h3>
+              <p>{companyDetail.description || 'Описание пока не заполнено.'}</p>
+            </article>
+
+            <aside className="company-profile-card">
+              <h2>Контакты</h2>
+              {hasPrimaryContacts ? (
+                <div className="company-profile-contacts">
+                  <p><Mail size={16} />{companyDetail.publicEmail || 'Почта не указана'}</p>
+                  <p><Phone size={16} />{companyDetail.publicPhone || 'Телефон не указан'}</p>
+                  <p>
+                    <Globe size={16} />
+                    {companyDetail.websiteUrl ? (
+                      <a href={companyDetail.websiteUrl} target="_blank" rel="noreferrer">
+                        {companyDetail.websiteUrl}
+                      </a>
+                    ) : (
+                      <span>Сайт не указан</span>
+                    )}
+                  </p>
+                </div>
+              ) : (
+                <p>Контакты не указаны.</p>
+              )}
+
+              <h3>Ссылки</h3>
+              <div className="company-profile-links">
+                {companyDetail.links.length ? (
+                  companyDetail.links
+                    .filter((link) => Boolean(link.url))
+                    .map((link, index) => (
+                      <a key={`${link.url ?? 'link'}-${index}`} href={link.url ?? '#'} target="_blank" rel="noreferrer">
+                        <Link2 size={14} />
+                        <span>{link.label || link.url}</span>
+                      </a>
+                    ))
                 ) : (
-                  <span>Не указано</span>
+                  <p>Ссылки не добавлены.</p>
                 )}
               </div>
-            </div>
-          </div>
-        </article>
-
-        <aside className="card company-panel company-panel--aside">
-          <h2>Контакты</h2>
-          <div className="company-contacts">
-            <span>
-              <Mail size={15} />
-              {companyDetail.publicEmail || 'Email не указан'}
-            </span>
-            <span>
-              <Phone size={15} />
-              {companyDetail.publicPhone || 'Телефон не указан'}
-            </span>
-          </div>
-
-          <h3>Ссылки</h3>
-          <div className="company-links">
-            {companyDetail.links.length ? (
-              companyDetail.links.map((link) => (
-                <a key={`${link.kind ?? 'link'}-${link.url ?? ''}`} className="status-line" href={link.url ?? '#'} target="_blank" rel="noreferrer">
-                  <Link2 size={14} />
-                  <span>{link.label ?? link.url ?? 'Ссылка'}</span>
-                </a>
-              ))
-            ) : companyDetail.websiteUrl ? (
-              <a className="status-line" href={companyDetail.websiteUrl} target="_blank" rel="noreferrer">
-                <Link2 size={14} />
-                <span>{companyDetail.websiteUrl}</span>
-              </a>
-            ) : (
-              <p>Ссылки не указаны.</p>
-            )}
-          </div>
-        </aside>
-      </section>
-
-      <section className="card company-panel">
-        <h2>Активные возможности</h2>
-        {companyDetail.activeOpportunities.length ? (
-          <div className="company-opportunity-list">
-            {companyDetail.activeOpportunities.map((opportunity) => (
-              <CompanyOpportunityRow key={opportunity.id} opportunity={opportunity} />
-            ))}
-          </div>
+            </aside>
+          </section>
         ) : (
-          <p>Пока нет активных возможностей.</p>
+          <section className="company-profile-card company-profile-card--opportunities">
+            <div className="company-profile-opportunity-head">
+              <h2>Активные возможности</h2>
+              <span>{companyDetail.activeOpportunities.length}</span>
+            </div>
+            {companyDetail.activeOpportunities.length ? (
+              <div className="company-profile-opportunity-list">
+                {companyDetail.activeOpportunities.map((opportunity) => (
+                  <CompanyOpportunityRow key={opportunity.id} opportunity={opportunity} />
+                ))}
+              </div>
+            ) : (
+              <p>Пока нет активных возможностей.</p>
+            )}
+          </section>
         )}
-      </section>
+
+        <section className="company-profile-meta">
+          <div>
+            <ShieldCheck size={16} />
+            <span>{companyDetail.verified ? 'Компания прошла верификацию' : 'Компания ожидает верификацию'}</span>
+          </div>
+          <div>
+            <MapPin size={16} />
+            <span>{companyDetail.cityName || 'Город не указан'}</span>
+          </div>
+          <div>
+            <BriefcaseBusiness size={16} />
+            <span>{companyDetail.activeOpportunities.length} активных возможностей</span>
+          </div>
+          <div>
+            <Building2 size={16} />
+            <span>{companyDetail.legalName || displayName}</span>
+          </div>
+        </section>
+      </div>
     </section>
   )
 }

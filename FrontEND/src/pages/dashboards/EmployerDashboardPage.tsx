@@ -30,6 +30,8 @@ import { uploadCompanyLogo } from '../../api/media'
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
+import { DateInput } from '../../components/forms/DateInput'
+import { TagPicker } from '../../components/forms/TagPicker'
 import type { City, Location, TagListItem } from '../../types/catalog'
 import { formatSkillLevelDisplay } from '../../utils/skill-levels'
 
@@ -153,13 +155,6 @@ function locationOptionLabel(location: Location) {
   const addressParts = [location.streetName, location.houseNumber].filter(Boolean)
   const address = addressParts.length ? addressParts.join(', ') : 'Адрес не указан'
   return `${location.cityName}: ${address}`
-}
-
-function parseSelectedNumberOptions(options: HTMLOptionsCollection) {
-  return Array.from(options)
-    .filter((option) => option.selected)
-    .map((option) => Number(option.value))
-    .filter((value) => Number.isInteger(value) && value > 0)
 }
 
 function formatDate(value: string) {
@@ -307,7 +302,6 @@ export function EmployerDashboardPage() {
     salaryTo: '',
     currencyCode: 'RUB',
     salaryTaxMode: 3,
-    publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
     applicationDeadline: '',
     tagIds: [] as number[],
   })
@@ -325,7 +319,6 @@ export function EmployerDashboardPage() {
     priceAmount: '',
     priceCurrencyCode: 'RUB',
     participantsCanWrite: true,
-    publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
     eventDate: '',
     tagIds: [] as number[],
   })
@@ -577,16 +570,14 @@ export function EmployerDashboardPage() {
     }))
   }
 
-  function onVacancyTagsChange(event: ChangeEvent<HTMLSelectElement>) {
-    const values = parseSelectedNumberOptions(event.target.options)
+  function onVacancyTagsChange(values: number[]) {
     setVacancyForm((state) => ({
       ...state,
       tagIds: values,
     }))
   }
 
-  function onOpportunityTagsChange(event: ChangeEvent<HTMLSelectElement>) {
-    const values = parseSelectedNumberOptions(event.target.options)
+  function onOpportunityTagsChange(values: number[]) {
     setOpportunityForm((state) => ({
       ...state,
       tagIds: values,
@@ -616,7 +607,6 @@ export function EmployerDashboardPage() {
       salaryTo: '',
       currencyCode: 'RUB',
       salaryTaxMode: 3,
-      publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
       applicationDeadline: '',
       tagIds: [],
     })
@@ -636,7 +626,6 @@ export function EmployerDashboardPage() {
       priceAmount: '',
       priceCurrencyCode: 'RUB',
       participantsCanWrite: true,
-      publishAt: toLocalDateTimeInputValue(new Date().toISOString()),
       eventDate: '',
       tagIds: [],
     })
@@ -677,11 +666,7 @@ export function EmployerDashboardPage() {
       return
     }
 
-    const publishAt = toIsoDateTimeFromLocalInput(vacancyForm.publishAt)
-    if (!publishAt) {
-      setError('Укажите корректную дату публикации вакансии.')
-      return
-    }
+    const publishAt = new Date().toISOString()
 
     const applicationDeadline = vacancyForm.applicationDeadline.trim()
       ? toIsoDateTimeFromLocalInput(vacancyForm.applicationDeadline)
@@ -691,7 +676,7 @@ export function EmployerDashboardPage() {
       return
     }
 
-    if (applicationDeadline && Date.parse(applicationDeadline) < Date.parse(publishAt)) {
+    if (applicationDeadline && Date.parse(applicationDeadline) < Date.now()) {
       setError('Дедлайн откликов не может быть раньше даты публикации.')
       return
     }
@@ -762,11 +747,7 @@ export function EmployerDashboardPage() {
       return
     }
 
-    const publishAt = toIsoDateTimeFromLocalInput(opportunityForm.publishAt)
-    if (!publishAt) {
-      setError('Укажите корректную дату публикации возможности.')
-      return
-    }
+    const publishAt = new Date().toISOString()
 
     const eventDate = opportunityForm.eventDate.trim() ? toIsoDateTimeFromLocalInput(opportunityForm.eventDate) : null
     if (opportunityForm.eventDate.trim() && !eventDate) {
@@ -861,7 +842,6 @@ export function EmployerDashboardPage() {
           salaryTo: detail.salaryTo != null ? String(detail.salaryTo) : '',
           currencyCode: detail.currencyCode ?? 'RUB',
           salaryTaxMode: detail.salaryTaxMode,
-          publishAt: toLocalDateTimeInputValue(detail.publishAt),
           applicationDeadline: detail.applicationDeadline ? toLocalDateTimeInputValue(detail.applicationDeadline) : '',
           tagIds: mapTagNamesToIds(detail.tags),
         })
@@ -898,7 +878,6 @@ export function EmployerDashboardPage() {
           priceAmount: detail.priceAmount != null ? String(detail.priceAmount) : '',
           priceCurrencyCode: detail.priceCurrencyCode ?? 'RUB',
           participantsCanWrite: detail.participantsCanWrite,
-          publishAt: toLocalDateTimeInputValue(detail.publishAt),
           eventDate: detail.eventDate ? toLocalDateTimeInputValue(detail.eventDate) : '',
           tagIds: mapTagNamesToIds(detail.tags),
         })
@@ -1392,22 +1371,19 @@ export function EmployerDashboardPage() {
               </select>
             </label>
             <label>
-              Дата публикации
-              <input name="publishAt" type="datetime-local" value={vacancyForm.publishAt} onChange={onVacancyFormChange} required />
-            </label>
-            <label>
               Дедлайн откликов
-              <input name="applicationDeadline" type="datetime-local" value={vacancyForm.applicationDeadline} onChange={onVacancyFormChange} />
+              <DateInput name="applicationDeadline" type="datetime-local" value={vacancyForm.applicationDeadline} onChange={onVacancyFormChange} />
             </label>
             <label>
               Теги
-              <select multiple value={vacancyForm.tagIds.map(String)} onChange={onVacancyTagsChange}>
-                {tags.map((tag) => (
-                  <option key={tag.id} value={tag.id}>
-                    {tag.name}
-                  </option>
-                ))}
-              </select>
+              <TagPicker
+                options={tags.map((tag) => ({ id: tag.id, label: tag.name }))}
+                selectedIds={vacancyForm.tagIds}
+                onChange={onVacancyTagsChange}
+                placeholder="Select tags"
+                searchPlaceholder="Search tags..."
+                emptyMessage="No tags found"
+              />
             </label>
             <button type="submit" className="btn btn--primary" disabled={!company || creatingVacancy}>
               {creatingVacancy ? (editingVacancyId ? 'Сохраняем...' : 'Создаем...') : editingVacancyId ? 'Сохранить вакансию' : 'Создать вакансию'}
@@ -1513,22 +1489,19 @@ export function EmployerDashboardPage() {
               Участники могут писать в чат
             </label>
             <label>
-              Дата публикации
-              <input name="publishAt" type="datetime-local" value={opportunityForm.publishAt} onChange={onOpportunityFormChange} required />
-            </label>
-            <label>
               Дата события
-              <input name="eventDate" type="datetime-local" value={opportunityForm.eventDate} onChange={onOpportunityFormChange} />
+              <DateInput name="eventDate" type="datetime-local" value={opportunityForm.eventDate} onChange={onOpportunityFormChange} />
             </label>
             <label>
               Теги
-              <select multiple value={opportunityForm.tagIds.map(String)} onChange={onOpportunityTagsChange}>
-                {tags.map((tag) => (
-                  <option key={tag.id} value={tag.id}>
-                    {tag.name}
-                  </option>
-                ))}
-              </select>
+              <TagPicker
+                options={tags.map((tag) => ({ id: tag.id, label: tag.name }))}
+                selectedIds={opportunityForm.tagIds}
+                onChange={onOpportunityTagsChange}
+                placeholder="Select tags"
+                searchPlaceholder="Search tags..."
+                emptyMessage="No tags found"
+              />
             </label>
             <button type="submit" className="btn btn--secondary" disabled={!company || creatingOpportunity}>
               {creatingOpportunity ? (editingOpportunityId ? 'Сохраняем...' : 'Создаем...') : editingOpportunityId ? 'Сохранить возможность' : 'Создать возможность'}

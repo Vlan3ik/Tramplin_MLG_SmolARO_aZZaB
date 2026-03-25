@@ -1,9 +1,10 @@
 ﻿const RAW_ENV_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
-const DEFAULT_FALLBACK_API_BASE_URL = 'http://localhost:1488/api'
+const DEFAULT_FALLBACK_API_BASE_URL = 'http://169.254.185.29:1488/api'
 const API_BASE_URL_STORAGE_KEY = 'tramplin.dev.api-base-url'
 const API_BASE_URL_QUERY_KEY = 'apiBaseUrl'
 const API_HOST_QUERY_KEY = 'apiHost'
 const API_RESET_QUERY_KEY = 'apiReset'
+const LEGACY_LOCAL_API_BASE_URL = 'http://localhost:1488/api'
 
 function isBrowser() {
   return typeof window !== 'undefined'
@@ -68,6 +69,14 @@ function resolveApiBaseUrl() {
   const normalizedStoredUrl = storedUrl ? normalizeApiBaseUrl(storedUrl, true) : null
 
   if (normalizedStoredUrl) {
+    const normalizedLegacyLocalUrl = normalizeApiBaseUrl(LEGACY_LOCAL_API_BASE_URL, true)
+
+    // Auto-migrate old local API host to current shared backend host.
+    if (normalizedLegacyLocalUrl && normalizedStoredUrl === normalizedLegacyLocalUrl) {
+      window.localStorage.setItem(API_BASE_URL_STORAGE_KEY, DEFAULT_FALLBACK_API_BASE_URL)
+      return DEFAULT_FALLBACK_API_BASE_URL
+    }
+
     return normalizedStoredUrl
   }
 

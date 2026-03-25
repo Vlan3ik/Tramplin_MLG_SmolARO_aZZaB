@@ -203,8 +203,10 @@ type EmployerVacancyUpsertRequest = {
   kind: number
   format: number
   status: number
-  cityId: number | null
-  locationId: number | null
+  mapPoint: {
+    latitude: number
+    longitude: number
+  } | null
   salaryFrom: number | null
   salaryTo: number | null
   currencyCode: string | null
@@ -221,8 +223,10 @@ type EmployerOpportunityUpsertRequest = {
   kind: number
   format: number
   status: number
-  cityId: number | null
-  locationId: number | null
+  mapPoint: {
+    latitude: number
+    longitude: number
+  } | null
   priceType: number
   priceAmount: number | null
   priceCurrencyCode: string | null
@@ -412,8 +416,14 @@ export type CreateEmployerVacancyRequest = {
   kind?: number
   format?: number
   status?: number
+  mapPoint?: {
+    latitude: number
+    longitude: number
+  } | null
   cityId?: number | null
   locationId?: number | null
+  locationLatitude?: number | null
+  locationLongitude?: number | null
   salaryFrom?: number | null
   salaryTo?: number | null
   currencyCode?: string | null
@@ -430,8 +440,14 @@ export type CreateEmployerOpportunityRequest = {
   kind?: number
   format?: number
   status?: number
+  mapPoint?: {
+    latitude: number
+    longitude: number
+  } | null
   cityId?: number | null
   locationId?: number | null
+  locationLatitude?: number | null
+  locationLongitude?: number | null
   priceType?: number
   priceAmount?: number | null
   priceCurrencyCode?: string | null
@@ -617,6 +633,32 @@ function toIsoDateOrNow(value?: string) {
   return new Date().toISOString()
 }
 
+function resolveMapPoint(payload: {
+  mapPoint?: {
+    latitude: number
+    longitude: number
+  } | null
+  locationLatitude?: number | null
+  locationLongitude?: number | null
+}) {
+  if (payload.mapPoint && Number.isFinite(payload.mapPoint.latitude) && Number.isFinite(payload.mapPoint.longitude)) {
+    return payload.mapPoint
+  }
+
+  if (payload.locationLatitude == null || payload.locationLongitude == null) {
+    return null
+  }
+
+  if (!Number.isFinite(payload.locationLatitude) || !Number.isFinite(payload.locationLongitude)) {
+    return null
+  }
+
+  return {
+    latitude: payload.locationLatitude,
+    longitude: payload.locationLongitude,
+  }
+}
+
 function mapVacancyForCreate(payload: CreateEmployerVacancyRequest): EmployerVacancyUpsertRequest {
   return {
     title: payload.title.trim(),
@@ -625,8 +667,7 @@ function mapVacancyForCreate(payload: CreateEmployerVacancyRequest): EmployerVac
     kind: payload.kind ?? 2,
     format: payload.format ?? 2,
     status: payload.status ?? 1,
-    cityId: payload.cityId ?? null,
-    locationId: payload.locationId ?? null,
+    mapPoint: resolveMapPoint(payload),
     salaryFrom: payload.salaryFrom ?? null,
     salaryTo: payload.salaryTo ?? null,
     currencyCode: payload.currencyCode?.trim() || null,
@@ -645,8 +686,7 @@ function mapOpportunityForCreate(payload: CreateEmployerOpportunityRequest): Emp
     kind: payload.kind ?? 4,
     format: payload.format ?? 2,
     status: payload.status ?? 1,
-    cityId: payload.cityId ?? null,
-    locationId: payload.locationId ?? null,
+    mapPoint: resolveMapPoint(payload),
     priceType: payload.priceType ?? 1,
     priceAmount: payload.priceAmount ?? null,
     priceCurrencyCode: payload.priceCurrencyCode?.trim() || null,
