@@ -149,13 +149,15 @@ public class EmployerOpportunitiesController(
             opportunity.Participants.Count(p => p.JoinedAt >= last24));
 
         var locationCity = opportunity.City ?? opportunity.Location?.City;
+        var locationLatitude = opportunity.Location is not null ? (decimal?)opportunity.Location.GeoPoint.Y : locationCity?.Latitude;
+        var locationLongitude = opportunity.Location is not null ? (decimal?)opportunity.Location.GeoPoint.X : locationCity?.Longitude;
         var location = locationCity is null
             ? null
             : new LocationDto(
                 locationCity.Id,
                 locationCity.CityName,
-                locationCity.Latitude,
-                locationCity.Longitude,
+                locationLatitude,
+                locationLongitude,
                 opportunity.Location?.StreetName,
                 opportunity.Location?.HouseNumber);
 

@@ -24,7 +24,7 @@ public class EmployerLocationService(AppDbContext dbContext, IReverseGeocodingSe
         var street = CleanText(reverse?.StreetName);
         var house = CleanText(reverse?.HouseNumber);
 
-        var location = await FindLocationAsync(city.Id, street, house, cancellationToken);
+        var location = await FindLocationAsync(city.Id, latitude, longitude, cancellationToken);
         if (location is null)
         {
             location = new LocationEntity
@@ -122,20 +122,15 @@ public class EmployerLocationService(AppDbContext dbContext, IReverseGeocodingSe
                 Math.Abs(x.Longitude!.Value - longitude))
             .FirstOrDefaultAsync(cancellationToken);
 
-    private async Task<LocationEntity?> FindLocationAsync(long cityId, string? street, string? house, CancellationToken cancellationToken)
+    private async Task<LocationEntity?> FindLocationAsync(long cityId, decimal latitude, decimal longitude, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(street) || string.IsNullOrWhiteSpace(house))
-        {
-            return null;
-        }
-
+        var pointLatitude = (double)latitude;
+        var pointLongitude = (double)longitude;
         return await dbContext.Locations
             .FirstOrDefaultAsync(
                 x => x.CityId == cityId
-                     && x.StreetName != null
-                     && x.HouseNumber != null
-                     && x.StreetName.ToLower() == street.ToLower()
-                     && x.HouseNumber.ToLower() == house.ToLower(),
+                     && x.GeoPoint.Y == pointLatitude
+                     && x.GeoPoint.X == pointLongitude,
                 cancellationToken);
     }
 

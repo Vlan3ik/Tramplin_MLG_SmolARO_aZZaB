@@ -86,9 +86,9 @@ public class MapController(AppDbContext dbContext, IEmployerLocationService empl
                     CompanyName = x.Company.BrandName ?? x.Company.LegalName,
                     Verified = x.Company.Status == CompanyStatus.Verified,
                     CityId = x.City != null ? x.City.Id : (x.Location != null ? x.Location.City.Id : 0),
-                    CityName = x.City != null ? x.City.CityName : (x.Location != null ? x.Location.City.CityName : "Unknown"),
-                    Lat = x.City != null ? x.City.Latitude : (x.Location != null ? x.Location.City.Latitude : null),
-                    Lng = x.City != null ? x.City.Longitude : (x.Location != null ? x.Location.City.Longitude : null),
+                    CityName = x.Location != null ? x.Location.City.CityName : (x.City != null ? x.City.CityName : "Unknown"),
+                    Lat = x.Location != null ? (decimal?)x.Location.GeoPoint.Y : (x.City != null ? x.City.Latitude : null),
+                    Lng = x.Location != null ? (decimal?)x.Location.GeoPoint.X : (x.City != null ? x.City.Longitude : null),
                     Street = x.Location != null ? x.Location.StreetName : null,
                     House = x.Location != null ? x.Location.HouseNumber : null,
                     Tags = x.VacancyTags.Select(t => t.Tag.Name).ToArray()
@@ -158,9 +158,9 @@ public class MapController(AppDbContext dbContext, IEmployerLocationService empl
                     CompanyName = x.Company.BrandName ?? x.Company.LegalName,
                     Verified = x.Company.Status == CompanyStatus.Verified,
                     CityId = x.City != null ? x.City.Id : (x.Location != null ? x.Location.City.Id : 0),
-                    CityName = x.City != null ? x.City.CityName : (x.Location != null ? x.Location.City.CityName : "Unknown"),
-                    Lat = x.City != null ? x.City.Latitude : (x.Location != null ? x.Location.City.Latitude : null),
-                    Lng = x.City != null ? x.City.Longitude : (x.Location != null ? x.Location.City.Longitude : null),
+                    CityName = x.Location != null ? x.Location.City.CityName : (x.City != null ? x.City.CityName : "Unknown"),
+                    Lat = x.Location != null ? (decimal?)x.Location.GeoPoint.Y : (x.City != null ? x.City.Latitude : null),
+                    Lng = x.Location != null ? (decimal?)x.Location.GeoPoint.X : (x.City != null ? x.City.Longitude : null),
                     Street = x.Location != null ? x.Location.StreetName : null,
                     House = x.Location != null ? x.Location.HouseNumber : null,
                     ParticipantsCount = x.Participants.Count,
@@ -359,29 +359,29 @@ public class MapController(AppDbContext dbContext, IEmployerLocationService empl
             if (bounds.MinLat is not null)
             {
                 vacancies = vacancies.Where(x =>
-                    (x.City != null && x.City.Latitude >= bounds.MinLat) ||
-                    (x.Location != null && x.Location.City.Latitude >= bounds.MinLat));
+                    (x.Location != null && x.Location.GeoPoint.Y >= (double)bounds.MinLat) ||
+                    (x.Location == null && x.City != null && x.City.Latitude >= bounds.MinLat));
             }
 
             if (bounds.MaxLat is not null)
             {
                 vacancies = vacancies.Where(x =>
-                    (x.City != null && x.City.Latitude <= bounds.MaxLat) ||
-                    (x.Location != null && x.Location.City.Latitude <= bounds.MaxLat));
+                    (x.Location != null && x.Location.GeoPoint.Y <= (double)bounds.MaxLat) ||
+                    (x.Location == null && x.City != null && x.City.Latitude <= bounds.MaxLat));
             }
 
             if (bounds.MinLng is not null)
             {
                 vacancies = vacancies.Where(x =>
-                    (x.City != null && x.City.Longitude >= bounds.MinLng) ||
-                    (x.Location != null && x.Location.City.Longitude >= bounds.MinLng));
+                    (x.Location != null && x.Location.GeoPoint.X >= (double)bounds.MinLng) ||
+                    (x.Location == null && x.City != null && x.City.Longitude >= bounds.MinLng));
             }
 
             if (bounds.MaxLng is not null)
             {
                 vacancies = vacancies.Where(x =>
-                    (x.City != null && x.City.Longitude <= bounds.MaxLng) ||
-                    (x.Location != null && x.Location.City.Longitude <= bounds.MaxLng));
+                    (x.Location != null && x.Location.GeoPoint.X <= (double)bounds.MaxLng) ||
+                    (x.Location == null && x.City != null && x.City.Longitude <= bounds.MaxLng));
             }
 
             return (IQueryable<T>)vacancies;
@@ -391,29 +391,29 @@ public class MapController(AppDbContext dbContext, IEmployerLocationService empl
         if (bounds.MinLat is not null)
         {
             opportunities = opportunities.Where(x =>
-                (x.City != null && x.City.Latitude >= bounds.MinLat) ||
-                (x.Location != null && x.Location.City.Latitude >= bounds.MinLat));
+                (x.Location != null && x.Location.GeoPoint.Y >= (double)bounds.MinLat) ||
+                (x.Location == null && x.City != null && x.City.Latitude >= bounds.MinLat));
         }
 
         if (bounds.MaxLat is not null)
         {
             opportunities = opportunities.Where(x =>
-                (x.City != null && x.City.Latitude <= bounds.MaxLat) ||
-                (x.Location != null && x.Location.City.Latitude <= bounds.MaxLat));
+                (x.Location != null && x.Location.GeoPoint.Y <= (double)bounds.MaxLat) ||
+                (x.Location == null && x.City != null && x.City.Latitude <= bounds.MaxLat));
         }
 
         if (bounds.MinLng is not null)
         {
             opportunities = opportunities.Where(x =>
-                (x.City != null && x.City.Longitude >= bounds.MinLng) ||
-                (x.Location != null && x.Location.City.Longitude >= bounds.MinLng));
+                (x.Location != null && x.Location.GeoPoint.X >= (double)bounds.MinLng) ||
+                (x.Location == null && x.City != null && x.City.Longitude >= bounds.MinLng));
         }
 
         if (bounds.MaxLng is not null)
         {
             opportunities = opportunities.Where(x =>
-                (x.City != null && x.City.Longitude <= bounds.MaxLng) ||
-                (x.Location != null && x.Location.City.Longitude <= bounds.MaxLng));
+                (x.Location != null && x.Location.GeoPoint.X <= (double)bounds.MaxLng) ||
+                (x.Location == null && x.City != null && x.City.Longitude <= bounds.MaxLng));
         }
 
         return (IQueryable<T>)opportunities;

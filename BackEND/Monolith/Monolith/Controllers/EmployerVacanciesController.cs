@@ -163,13 +163,15 @@ public class EmployerVacanciesController(
             vacancy.Applications.Count(a => a.Status == ApplicationStatus.Canceled));
 
         var locationCity = vacancy.City ?? vacancy.Location?.City;
+        var locationLatitude = vacancy.Location is not null ? (decimal?)vacancy.Location.GeoPoint.Y : locationCity?.Latitude;
+        var locationLongitude = vacancy.Location is not null ? (decimal?)vacancy.Location.GeoPoint.X : locationCity?.Longitude;
         var location = locationCity is null
             ? null
             : new LocationDto(
                 locationCity.Id,
                 locationCity.CityName,
-                locationCity.Latitude,
-                locationCity.Longitude,
+                locationLatitude,
+                locationLongitude,
                 vacancy.Location?.StreetName,
                 vacancy.Location?.HouseNumber);
 
