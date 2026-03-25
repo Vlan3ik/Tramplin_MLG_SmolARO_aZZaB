@@ -320,33 +320,62 @@
 
 .seeker-profile-hero-exact__actions {
   position: absolute;
-  right: 50px;
-  top: 352px;
-  display: grid;
+  right: 32px;
+  bottom: 26px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 0.45rem;
-  width: min(240px, calc(100vw - 100px));
+  width: min(520px, calc(100vw - 64px));
   z-index: 1;
 }
 
 .seeker-profile-hero-exact__action {
-  justify-content: center;
-  width: 100%;
-}
-
-.seeker-profile-hero-exact__subscribe {
-  position: absolute;
-  right: 50px;
-  top: 418px;
   min-height: 39px;
-  padding: 10px;
-  border: 0;
   border-radius: 10px;
-  background: linear-gradient(45deg, var(--primary, #0171e1) 0%, var(--second, #87c3ff) 100%);
-  color: #f6fafd;
-  font-size: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 17px;
   font-family: Montserrat, Inter, sans-serif;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  width: auto;
+  min-width: 164px;
+  padding: 0 0.9rem;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.28);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.75;
+    cursor: wait;
+  }
+}
+
+.seeker-profile-hero-exact__action--edit {
+  border-color: rgba(135, 195, 255, 0.85);
+  background: rgba(1, 113, 225, 0.28);
+}
+
+.seeker-profile-hero-exact__action--print {
+  border-color: rgba(255, 255, 255, 0.62);
+}
+
+.seeker-profile-hero-exact__subscribe {
+  border: 0;
+  background: linear-gradient(45deg, var(--primary, #0171e1) 0%, var(--second, #87c3ff) 100%);
+  color: #f6fafd;
+  font-size: 18px;
 }
 
 .seeker-profile-toolbar {
@@ -437,6 +466,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.seeker-profile-mode-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
   flex-wrap: wrap;
 }
 
@@ -2257,8 +2293,8 @@
 
   .seeker-profile-hero-exact__actions {
     right: 20px;
-    top: 286px;
-    width: min(220px, calc(100vw - 40px));
+    bottom: 18px;
+    width: min(460px, calc(100vw - 40px));
   }
 
   .seeker-profile-hero {
@@ -2411,8 +2447,15 @@
 
   .seeker-profile-hero-exact__actions {
     right: 10px;
-    top: 308px;
-    width: min(200px, calc(100vw - 20px));
+    bottom: 10px;
+    width: min(360px, calc(100vw - 20px));
+    justify-content: flex-end;
+  }
+
+  .seeker-profile-hero-exact__action {
+    min-width: 140px;
+    font-size: 14px;
+    padding: 0 0.65rem;
   }
 
   .seeker-profile-state {

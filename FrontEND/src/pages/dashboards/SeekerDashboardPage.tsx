@@ -2525,7 +2525,31 @@ export function SeekerDashboardPage() {
               <div className="seeker-profile-hero-exact__avatar">{avatarUrl ? <img src={avatarUrl} alt={displayName} /> : <span>{avatarFallback}</span>}</div>
               <h1 className="seeker-profile-hero-exact__name">{displayName}</h1>
 
-              {isForeignProfile && !isPublicReadOnlyMode ? <button type="button" className="seeker-profile-hero-exact__subscribe">Подписаться</button> : null}
+              {!isPublicReadOnlyMode ? (
+                <div className="seeker-profile-hero-exact__actions">
+                  {!isForeignProfile ? (
+                    <>
+                      <button
+                        type="button"
+                        className="seeker-profile-hero-exact__action seeker-profile-hero-exact__action--edit"
+                        onClick={() => setIsSettingsOpen(true)}
+                        disabled={loadingProfile || !profile}
+                      >
+                        Редактировать профиль
+                      </button>
+                      <Link
+                        className="seeker-profile-hero-exact__action seeker-profile-hero-exact__action--print"
+                        to="/dashboard/seeker/resume/print"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Печать / PDF
+                      </Link>
+                    </>
+                  ) : null}
+                  {isForeignProfile ? <button type="button" className="seeker-profile-hero-exact__action seeker-profile-hero-exact__subscribe">Подписаться</button> : null}
+                </div>
+              ) : null}
             </header>
           ) : null}
 
@@ -2556,9 +2580,13 @@ export function SeekerDashboardPage() {
                   ))}
                 </nav>
                 {!isPublicReadOnlyMode ? (
-                  <button type="button" className="btn btn--primary" onClick={() => setIsProjectModalOpen(true)}>
-                    Добавить проект
-                  </button>
+                  <div className="seeker-profile-mode-actions">
+                    {profilePanel === 'portfolio' ? (
+                      <button type="button" className="btn btn--primary" onClick={() => setIsProjectModalOpen(true)}>
+                        Добавить проект
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
 
@@ -2785,11 +2813,6 @@ export function SeekerDashboardPage() {
                 <section className="card seeker-profile-panel seeker-profile-panel--profile" style={profileInfoPanelStyle}>
                   <div className="seeker-profile-panel__head seeker-profile-panel__head--compact">
                     <h2>Профиль</h2>
-                    {!isPublicReadOnlyMode && !isForeignProfile ? (
-                      <button type="button" className="btn btn--ghost" onClick={() => setIsSettingsOpen(true)} disabled={loadingProfile || !profile}>
-                        Редактировать профиль
-                      </button>
-                    ) : null}
                   </div>
                   <div className="seeker-profile-info-grid">
                     <article className="seeker-profile-info-card">
@@ -2852,9 +2875,6 @@ export function SeekerDashboardPage() {
                       <div className="resume-view-actions">
                         <Link className="btn btn--ghost" to="/dashboard/seeker/resume/edit">
                           Редактировать резюме
-                        </Link>
-                        <Link className="btn btn--primary" to="/dashboard/seeker/resume/print" target="_blank" rel="noreferrer">
-                          Печать / PDF
                         </Link>
                       </div>
                     ) : null}

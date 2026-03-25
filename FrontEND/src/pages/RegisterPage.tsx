@@ -1,4 +1,4 @@
-import { Building2, BriefcaseBusiness, Eye, EyeOff, UserCircle2 } from 'lucide-react'
+import { Building2, Eye, EyeOff, UserCircle2 } from 'lucide-react'
 import { type ChangeEvent, type FormEvent, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { registerUser } from '../api/auth'
@@ -23,8 +23,6 @@ const roleOptions = [
     role: PlatformRole.Seeker,
     title: 'Соискатель',
     subtitle: 'Поиск возможностей, отклики, портфолио и карьерный трек.',
-    accent: 'При регистрации будет отправлен role: 1.',
-    hint: 'После регистрации откроется кабинет соискателя.',
     emailPlaceholder: 'name@mail.com',
     icon: UserCircle2,
   },
@@ -32,8 +30,6 @@ const roleOptions = [
     role: PlatformRole.Employer,
     title: 'Работодатель',
     subtitle: 'Размещение вакансий, стажировок и управление откликами.',
-    accent: 'При регистрации будет отправлен role: 2.',
-    hint: 'После регистрации откроется страница верификации работодателя.',
     emailPlaceholder: 'hr@company.com',
     icon: Building2,
   },
@@ -48,10 +44,7 @@ export function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
 
-  const activeRole = useMemo(
-    () => roleOptions.find((option) => option.role === selectedRole) ?? roleOptions[0],
-    [selectedRole],
-  )
+  const activeRole = useMemo(() => roleOptions.find((option) => option.role === selectedRole) ?? roleOptions[0], [selectedRole])
 
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const field = event.target.name as keyof RegisterFormState
@@ -102,16 +95,15 @@ export function RegisterPage() {
   }
 
   return (
-    <section className="auth-screen container auth-screen--split">
-      <div className="auth-form card">
-        <div className="brand">
-          <span className="brand__dot" />
-          Трамплин
-        </div>
-        <h1>Регистрация</h1>
-        <p>Создайте аккаунт и начните строить карьерный маршрут в IT.</p>
+    <section className="auth-layout auth-layout--register">
+      <img className="auth-layout__art auth-layout__art--left" src="/regauthphoto.svg" alt="" aria-hidden="true" />
+      <img className="auth-layout__art auth-layout__art--right" src="/regauthphoto2.svg" alt="" aria-hidden="true" />
 
-        <div className="role-cards" aria-label="Выбор роли пользователя">
+      <div className="auth-panel">
+        <h1 className="auth-panel__title">Регистрация</h1>
+        <p className="auth-panel__subtitle">Создайте аккаунт и начните строить карьерный маршрут в IT</p>
+
+        <div className="auth-role-grid" aria-label="Выбор роли пользователя">
           {roleOptions.map((option) => {
             const Icon = option.icon
             const isActive = option.role === selectedRole
@@ -120,32 +112,23 @@ export function RegisterPage() {
               <button
                 key={option.role}
                 type="button"
-                className={`role-card ${isActive ? 'role-card--active' : ''}`}
+                className={`auth-role-card ${isActive ? 'auth-role-card--active' : ''}`}
                 onClick={() => setSelectedRole(option.role)}
                 aria-pressed={isActive}
               >
-                <Icon size={20} />
-                <strong>{option.title}</strong>
+                <div className="auth-role-card__head">
+                  <Icon size={20} />
+                  <strong>{option.title}</strong>
+                </div>
                 <span>{option.subtitle}</span>
               </button>
             )
           })}
         </div>
 
-        <div key={selectedRole} className="role-preview">
-          <div className="role-preview__icon">
-            <BriefcaseBusiness size={18} />
-          </div>
-          <div className="role-preview__content">
-            <strong>{activeRole.accent}</strong>
-            <p>{activeRole.hint}</p>
-          </div>
-          <div className="role-preview__badge">role: {selectedRole}</div>
-        </div>
-
-        <form className="form-grid" onSubmit={handleSubmit}>
-          <label>
-            Email
+        <form className="auth-form-grid" onSubmit={handleSubmit}>
+          <label className="auth-field">
+            <span>Email</span>
             <input
               name="email"
               type="email"
@@ -155,8 +138,9 @@ export function RegisterPage() {
               autoComplete="email"
             />
           </label>
-          <label>
-            Отображаемое имя
+
+          <label className="auth-field">
+            <span>Отображаемое имя</span>
             <input
               name="fullName"
               type="text"
@@ -166,9 +150,10 @@ export function RegisterPage() {
               autoComplete="name"
             />
           </label>
-          <label>
-            Пароль
-            <div className="password-field">
+
+          <label className="auth-field">
+            <span>Пароль</span>
+            <div className="auth-password">
               <input
                 name="password"
                 type={isPasswordVisible ? 'text' : 'password'}
@@ -179,7 +164,7 @@ export function RegisterPage() {
               />
               <button
                 type="button"
-                className="password-field__toggle"
+                className="auth-password__toggle"
                 onClick={() => setIsPasswordVisible((currentState) => !currentState)}
                 aria-label={isPasswordVisible ? 'Скрыть пароль' : 'Показать пароль'}
                 aria-pressed={isPasswordVisible}
@@ -191,26 +176,19 @@ export function RegisterPage() {
 
           {errorMessage ? <div className="auth-feedback auth-feedback--error">{errorMessage}</div> : null}
 
-          <button type="submit" className="btn btn--primary" disabled={isSubmitting}>
+          <button type="submit" className="auth-action auth-action--primary" disabled={isSubmitting}>
             {isSubmitting ? 'Создаём аккаунт...' : 'Создать аккаунт'}
           </button>
         </form>
 
-        <div className="auth-links">
+        <button type="button" className="auth-action auth-action--vk">
+          Войти через VK
+        </button>
+
+        <div className="auth-footer-links">
           <Link to="/login">Уже есть аккаунт? Войти</Link>
         </div>
       </div>
-
-      <aside className="auth-side card">
-        <h2>Почему Трамплин</h2>
-        <img src="/auth/reklama.png" alt="" />
-        <ul>
-          <li>Одна платформа для вакансий, стажировок, менторства и событий.</li>
-          <li>Проверенные компании и прозрачные статусы откликов.</li>
-          <li>Рекомендации на основе навыков, стека и карьерных целей.</li>
-          <li>Инструменты для роста портфолио и профессиональных контактов.</li>
-        </ul>
-      </aside>
     </section>
   )
 }
