@@ -21,6 +21,7 @@ const eventsQuery: {
     tagIds: [],
     salaryFrom: null,
     salaryTo: null,
+    statuses: [],
     verifiedOnly: false,
   },
 }

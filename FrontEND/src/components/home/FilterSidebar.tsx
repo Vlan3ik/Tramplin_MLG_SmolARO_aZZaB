@@ -4,6 +4,7 @@ type FilterSidebarProps = {
   filters: OpportunityFilters
   onTypesChange: (types: OpportunityType[]) => void
   onFormatsChange: (formats: string[]) => void
+  onStatusesChange: (statuses: number[]) => void
   onVerifiedOnlyChange: (verifiedOnly: boolean) => void
   onReset: () => void
 }
@@ -21,6 +22,12 @@ const formatOptions = [
   { value: 'onsite', label: 'Офис' },
 ]
 
+const statusGroups = [
+  { key: 'planned', label: 'Запланированные', values: [1, 2] },
+  { key: 'active', label: 'Активные', values: [3] },
+  { key: 'closed', label: 'Закрытые', values: [4, 5, 6, 7] },
+]
+
 function toggleItem<T>(items: T[], value: T) {
   return items.includes(value) ? items.filter((item) => item !== value) : [...items, value]
 }
@@ -29,9 +36,20 @@ export function FilterSidebar({
   filters,
   onTypesChange,
   onFormatsChange,
+  onStatusesChange,
   onVerifiedOnlyChange,
   onReset,
 }: FilterSidebarProps) {
+  function toggleStatusGroup(values: number[]) {
+    const hasAll = values.every((value) => filters.statuses.includes(value))
+    if (hasAll) {
+      onStatusesChange(filters.statuses.filter((value) => !values.includes(value)))
+      return
+    }
+
+    onStatusesChange(Array.from(new Set([...filters.statuses, ...values])))
+  }
+
   return (
     <aside className="filter-sidebar card">
       <div className="filter-sidebar__head">
@@ -70,6 +88,21 @@ export function FilterSidebar({
               <span>{option.label}</span>
             </label>
           ))}
+        </div>
+      </section>
+
+      <section className="filter-group">
+        <h4>Статус</h4>
+        <div className="filter-group__options">
+          {statusGroups.map((group) => {
+            const checked = group.values.every((value) => filters.statuses.includes(value))
+            return (
+              <label key={group.key}>
+                <input type="checkbox" checked={checked} onChange={() => toggleStatusGroup(group.values)} />
+                <span>{group.label}</span>
+              </label>
+            )
+          })}
         </div>
       </section>
 

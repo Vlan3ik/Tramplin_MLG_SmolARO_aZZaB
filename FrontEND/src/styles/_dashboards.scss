@@ -141,6 +141,11 @@
   .moderation-grid {
     grid-template-columns: 1fr;
   }
+
+  .seeker-list-filters,
+  .seeker-list-filters--triple {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -152,6 +157,7 @@
     flex-direction: column;
     align-items: flex-start;
   }
+
 }
 
 .seeker-profile-page {
@@ -1295,6 +1301,43 @@
   gap: 0.7rem;
 }
 
+.employer-opportunity-filters {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.8rem;
+
+  label {
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.86rem;
+    color: var(--text-secondary);
+  }
+
+  input {
+    min-height: 38px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    padding: 0 0.7rem;
+  }
+}
+
+.employer-opportunity-filters__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+
+  .btn {
+    min-height: 34px;
+    padding: 0 0.7rem;
+  }
+
+  .btn.is-active {
+    background: linear-gradient(45deg, var(--primary, #0171e1) 0%, var(--second, #87c3ff) 100%);
+    color: #fff;
+    border-color: transparent;
+  }
+}
+
 .favorite-card {
   border: 1px solid rgba(127, 154, 198, 0.24);
   border-radius: 14px;
@@ -1347,6 +1390,23 @@
   .btn {
     min-height: 38px;
   }
+}
+
+.seeker-list-filters {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 0.65rem;
+
+  label {
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+  }
+}
+
+.seeker-list-filters--triple {
+  grid-template-columns: 1fr 220px 220px;
 }
 
 .subscriptions-block {

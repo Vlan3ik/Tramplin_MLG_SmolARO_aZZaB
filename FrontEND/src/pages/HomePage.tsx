@@ -26,6 +26,7 @@ const defaultFilters: OpportunityFilters = {
   tagIds: [],
   salaryFrom: null,
   salaryTo: null,
+  statuses: [],
   verifiedOnly: false,
 }
 
@@ -181,6 +182,12 @@ export function HomePage() {
   }
 
   async function handleApply(opportunity: Opportunity) {
+    if (opportunity.status >= 4) {
+      setActionError(true)
+      setActionMessage('Отклик недоступен: карточка закрыта.')
+      return
+    }
+
     if (!session?.accessToken || !session.user?.id) {
       setActionError(true)
       setActionMessage('Для отклика нужно войти как соискатель.')

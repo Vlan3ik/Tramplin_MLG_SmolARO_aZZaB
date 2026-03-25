@@ -7,6 +7,7 @@ export type Opportunity = {
   entityType?: 'vacancy' | 'opportunity'
   title: string
   type: OpportunityType
+  status: number
   compensation: string
   company: string
   location: string
@@ -38,7 +39,18 @@ export type OpportunityFilters = {
   tagIds: number[]
   salaryFrom: number | null
   salaryTo: number | null
+  statuses: number[]
   verifiedOnly: boolean
+}
+
+export const opportunityStatusLabel: Record<number, string> = {
+  1: 'Запланировано',
+  2: 'На модерации',
+  3: 'Активно',
+  4: 'Закрыто',
+  5: 'Отменено',
+  6: 'Отклонено',
+  7: 'В архиве',
 }
 
 export const typeLabel: Record<OpportunityType, string> = {

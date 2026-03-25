@@ -8,6 +8,7 @@ type WorkFormatApi = string | number | null | undefined
 type VacancyListItemApi = {
   id: number
   title: string | null
+  status?: number | null
   kind?: KindApi
   type?: KindApi
   format?: WorkFormatApi
@@ -24,6 +25,7 @@ type VacancyListItemApi = {
 type OpportunityListItemApi = {
   id: number
   title: string | null
+  status?: number | null
   kind?: KindApi
   format?: WorkFormatApi
   companyName?: string | null
@@ -40,6 +42,7 @@ type OpportunityListItemApi = {
 type VacancyDetailApi = {
   id: number
   title: string | null
+  status?: number | null
   shortDescription?: string | null
   fullDescription?: string | null
   kind?: KindApi
@@ -71,6 +74,7 @@ type VacancyDetailApi = {
 type OpportunityDetailApi = {
   id: number
   title: string | null
+  status?: number | null
   shortDescription?: string | null
   fullDescription?: string | null
   kind?: KindApi
@@ -108,6 +112,7 @@ type MapOpportunityFeatureApi = {
     id?: number
     entityType?: string | number | null
     title?: string | null
+    status?: number | null
     shortDescription?: string | null
     fullDescription?: string | null
     kind?: KindApi
@@ -157,6 +162,8 @@ export type MapSearchQuery = {
   filters: OpportunityFilters
   bounds?: MapViewportBounds | null
 }
+
+const defaultStatuses = [1, 2, 3, 4, 5, 6, 7]
 
 const formatByText: Record<string, string> = {
   onsite: 'onsite',
@@ -288,6 +295,7 @@ function toOpportunityFromVacancy(apiItem: VacancyListItemApi, coordinates: { la
     entityType: 'vacancy',
     title: apiItem.title ?? 'Без названия',
     type,
+    status: apiItem.status ?? 3,
     company: apiItem.companyName ?? 'Компания',
     location: apiItem.locationName ?? 'Локация не указана',
     compensation: formatSalary(apiItem.salaryFrom, apiItem.salaryTo, apiItem.currencyCode),
@@ -318,6 +326,7 @@ function toOpportunityFromOpportunity(
     entityType: 'opportunity',
     title: apiItem.title ?? 'Без названия',
     type: type === 'vacancy' ? 'event' : type,
+    status: apiItem.status ?? 3,
     company: apiItem.companyName ?? 'Компания',
     location: apiItem.locationName ?? 'Локация не указана',
     compensation: formatPrice(apiItem.priceType, apiItem.priceAmount, apiItem.priceCurrencyCode),
@@ -395,6 +404,11 @@ function buildVacanciesQueryString(query: HomeSearchQuery) {
     params.set('SalaryTo', String(query.filters.salaryTo))
   }
 
+  const statuses = query.filters.statuses.length ? query.filters.statuses : defaultStatuses
+  for (const status of statuses) {
+    params.append('Statuses', String(status))
+  }
+
   if (query.filters.verifiedOnly) {
     params.set('VerifiedOnly', 'true')
   }
@@ -434,6 +448,11 @@ function buildOpportunitiesQueryString(query: HomeSearchQuery) {
 
   for (const tagId of query.filters.tagIds) {
     params.append('TagIds', String(tagId))
+  }
+
+  const statuses = query.filters.statuses.length ? query.filters.statuses : defaultStatuses
+  for (const status of statuses) {
+    params.append('Statuses', String(status))
   }
 
   if (query.filters.verifiedOnly) {
@@ -496,6 +515,11 @@ function buildMapQueryString(query: HomeSearchQuery) {
 
   if (query.filters.salaryTo != null) {
     params.set('SalaryTo', String(query.filters.salaryTo))
+  }
+
+  const statuses = query.filters.statuses.length ? query.filters.statuses : defaultStatuses
+  for (const status of statuses) {
+    params.append('Statuses', String(status))
   }
 
   if (query.filters.verifiedOnly) {
@@ -563,6 +587,11 @@ function buildMapSearchQueryString(query: MapSearchQuery) {
     params.set('SalaryTo', String(query.filters.salaryTo))
   }
 
+  const statuses = query.filters.statuses.length ? query.filters.statuses : defaultStatuses
+  for (const status of statuses) {
+    params.append('Statuses', String(status))
+  }
+
   if (query.filters.verifiedOnly) {
     params.set('VerifiedOnly', 'true')
   }
@@ -593,6 +622,7 @@ function mapOpportunityFromFeature(feature: MapOpportunityFeatureApi): Opportuni
     id,
     title: props?.title ?? 'Без названия',
     type: entityType === 'opportunity' && type === 'vacancy' ? 'event' : type,
+    status: props?.status ?? 3,
     company: companyName,
     location: locationName,
     compensation,
@@ -747,6 +777,7 @@ function mapFromVacancyDetail(response: VacancyDetailApi): OpportunityDetail {
     id: response.id,
     title: response.title ?? 'Без названия',
     type,
+    status: response.status ?? 3,
     company: response.company?.name ?? 'Компания',
     location: response.location?.cityName ?? 'Локация не указана',
     compensation: formatSalary(response.salaryFrom, response.salaryTo, response.currencyCode),
@@ -777,6 +808,7 @@ function mapFromOpportunityDetail(response: OpportunityDetailApi): OpportunityDe
     id: response.id,
     title: response.title ?? 'Без названия',
     type,
+    status: response.status ?? 3,
     company: response.company?.name ?? 'Компания',
     location: response.location?.cityName ?? 'Локация не указана',
     compensation: formatPrice(response.priceType, response.priceAmount, response.priceCurrencyCode),
@@ -814,6 +846,7 @@ export async function fetchOpportunityById(id: number, signal?: AbortSignal): Pr
     id: detail.id,
     title: detail.title,
     type: detail.type,
+    status: detail.status,
     company: detail.company,
     location: detail.location,
     compensation: detail.compensation,
