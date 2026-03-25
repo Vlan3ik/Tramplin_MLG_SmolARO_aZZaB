@@ -34,7 +34,8 @@ img {
 }
 
 main {
-  min-height: calc(100vh - 200px);
+  flex: 0 0 auto;
+  min-height: 0;
 }
 
 h1,
