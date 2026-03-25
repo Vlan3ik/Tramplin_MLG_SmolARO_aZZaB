@@ -36,6 +36,9 @@ export type OpportunityDetail = Opportunity & {
 export type OpportunityFilters = {
   types: OpportunityType[]
   formats: string[]
+  tagIds: number[]
+  salaryFrom: number | null
+  salaryTo: number | null
   statuses: number[]
   verifiedOnly: boolean
 }

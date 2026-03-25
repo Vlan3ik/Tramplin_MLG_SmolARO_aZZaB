@@ -1,16 +1,29 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import type { Opportunity } from '../../types/opportunity'
+import { isFavoriteOpportunity, subscribeToFavoriteOpportunities } from '../../utils/favorites'
+import {
+  isMapItemViewed,
+  markMapItemViewed,
+  subscribeToViewedMapItems,
+  type ViewedMapEntityType,
+} from '../../utils/viewedMapItems'
 import { cartoStyle } from './mapStyle'
 
-type MarkerKind = 'single' | 'verified' | 'cluster'
+type MarkerKind = 'single' | 'cluster'
+type MarkerTone = 'vacancy-like' | 'event'
 
 type OpportunityMarker = {
   id: string
   lngLat: [number, number]
   kind: MarkerKind
+  tone: MarkerTone
+  isViewed: boolean
+  isFavorite: boolean
+  entityType: ViewedMapEntityType | null
+  opportunityId: number | null
   count: number
   opportunities: Opportunity[]
 }
@@ -25,112 +38,25 @@ type MapBoardProps = {
   jumpToRequest: { token: number; lngLat: [number, number] } | null
 }
 
-function createOpportunityTags(tags: string[]) {
-  const tagRow = document.createElement('div')
-  tagRow.className = 'map-popup__tags'
-
-  tags.slice(0, 3).forEach((tagName) => {
-    const tag = document.createElement('span')
-    tag.className = 'map-popup__tag'
-    tag.textContent = tagName
-    tagRow.append(tag)
-  })
-
-  return tagRow
-}
-
-function createPopupContent(
-  marker: OpportunityMarker,
-  onOpenCluster: (clusterMarker: OpportunityMarker) => void,
-) {
-  const wrapper = document.createElement('div')
-  wrapper.className = `map-popup ${marker.kind === 'cluster' ? 'map-popup--cluster' : 'map-popup--single'}`
-
-  if (marker.kind === 'cluster') {
-    const title = document.createElement('strong')
-    title.className = 'map-popup__title'
-    title.textContent = `${marker.count} вакансий в этой точке`
-
-    const hint = document.createElement('span')
-    hint.className = 'map-popup__hint'
-    hint.textContent = 'Откройте полный список в левой панели.'
-
-    const preview = document.createElement('div')
-    preview.className = 'map-popup__preview'
-
-    marker.opportunities.slice(0, 2).forEach((opportunity) => {
-      const previewRow = document.createElement('span')
-      previewRow.textContent = `${opportunity.title} • ${opportunity.company}`
-      preview.append(previewRow)
-    })
-
-    const openButton = document.createElement('button')
-    openButton.type = 'button'
-    openButton.className = 'map-popup__action'
-    openButton.textContent = 'Показать все вакансии в точке'
-    openButton.addEventListener('click', () => onOpenCluster(marker))
-
-    wrapper.append(title, hint, preview, openButton)
-    return wrapper
+function resolveEntityType(item: Opportunity): ViewedMapEntityType {
+  if (item.entityType) {
+    return item.entityType
   }
 
-  const opportunity = marker.opportunities[0]
-
-  const top = document.createElement('div')
-  top.className = 'map-popup__top'
-
-  const badge = document.createElement('span')
-  badge.className = `badge badge--${opportunity.type}`
-  badge.textContent =
-    opportunity.type === 'event'
-      ? 'Событие'
-      : opportunity.type === 'internship'
-        ? 'Стажировка'
-        : opportunity.type === 'mentorship'
-          ? 'Менторство'
-          : 'Вакансия'
-
-  const compensation = document.createElement('span')
-  compensation.className = 'map-popup__salary'
-  compensation.textContent = opportunity.compensation
-
-  top.append(badge, compensation)
-
-  const title = document.createElement('strong')
-  title.className = 'map-popup__title'
-  title.textContent = opportunity.title
-
-  const meta = document.createElement('div')
-  meta.className = 'map-popup__meta'
-
-  const company = document.createElement('span')
-  company.textContent = opportunity.company
-
-  const location = document.createElement('span')
-  location.textContent = opportunity.location
-
-  const format = document.createElement('span')
-  format.textContent = opportunity.workFormat
-
-  meta.append(company, location, format)
-
-  const detailsLink = document.createElement('a')
-  detailsLink.href = `/opportunity/${opportunity.id}`
-  detailsLink.className = 'map-popup__action'
-  detailsLink.textContent = 'Открыть карточку'
-
-  wrapper.append(top, title, meta, createOpportunityTags(opportunity.tags), detailsLink)
-  return wrapper
+  return item.type === 'vacancy' || item.type === 'internship' ? 'vacancy' : 'opportunity'
 }
 
 export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetry, onBoundsChange, jumpToRequest }: MapBoardProps) {
+  const navigate = useNavigate()
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const mapMarkersRef = useRef<maplibregl.Marker[]>([])
   const hasAutoFittedRef = useRef(false)
   const boundsDebounceRef = useRef<number | null>(null)
+  const ignoreNextMoveEndRef = useRef(false)
   const lastJumpTokenRef = useRef<number | null>(null)
-  const [activeCluster, setActiveCluster] = useState<OpportunityMarker | null>(null)
+  const [markersVersion, setMarkersVersion] = useState(0)
+  const [activePoint, setActivePoint] = useState<OpportunityMarker | null>(null)
 
   const markerData = useMemo<OpportunityMarker[]>(() => {
     const groups = new Map<
@@ -160,27 +86,56 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
       })
 
     return Array.from(groups.entries()).map(([key, group]) => {
+      const hasOnlyEvents = group.opportunities.every((item) => item.type === 'event')
+      const tone: MarkerTone = hasOnlyEvents ? 'event' : 'vacancy-like'
+      const isGroupViewed = group.opportunities.some((item) => isMapItemViewed(resolveEntityType(item), item.id))
+
       if (group.opportunities.length > 1) {
         return {
           id: key,
           lngLat: group.lngLat,
           kind: 'cluster' as const,
+          tone,
+          isViewed: isGroupViewed,
+          isFavorite: false,
+          entityType: null,
+          opportunityId: null,
           count: group.opportunities.length,
           opportunities: group.opportunities,
         }
       }
 
       const [singleItem] = group.opportunities
+      const entityType = resolveEntityType(singleItem)
 
       return {
         id: `single-${singleItem.id}`,
         lngLat: group.lngLat,
-        kind: singleItem.verified ? 'verified' : 'single',
+        kind: 'single' as const,
+        tone,
+        isViewed: isMapItemViewed(entityType, singleItem.id),
+        isFavorite: isFavoriteOpportunity(singleItem.id),
+        entityType,
+        opportunityId: singleItem.id,
         count: 1,
         opportunities: group.opportunities,
       }
     })
-  }, [opportunities])
+  }, [markersVersion, opportunities])
+
+  useEffect(() => {
+    const unsubscribeFavorites = subscribeToFavoriteOpportunities(() => {
+      setMarkersVersion((current) => current + 1)
+    })
+    const unsubscribeViewed = subscribeToViewedMapItems(() => {
+      setMarkersVersion((current) => current + 1)
+    })
+
+    return () => {
+      unsubscribeFavorites()
+      unsubscribeViewed()
+    }
+  }, [])
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) {
@@ -213,6 +168,12 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
     }
 
     const handleMoveEnd = () => {
+      if (ignoreNextMoveEndRef.current) {
+        ignoreNextMoveEndRef.current = false
+      } else {
+        setActivePoint(null)
+      }
+
       if (boundsDebounceRef.current != null) {
         window.clearTimeout(boundsDebounceRef.current)
       }
@@ -258,22 +219,20 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
       .map((marker) => {
         const markerElement = document.createElement('button')
         markerElement.type = 'button'
-        markerElement.className = `map-marker map-marker--${marker.kind}`
+        markerElement.className = `map-marker map-marker--${marker.kind} map-marker--tone-${marker.tone} ${marker.isViewed ? 'map-marker--viewed' : ''}`
         markerElement.dataset.kind = marker.kind
         markerElement.ariaLabel = 'Метка возможности на карте'
 
-        const glow = document.createElement('span')
-        glow.className = 'map-marker__glow'
+        const circle = document.createElement('span')
+        circle.className = 'map-marker__circle'
+        markerElement.append(circle)
 
-        const pin = document.createElement('span')
-        pin.className = 'map-marker__pin'
-
-        const glyph = document.createElement('span')
-        glyph.className = 'map-marker__glyph'
-        glyph.textContent = marker.kind === 'verified' ? '✓' : '✦'
-
-        pin.append(glyph)
-        markerElement.append(glow, pin)
+        if (marker.kind === 'single' && marker.isFavorite) {
+          const favoriteBadge = document.createElement('span')
+          favoriteBadge.className = 'map-marker__favorite'
+          favoriteBadge.textContent = '★'
+          markerElement.append(favoriteBadge)
+        }
 
         if (marker.kind === 'cluster') {
           const badge = document.createElement('span')
@@ -283,6 +242,14 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
         }
 
         markerElement.addEventListener('click', () => {
+          setActivePoint(marker)
+
+          marker.opportunities.forEach((item) => {
+            markMapItemViewed(resolveEntityType(item), item.id)
+          })
+          markerElement.classList.add('map-marker--viewed')
+
+          ignoreNextMoveEndRef.current = true
           map.flyTo({
             center: marker.lngLat,
             zoom: marker.kind === 'cluster' ? Math.min(map.getZoom() + 2, 11) : 10.8,
@@ -292,37 +259,11 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
           })
         })
 
-        const popup = new maplibregl.Popup({
-          offset: 24,
-          closeButton: false,
-          maxWidth: '320px',
-        }).setDOMContent(
-          createPopupContent(marker, (clusterMarker) => {
-            setActiveCluster(clusterMarker)
-            popup.remove()
-
-            map.flyTo({
-              center: clusterMarker.lngLat,
-              zoom: Math.min(map.getZoom() + 1, 11),
-              speed: 0.8,
-              curve: 1.2,
-              essential: true,
-            })
-
-            setTimeout(() => {
-              const section = document.getElementById('map-point-results')
-              section?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            }, 50)
-          }),
-        )
-
         return new maplibregl.Marker({
           element: markerElement,
           anchor: 'center',
-          offset: [0, -33],
         })
           .setLngLat(marker.lngLat)
-          .setPopup(popup)
           .addTo(map)
       })
       .filter((marker): marker is maplibregl.Marker => marker !== null)
@@ -367,21 +308,13 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
     })
   }, [jumpToRequest])
 
-  const displayedItems = activeCluster ? activeCluster.opportunities : opportunities.slice(0, 6)
+  const displayedItems = activePoint ? activePoint.opportunities : opportunities
 
   return (
     <section className="map-mode">
       <div className="map-results card">
-        <h3>
-          {activeCluster
-            ? `Вакансии в точке: ${activeCluster.opportunities[0]?.location ?? 'локация'}`
-            : `Найдено ${total} возможностей`}
-        </h3>
-        <p>
-          {activeCluster
-            ? `Показаны ${activeCluster.count} вакансий в одной точке на карте.`
-            : 'Показываем актуальные данные из бэкенда. Нажмите на маркер, чтобы открыть карточку.'}
-        </p>
+        <h3>{activePoint ? `Возможности в точке: ${activePoint.opportunities[0]?.location ?? 'локация'}` : `Найдено ${total} возможностей`}</h3>
+        {activePoint ? <p>{`Показаны ${activePoint.count} возможностей в выбранной точке.`}</p> : null}
 
         {isLoading ? <div className="state-card">Загружаем карту и подборку...</div> : null}
         {!isLoading && errorMessage ? (
@@ -392,23 +325,34 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
             </button>
           </div>
         ) : null}
-        {!isLoading && !errorMessage && opportunities.length === 0 ? (
-          <div className="state-card">По вашему запросу ничего не найдено.</div>
-        ) : null}
+        {!isLoading && !errorMessage && opportunities.length === 0 ? <div className="state-card">По вашему запросу ничего не найдено.</div> : null}
 
         {!isLoading && !errorMessage && opportunities.length > 0 ? (
           <div className="map-results__list" id="map-point-results">
-            {activeCluster ? (
-              <button type="button" className="btn btn--ghost" onClick={() => setActiveCluster(null)}>
+            {activePoint ? (
+              <button type="button" className="btn btn--ghost" onClick={() => setActivePoint(null)}>
                 Показать общий список
               </button>
             ) : null}
             {displayedItems.map((item) => (
-              <article key={item.id} className="map-mini-card">
-                <h4>{item.title}</h4>
-                <div>{item.company}</div>
-                <div>{item.compensation}</div>
-                <div>{item.location}</div>
+              <article
+                key={item.id}
+                className="map-mini-card"
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/opportunity/${item.id}`)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    navigate(`/opportunity/${item.id}`)
+                  }
+                }}
+              >
+                <div className="map-mini-card__head">
+                  <h4>{item.title}</h4>
+                  <span className="map-mini-card__company">{item.company}</span>
+                </div>
+                <div className="map-mini-card__salary">{item.compensation}</div>
                 <div className="tag-row">
                   {item.tags.slice(0, 3).map((tag) => (
                     <span key={tag} className="tag">
@@ -416,9 +360,6 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
                     </span>
                   ))}
                 </div>
-                <Link to={`/opportunity/${item.id}`} className="btn btn--ghost">
-                  Открыть
-                </Link>
               </article>
             ))}
           </div>

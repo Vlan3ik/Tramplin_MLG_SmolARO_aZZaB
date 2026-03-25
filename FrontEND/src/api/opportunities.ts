@@ -392,6 +392,18 @@ function buildVacanciesQueryString(query: HomeSearchQuery) {
     if (format === 'remote') params.append('Formats', '3')
   }
 
+  for (const tagId of query.filters.tagIds) {
+    params.append('TagIds', String(tagId))
+  }
+
+  if (query.filters.salaryFrom != null) {
+    params.set('SalaryFrom', String(query.filters.salaryFrom))
+  }
+
+  if (query.filters.salaryTo != null) {
+    params.set('SalaryTo', String(query.filters.salaryTo))
+  }
+
   const statuses = query.filters.statuses.length ? query.filters.statuses : defaultStatuses
   for (const status of statuses) {
     params.append('Statuses', String(status))
@@ -432,6 +444,10 @@ function buildOpportunitiesQueryString(query: HomeSearchQuery) {
     if (format === 'onsite') params.append('Formats', '1')
     if (format === 'hybrid') params.append('Formats', '2')
     if (format === 'remote') params.append('Formats', '3')
+  }
+
+  for (const tagId of query.filters.tagIds) {
+    params.append('TagIds', String(tagId))
   }
 
   const statuses = query.filters.statuses.length ? query.filters.statuses : defaultStatuses
@@ -487,6 +503,18 @@ function buildMapQueryString(query: HomeSearchQuery) {
     if (format === 'onsite') params.append('Formats', '1')
     if (format === 'hybrid') params.append('Formats', '2')
     if (format === 'remote') params.append('Formats', '3')
+  }
+
+  for (const tagId of query.filters.tagIds) {
+    params.append('TagIds', String(tagId))
+  }
+
+  if (query.filters.salaryFrom != null) {
+    params.set('SalaryFrom', String(query.filters.salaryFrom))
+  }
+
+  if (query.filters.salaryTo != null) {
+    params.set('SalaryTo', String(query.filters.salaryTo))
   }
 
   const statuses = query.filters.statuses.length ? query.filters.statuses : defaultStatuses
@@ -545,6 +573,18 @@ function buildMapSearchQueryString(query: MapSearchQuery) {
     if (format === 'onsite') params.append('Formats', '1')
     if (format === 'hybrid') params.append('Formats', '2')
     if (format === 'remote') params.append('Formats', '3')
+  }
+
+  for (const tagId of query.filters.tagIds) {
+    params.append('TagIds', String(tagId))
+  }
+
+  if (query.filters.salaryFrom != null) {
+    params.set('SalaryFrom', String(query.filters.salaryFrom))
+  }
+
+  if (query.filters.salaryTo != null) {
+    params.set('SalaryTo', String(query.filters.salaryTo))
   }
 
   const statuses = query.filters.statuses.length ? query.filters.statuses : defaultStatuses

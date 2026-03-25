@@ -18,6 +18,9 @@ const eventsQuery: {
   filters: {
     types: ['event'],
     formats: [],
+    tagIds: [],
+    salaryFrom: null,
+    salaryTo: null,
     statuses: [],
     verifiedOnly: false,
   },
