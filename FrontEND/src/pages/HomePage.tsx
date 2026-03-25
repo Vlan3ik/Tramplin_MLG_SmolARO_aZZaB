@@ -18,6 +18,7 @@ import type { Opportunity, OpportunityFilters } from '../types/opportunity'
 import type { SearchSuggestItem } from '../types/search'
 import { CommunityTabsSection } from '../components/layout/community-tabs/CommunityTabsSection'
 import { EventsCarouselSection } from '../components/layout/events-carousel/EventsCarouselSection'
+import { useSearchParams } from 'react-router-dom'
 
 const defaultFilters: OpportunityFilters = {
   types: [],
@@ -32,6 +33,7 @@ const defaultFilters: OpportunityFilters = {
 export function HomePage() {
   const { session } = useAuth()
   const { hasApplied } = useApplications()
+  const [searchParams] = useSearchParams()
 
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map')
   const [searchInput, setSearchInput] = useState('')
@@ -132,6 +134,23 @@ export function HomePage() {
     void loadListOpportunities(abortController.signal)
     return () => abortController.abort()
   }, [loadListOpportunities])
+
+  useEffect(() => {
+    const requestedView = searchParams.get('view')
+    if (requestedView === 'map') {
+      setViewMode('map')
+    }
+
+    const lat = Number(searchParams.get('lat'))
+    const lng = Number(searchParams.get('lng'))
+
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      setMapJumpRequest({
+        token: Date.now(),
+        lngLat: [lng, lat],
+      })
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (viewMode !== 'map' || !mapBounds) {

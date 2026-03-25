@@ -1,4 +1,4 @@
-import { Bookmark, CheckCircle2, MapPinned, MapPin, Send } from 'lucide-react'
+﻿import { Bookmark, Building2, CheckCircle2, Clock3, MapPin, Send } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -14,12 +14,11 @@ type OpportunityCardProps = {
   onApply?: (opportunity: Opportunity) => void
 }
 
-function buildMapLink(opportunity: Opportunity) {
-  if (typeof opportunity.latitude === 'number' && typeof opportunity.longitude === 'number') {
-    return `https://yandex.ru/maps/?ll=${opportunity.longitude}%2C${opportunity.latitude}&z=14&pt=${opportunity.longitude},${opportunity.latitude},pm2blm`
-  }
-
-  return `https://yandex.ru/maps/?text=${encodeURIComponent(opportunity.location)}`
+function getApplyLabel(opportunity: Opportunity, isApplying: boolean, isApplied: boolean, isClosed: boolean) {
+  if (isApplying) return 'Отправляем...'
+  if (isApplied) return 'Отклик отправлен'
+  if (isClosed) return 'Закрыто'
+  return opportunity.type === 'event' ? 'Записаться' : 'Откликнуться'
 }
 
 export function OpportunityCard({ opportunity, compact = false, isApplying = false, isApplied = false, onApply }: OpportunityCardProps) {
@@ -43,32 +42,45 @@ export function OpportunityCard({ opportunity, compact = false, isApplying = fal
   return (
     <article className={clsx('opportunity-card card', compact && 'opportunity-card--compact')}>
       <div className="opportunity-card__top">
-        <span className={`badge badge--${opportunity.type}`}>{typeLabel[opportunity.type]}</span>
-        <span className="status-chip">{opportunityStatusLabel[opportunity.status] ?? `Статус ${opportunity.status}`}</span>
+        <div className="opportunity-card__badges">
+          <span className={`badge badge--${opportunity.type}`}>{typeLabel[opportunity.type]}</span>
+          <span className="status-chip">{opportunityStatusLabel[opportunity.status] ?? `Статус ${opportunity.status}`}</span>
+        </div>
         <span className="opportunity-card__compensation">{opportunity.compensation}</span>
       </div>
 
-      <h3>{opportunity.title}</h3>
+      <h3>
+        <Link to={`/opportunity/${opportunity.id}`} className="opportunity-card__title-link">
+          {opportunity.title}
+        </Link>
+      </h3>
 
-      <div className="opportunity-meta">
-        <span>{opportunity.company}</span>
-        <span>
+      <div className="opportunity-card__meta-grid">
+        <span className="opportunity-card__meta-item">
+          <Building2 size={14} />
+          {opportunity.company}
+        </span>
+        <span className="opportunity-card__meta-item">
           <MapPin size={14} />
           {opportunity.location}
         </span>
-        <span>{opportunity.workFormat}</span>
-        <span>{opportunity.date}</span>
+        <span className="opportunity-card__meta-item">
+          <Clock3 size={14} />
+          {opportunity.workFormat} • {opportunity.date}
+        </span>
       </div>
 
-      <p>{opportunity.description}</p>
+      <p className="opportunity-card__description">{opportunity.description}</p>
 
-      <div className="tag-row">
-        {opportunity.tags.slice(0, 5).map((tag) => (
-          <span key={tag} className="tag">
-            {tag}
-          </span>
-        ))}
-      </div>
+      {opportunity.tags.length ? (
+        <div className="tag-row">
+          {opportunity.tags.slice(0, 6).map((tag) => (
+            <span key={tag} className="tag">
+              {tag}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       <div className="opportunity-card__footer">
         <div className="company-status">
@@ -81,13 +93,9 @@ export function OpportunityCard({ opportunity, compact = false, isApplying = fal
           <Link className="btn btn--ghost" to={`/opportunity/${opportunity.id}`}>
             Подробнее
           </Link>
-          <a className="btn btn--ghost" href={buildMapLink(opportunity)} target="_blank" rel="noreferrer">
-            <MapPinned size={15} />
-            На карте
-          </a>
           <button className="btn btn--primary" type="button" disabled={isApplying || isApplied || isClosed} onClick={() => onApply?.(opportunity)}>
             <Send size={15} />
-            {isApplying ? 'Отправляем...' : isApplied ? 'Отклик отправлен' : isClosed ? 'Закрыто' : opportunity.type === 'event' ? 'Записаться' : 'Откликнуться'}
+            {getApplyLabel(opportunity, isApplying, isApplied, isClosed)}
           </button>
           <button className={clsx('btn btn--icon', isFavorite && 'btn--icon-active')} type="button" aria-label={favoriteLabel} onClick={handleFavoriteToggle}>
             <Bookmark size={16} fill={isFavorite ? 'currentColor' : 'none'} />
