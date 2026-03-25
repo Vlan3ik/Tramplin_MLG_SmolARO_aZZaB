@@ -21,6 +21,7 @@ import { createApplication } from '../../api/applications'
 import { fetchCities, fetchTags } from '../../api/catalog'
 import { createDirectChat } from '../../api/chats'
 import { fetchCompanies } from '../../api/companies'
+import { fetchEmployerCompany, fetchEmployerVacancies, type EmployerOpportunity } from '../../api/employer'
 import {
   fetchMe,
   fetchSeekerProfile,
@@ -53,6 +54,7 @@ import { TagPicker } from '../../components/forms/TagPicker'
 import { API_ORIGIN } from '../../config/api'
 import { useApplications } from '../../hooks/useApplications'
 import { useAuth } from '../../hooks/useAuth'
+import { PlatformRole } from '../../types/auth'
 import type { City, TagListItem } from '../../types/catalog'
 import type { Company } from '../../types/company'
 import type { CandidateGender, SeekerProfile, SeekerSettings } from '../../types/me'
@@ -92,6 +94,16 @@ const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'resume', label: 'Резюме' },
   { id: 'responses', label: 'Отклики' },
   { id: 'favorites', label: 'Избранное' },
+]
+
+const APPLICATION_STATUS_FILTER_OPTIONS: Array<{ value: number; label: string }> = [
+  { value: 1, label: 'Новый' },
+  { value: 2, label: 'На рассмотрении' },
+  { value: 3, label: 'Собеседование' },
+  { value: 4, label: 'Оффер' },
+  { value: 5, label: 'Нанят' },
+  { value: 6, label: 'Отклонен' },
+  { value: 7, label: 'Отменен' },
 ]
 
 const resumeSteps = ['Основная информация', 'Скиллы', 'Опыт работы', 'Портфолио', 'Образование', 'Ссылки на соцсети']
@@ -996,10 +1008,12 @@ export function SeekerDashboardPage() {
   const [favoriteOpportunities, setFavoriteOpportunities] = useState<Opportunity[]>([])
   const [favoriteIds, setFavoriteIds] = useState<number[]>(() => getFavoriteOpportunityIds())
   const [responsesSearch, setResponsesSearch] = useState('')
-  const [responsesToneFilter, setResponsesToneFilter] = useState<'all' | 'success' | 'warning' | 'danger'>('all')
+  const [responsesStatusFilter, setResponsesStatusFilter] = useState<'all' | number>('all')
+  const [responsesKindFilter, setResponsesKindFilter] = useState<'all' | 'vacancy' | 'event'>('all')
   const [favoritesSearch, setFavoritesSearch] = useState('')
-  const [favoritesTypeFilter, setFavoritesTypeFilter] = useState<'all' | Opportunity['type']>('all')
+  const [favoritesKindFilter, setFavoritesKindFilter] = useState<'all' | 'vacancy' | 'event'>('all')
   const [favoritesFormatFilter, setFavoritesFormatFilter] = useState<'all' | string>('all')
+  const [applicationKindsById, setApplicationKindsById] = useState<Record<number, 'vacancy' | 'event'>>({})
   const [applyingIds, setApplyingIds] = useState<Record<number, boolean>>({})
   const [followingUsers, setFollowingUsers] = useState<SubscriptionUser[]>([])
   const [followerUsers, setFollowerUsers] = useState<SubscriptionUser[]>([])
@@ -1009,6 +1023,12 @@ export function SeekerDashboardPage() {
   const [portfolioProjectCards, setPortfolioProjectCards] = useState<PublicPortfolioProjectCard[]>([])
   const [profilePanel, setProfilePanel] = useState<ProfilePanelId>('portfolio')
   const [followMode, setFollowMode] = useState<FollowMode>('subscriptions')
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const [employerVacancies, setEmployerVacancies] = useState<EmployerOpportunity[]>([])
+  const [loadingEmployerVacancies, setLoadingEmployerVacancies] = useState(false)
+  const [invitingToVacancy, setInvitingToVacancy] = useState(false)
+  const [selectedInviteVacancyId, setSelectedInviteVacancyId] = useState<number | null>(null)
+  const [employerCompanyId, setEmployerCompanyId] = useState<number | null>(null)
 
   const [profileForm, setProfileForm] = useState<ProfileFormState>({
     firstName: '',
@@ -1427,6 +1447,89 @@ export function SeekerDashboardPage() {
   }, [favoriteIds, isPublicReadOnlyMode])
 
   useEffect(() => {
+    if (isPublicReadOnlyMode || !applications.length) {
+      setApplicationKindsById({})
+      return
+    }
+
+    const controller = new AbortController()
+
+    async function loadApplicationKinds() {
+      const results = await Promise.allSettled(
+        applications.map(async (item) => {
+          const detail = await fetchOpportunityById(item.opportunityId, controller.signal)
+          return {
+            opportunityId: item.opportunityId,
+            kind: detail.type === 'event' ? 'event' : 'vacancy',
+          } as const
+        }),
+      )
+
+      if (controller.signal.aborted) {
+        return
+      }
+
+      const nextMap: Record<number, 'vacancy' | 'event'> = {}
+      for (const result of results) {
+        if (result.status !== 'fulfilled') {
+          continue
+        }
+        nextMap[result.value.opportunityId] = result.value.kind
+      }
+
+      setApplicationKindsById(nextMap)
+    }
+
+    void loadApplicationKinds()
+
+    return () => controller.abort()
+  }, [applications, isPublicReadOnlyMode])
+
+  useEffect(() => {
+    if (!isInviteModalOpen || session?.platformRole !== PlatformRole.Employer || !session?.accessToken) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    async function loadEmployerVacancies() {
+      setLoadingEmployerVacancies(true)
+      setProfileError('')
+
+      try {
+        const [company, vacancies] = await Promise.all([
+          fetchEmployerCompany(controller.signal),
+          fetchEmployerVacancies(controller.signal),
+        ])
+
+        if (controller.signal.aborted) {
+          return
+        }
+
+        const onlyVacancies = vacancies.filter((item) => item.source === 'vacancy')
+        setEmployerCompanyId(company.id)
+        setEmployerVacancies(onlyVacancies)
+        setSelectedInviteVacancyId(onlyVacancies[0]?.id ?? null)
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setProfileError(error instanceof Error ? error.message : 'Не удалось загрузить вакансии работодателя.')
+          setEmployerVacancies([])
+          setEmployerCompanyId(null)
+          setSelectedInviteVacancyId(null)
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoadingEmployerVacancies(false)
+        }
+      }
+    }
+
+    void loadEmployerVacancies()
+
+    return () => controller.abort()
+  }, [isInviteModalOpen, session?.accessToken, session?.platformRole])
+
+  useEffect(() => {
     projectPhotoFilesRef.current = projectPhotoFiles
   }, [projectPhotoFiles])
 
@@ -1574,7 +1677,12 @@ export function SeekerDashboardPage() {
     () => (foreignProfileUserId ? followingUserIds.has(foreignProfileUserId) : false),
     [foreignProfileUserId, followingUserIds],
   )
+  const isEmployerViewer = session?.platformRole === PlatformRole.Employer
   const isForeignSubscriptionLoading = foreignProfileUserId ? Boolean(subscriptionActionLoading[foreignProfileUserId]) : false
+  const employerVacancyOptions = useMemo(
+    () => employerVacancies.filter((item) => item.source === 'vacancy'),
+    [employerVacancies],
+  )
   const availableProfilePanels = useMemo(
     () => (isPublicReadOnlyMode ? profilePanels.filter((item) => item.id !== 'subscriptions') : profilePanels),
     [isPublicReadOnlyMode],
@@ -1590,8 +1698,15 @@ export function SeekerDashboardPage() {
     const query = responsesSearch.trim().toLowerCase()
 
     return applications.filter((item) => {
-      if (responsesToneFilter !== 'all' && item.tone !== responsesToneFilter) {
+      if (responsesStatusFilter !== 'all' && item.statusCode !== responsesStatusFilter) {
         return false
+      }
+
+      if (responsesKindFilter !== 'all') {
+        const kind = applicationKindsById[item.opportunityId] ?? 'vacancy'
+        if (kind !== responsesKindFilter) {
+          return false
+        }
       }
 
       if (!query) {
@@ -1601,14 +1716,17 @@ export function SeekerDashboardPage() {
       const haystack = [item.title, item.company, item.location, item.status].join(' ').toLowerCase()
       return haystack.includes(query)
     })
-  }, [applications, responsesSearch, responsesToneFilter])
+  }, [applicationKindsById, applications, responsesKindFilter, responsesSearch, responsesStatusFilter])
 
   const filteredFavoriteOpportunities = useMemo(() => {
     const query = favoritesSearch.trim().toLowerCase()
 
     return favoriteOpportunities.filter((item) => {
-      if (favoritesTypeFilter !== 'all' && item.type !== favoritesTypeFilter) {
-        return false
+      if (favoritesKindFilter !== 'all') {
+        const kind = item.type === 'event' ? 'event' : 'vacancy'
+        if (kind !== favoritesKindFilter) {
+          return false
+        }
       }
 
       if (favoritesFormatFilter !== 'all' && item.workFormat !== favoritesFormatFilter) {
@@ -1622,17 +1740,37 @@ export function SeekerDashboardPage() {
       const haystack = [item.title, item.company, item.location, item.description].join(' ').toLowerCase()
       return haystack.includes(query)
     })
-  }, [favoriteOpportunities, favoritesFormatFilter, favoritesSearch, favoritesTypeFilter])
+  }, [favoriteOpportunities, favoritesFormatFilter, favoritesKindFilter, favoritesSearch])
 
-  const favoriteTypeOptions = useMemo(
-    () => Array.from(new Set(favoriteOpportunities.map((item) => item.type))),
-    [favoriteOpportunities],
-  )
+  const favoriteKindsAvailable = useMemo(() => {
+    const hasEvents = favoriteOpportunities.some((item) => item.type === 'event')
+    const hasVacancies = favoriteOpportunities.some((item) => item.type !== 'event')
+
+    return {
+      hasEvents,
+      hasVacancies,
+    }
+  }, [favoriteOpportunities])
 
   const favoriteFormatOptions = useMemo(
     () => Array.from(new Set(favoriteOpportunities.map((item) => item.workFormat).filter(Boolean))),
     [favoriteOpportunities],
   )
+
+  const responsesStatusOptions = useMemo(
+    () => APPLICATION_STATUS_FILTER_OPTIONS.filter((option) => applications.some((item) => item.statusCode === option.value)),
+    [applications],
+  )
+
+  const responsesKindsAvailable = useMemo(() => {
+    const hasEvents = applications.some((item) => (applicationKindsById[item.opportunityId] ?? 'vacancy') === 'event')
+    const hasVacancies = applications.some((item) => (applicationKindsById[item.opportunityId] ?? 'vacancy') === 'vacancy')
+
+    return {
+      hasEvents,
+      hasVacancies,
+    }
+  }, [applicationKindsById, applications])
 
   const responsesStats = useMemo(
     () => ({
@@ -2342,6 +2480,43 @@ export function SeekerDashboardPage() {
     }
   }
 
+  async function onInviteToVacancy() {
+    if (!session?.accessToken) {
+      setProfileError('Чтобы пригласить соискателя, нужно авторизоваться как работодатель.')
+      return
+    }
+    if (!foreignProfileUserId) {
+      setProfileError('Не удалось определить соискателя для приглашения.')
+      return
+    }
+    if (!selectedInviteVacancyId) {
+      setProfileError('Выберите вакансию для приглашения.')
+      return
+    }
+    if (!employerCompanyId) {
+      setProfileError('Не удалось определить компанию работодателя.')
+      return
+    }
+
+    setInvitingToVacancy(true)
+    setProfileError('')
+
+    try {
+      await createApplication({
+        companyId: employerCompanyId,
+        candidateUserId: foreignProfileUserId,
+        vacancyId: selectedInviteVacancyId,
+        initiatorRole: 2,
+      })
+      setSuccess('Приглашение на вакансию отправлено.')
+      setIsInviteModalOpen(false)
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : 'Не удалось отправить приглашение.')
+    } finally {
+      setInvitingToVacancy(false)
+    }
+  }
+
   if (isResumeEditMode) {
     return (
       <div className="app-shell">
@@ -2707,6 +2882,16 @@ export function SeekerDashboardPage() {
                   ) : null}
                   {isForeignProfile ? (
                     <>
+                      {isEmployerViewer ? (
+                        <button
+                          type="button"
+                          className="seeker-profile-hero-exact__action"
+                          onClick={() => setIsInviteModalOpen(true)}
+                          disabled={!foreignProfileUserId}
+                        >
+                          Пригласить на вакансию
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="seeker-profile-hero-exact__action seeker-profile-hero-exact__subscribe"
@@ -2728,6 +2913,16 @@ export function SeekerDashboardPage() {
                 </div>
               ) : isForeignProfile ? (
                 <div className="seeker-profile-hero-exact__actions">
+                  {isEmployerViewer ? (
+                    <button
+                      type="button"
+                      className="seeker-profile-hero-exact__action"
+                      onClick={() => setIsInviteModalOpen(true)}
+                      disabled={!foreignProfileUserId}
+                    >
+                      Пригласить на вакансию
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="seeker-profile-hero-exact__action seeker-profile-hero-exact__subscribe"
@@ -2937,7 +3132,7 @@ export function SeekerDashboardPage() {
               {!isPublicReadOnlyMode && tab === 'responses' ? (
                 <section className="card seeker-profile-panel">
                   <h2>Мои отклики</h2>
-                  <div className="seeker-list-filters">
+                  <div className="seeker-list-filters seeker-list-filters--triple">
                     <label>
                       Поиск
                       <input
@@ -2948,11 +3143,21 @@ export function SeekerDashboardPage() {
                     </label>
                     <label>
                       Статус
-                      <select value={responsesToneFilter} onChange={(event) => setResponsesToneFilter(event.target.value as 'all' | 'success' | 'warning' | 'danger')}>
+                      <select value={responsesStatusFilter === 'all' ? 'all' : String(responsesStatusFilter)} onChange={(event) => setResponsesStatusFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))}>
                         <option value="all">Все</option>
-                        <option value="success">Активные</option>
-                        <option value="warning">На рассмотрении</option>
-                        <option value="danger">Закрытые</option>
+                        {responsesStatusOptions.map((item) => (
+                          <option key={`response-status-${item.value}`} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Тип
+                      <select value={responsesKindFilter} onChange={(event) => setResponsesKindFilter(event.target.value as 'all' | 'vacancy' | 'event')}>
+                        <option value="all">Все</option>
+                        {responsesKindsAvailable.hasVacancies ? <option value="vacancy">Вакансии</option> : null}
+                        {responsesKindsAvailable.hasEvents ? <option value="event">Мероприятия</option> : null}
                       </select>
                     </label>
                   </div>
@@ -3000,13 +3205,10 @@ export function SeekerDashboardPage() {
                     </label>
                     <label>
                       Тип
-                      <select value={favoritesTypeFilter} onChange={(event) => setFavoritesTypeFilter(event.target.value as 'all' | Opportunity['type'])}>
+                      <select value={favoritesKindFilter} onChange={(event) => setFavoritesKindFilter(event.target.value as 'all' | 'vacancy' | 'event')}>
                         <option value="all">Все</option>
-                        {favoriteTypeOptions.map((item) => (
-                          <option key={`favorite-type-${item}`} value={item}>
-                            {item}
-                          </option>
-                        ))}
+                        {favoriteKindsAvailable.hasVacancies ? <option value="vacancy">Вакансии</option> : null}
+                        {favoriteKindsAvailable.hasEvents ? <option value="event">Мероприятия</option> : null}
                       </select>
                     </label>
                     <label>
@@ -3221,6 +3423,55 @@ export function SeekerDashboardPage() {
         onRemoveCollaboration={(id) => setProjectCollaborations((current) => current.filter((collaboration) => collaboration.id !== id))}
         onCreatePortfolioProject={() => void onCreatePortfolioProject()}
       />
+
+      {isInviteModalOpen ? (
+        <div className="profile-settings-modal" role="dialog" aria-modal="true" aria-labelledby="invite-to-vacancy-title">
+          <div className="profile-settings-modal__backdrop" onClick={() => !invitingToVacancy && setIsInviteModalOpen(false)} />
+          <div className="card profile-settings-modal__dialog">
+            <div className="profile-settings-modal__head">
+              <h2 id="invite-to-vacancy-title">Пригласить на вакансию</h2>
+              <button type="button" className="btn btn--icon" onClick={() => !invitingToVacancy && setIsInviteModalOpen(false)} aria-label="Закрыть">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="profile-settings-modal__form form-grid">
+              {loadingEmployerVacancies ? <p>Загружаем вакансии работодателя...</p> : null}
+              {!loadingEmployerVacancies && !employerVacancyOptions.length ? (
+                <p>У вас пока нет опубликованных вакансий для приглашения.</p>
+              ) : null}
+              {!loadingEmployerVacancies && employerVacancyOptions.length ? (
+                <label>
+                  Вакансия
+                  <select
+                    value={selectedInviteVacancyId == null ? '' : String(selectedInviteVacancyId)}
+                    onChange={(event) => setSelectedInviteVacancyId(event.target.value ? Number(event.target.value) : null)}
+                  >
+                    <option value="">Выберите вакансию</option>
+                    {employerVacancyOptions.map((vacancy) => (
+                      <option key={`invite-vacancy-${vacancy.id}`} value={vacancy.id}>
+                        {vacancy.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <div className="profile-settings-modal__actions">
+                <button type="button" className="btn btn--ghost" onClick={() => setIsInviteModalOpen(false)} disabled={invitingToVacancy}>
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => void onInviteToVacancy()}
+                  disabled={invitingToVacancy || loadingEmployerVacancies || !selectedInviteVacancyId || !employerVacancyOptions.length}
+                >
+                  {invitingToVacancy ? 'Отправляем...' : 'Отправить приглашение'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isSettingsOpen && !isPublicReadOnlyMode ? (
         <div className="profile-settings-modal" role="dialog" aria-modal="true" aria-labelledby="profile-settings-title">

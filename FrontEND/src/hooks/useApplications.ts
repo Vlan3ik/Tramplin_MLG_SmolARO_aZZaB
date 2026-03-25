@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { hasStoredAuthSession } from '../api/client'
 import { APPLICATIONS_CHANGE_EVENT, fetchMyApplications, type MyApplicationApi } from '../api/applications'
 
@@ -33,9 +33,9 @@ const APPLICATION_STATUS_META: Record<number, ApplicationMeta> = {
     note: 'Отклик находится в очереди на проверку.',
   },
   3: {
-    status: 'Интервью',
+    status: 'Собеседование',
     tone: 'success',
-    next: 'Проверьте чат и подготовьтесь к интервью.',
+    next: 'Проверьте чат и подготовьтесь к собеседованию.',
     note: 'Вас пригласили на следующий этап отбора.',
   },
   4: {

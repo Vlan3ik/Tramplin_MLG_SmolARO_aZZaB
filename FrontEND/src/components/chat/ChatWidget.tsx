@@ -1,8 +1,11 @@
 ﻿import { MessageCircle, Send, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fetchChatHistory, fetchChatMessages, fetchMyChats, markChatRead, sendChatMessage } from '../../api/chats'
+import { fetchChatHistory, fetchChatMessages, fetchEmployerChatDetail, fetchEmployerChats, fetchMyChats, markChatRead, sendChatMessage } from '../../api/chats'
+import { fetchEmployerApplications } from '../../api/employer'
 import { useAuth } from '../../hooks/useAuth'
+import { PlatformRole } from '../../types/auth'
 import type { ChatListItem, ChatMessage } from '../../types/chat'
+import { useNavigate } from 'react-router-dom'
 
 const CHAT_POLL_OPEN_INTERVAL_MS = 20000
 const MESSAGE_POLL_INTERVAL_MS = 8000
@@ -58,6 +61,31 @@ function getFallbackDirectChatTitle(chat: ChatListItem, currentUserId: number | 
   return companionId ? `Пользователь #${companionId}` : `Личный чат #${chat.id}`
 }
 
+function getChatSubjectTypeLabel(chat: ChatListItem) {
+  if (chat.type === 2) {
+    return 'Вакансия'
+  }
+
+  if (chat.type === 3) {
+    return 'Мероприятие'
+  }
+
+  return 'Личный чат'
+}
+
+function getChatSubjectTitle(chat: ChatListItem, currentUserId: number | undefined) {
+  const titleFromApi = chat.title?.trim()
+  if (titleFromApi) {
+    return titleFromApi
+  }
+
+  if (chat.type === 2 || chat.type === 3) {
+    return `Объявление #${chat.id}`
+  }
+
+  return getFallbackDirectChatTitle(chat, currentUserId)
+}
+
 function mergeMessages(currentMessages: ChatMessage[], incomingMessages: ChatMessage[]) {
   if (!incomingMessages.length) {
     return currentMessages
@@ -108,6 +136,8 @@ function getAvatarInitials(displayName: string | null | undefined, username: str
 export function ChatWidget() {
   const { session, isAuthenticated } = useAuth()
   const currentUserId = session?.user?.id
+  const isEmployerSession = session?.platformRole === PlatformRole.Employer
+  const navigate = useNavigate()
 
   const [isOpen, setIsOpen] = useState(false)
   const [chats, setChats] = useState<ChatListItem[]>([])
@@ -119,6 +149,7 @@ export function ChatWidget() {
   const [isSending, setIsSending] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [pendingOpenChatId, setPendingOpenChatId] = useState<number | null>(null)
+  const [chatVacancyById, setChatVacancyById] = useState<Record<number, { vacancyId: number; vacancyTitle: string }>>({})
 
   const chatsInFlightRef = useRef(false)
   const historyInFlightByChatRef = useRef<Record<number, boolean>>({})
@@ -135,6 +166,33 @@ export function ChatWidget() {
 
   const activeChat = useMemo(() => chats.find((chat) => chat.id === activeChatId) ?? null, [activeChatId, chats])
   const activeMessages = useMemo(() => (activeChatId ? messagesByChat[activeChatId] ?? [] : []), [activeChatId, messagesByChat])
+  const activeVacancyLink = useMemo(() => {
+    if (!activeChat || activeChat.type !== 2) {
+      return null
+    }
+
+    const mappedVacancy = chatVacancyById[activeChat.id]
+    if (mappedVacancy?.vacancyId) {
+      const mappedTitle = mappedVacancy.vacancyTitle?.trim()
+      return {
+        vacancyId: mappedVacancy.vacancyId,
+        title: mappedTitle || 'Вакансия',
+      }
+    }
+
+    return null
+  }, [activeChat, chatVacancyById])
+  const activeChatHeaderTitle = useMemo(() => {
+    if (!activeChat) {
+      return ''
+    }
+
+    if (activeVacancyLink?.title) {
+      return activeVacancyLink.title
+    }
+
+    return getChatSubjectTitle(activeChat, currentUserId)
+  }, [activeChat, activeVacancyLink, currentUserId])
 
   useEffect(() => {
     if (!isOpen || !activeChatId) {
@@ -199,7 +257,9 @@ export function ChatWidget() {
       setIsLoadingChats(true)
 
       try {
-        const response = await fetchMyChats(options?.signal)
+        const response = isEmployerSession
+          ? await fetchEmployerChats(options?.signal)
+          : await fetchMyChats(options?.signal)
 
         const sorted = [...response].sort((a, b) => {
           const aTime = new Date(a.lastMessage?.createdAt ?? a.createdAt).getTime()
@@ -226,7 +286,7 @@ export function ChatWidget() {
         }
       }
     },
-    [isAuthenticated, isOpen],
+    [isAuthenticated, isEmployerSession, isOpen],
   )
 
   const loadChatHistory = useCallback(
@@ -239,7 +299,9 @@ export function ChatWidget() {
       setIsLoadingMessages(true)
 
       try {
-        const history = await fetchChatHistory(chatId, undefined, 50, signal)
+        const history = isEmployerSession
+          ? (await fetchEmployerChatDetail(chatId, undefined, 50, signal)).history
+          : await fetchChatHistory(chatId, undefined, 50, signal)
         const response = history.messages
 
         const latest = response[response.length - 1]
@@ -262,7 +324,7 @@ export function ChatWidget() {
         }
       }
     },
-    [tryMarkRead],
+    [isEmployerSession, tryMarkRead],
   )
 
   const loadNewMessages = useCallback(
@@ -278,8 +340,10 @@ export function ChatWidget() {
       newMessagesInFlightByChatRef.current[chatId] = true
 
       try {
-        const cursor = latestMessageIdByChatRef.current[chatId] ?? undefined
-        const incoming = await fetchChatMessages(chatId, cursor, signal)
+        const cursor = latestMessageIdByChatRef.current[chatId] ?? 0
+        const incoming = isEmployerSession
+          ? (await fetchEmployerChatDetail(chatId, undefined, 50, signal)).history.messages.filter((message) => message.id > cursor)
+          : await fetchChatMessages(chatId, cursor || undefined, signal)
 
         if (!incoming.length || signal?.aborted) {
           return
@@ -305,7 +369,7 @@ export function ChatWidget() {
         newMessagesInFlightByChatRef.current[chatId] = false
       }
     },
-    [tryMarkRead],
+    [isEmployerSession, tryMarkRead],
   )
 
   useEffect(() => {
@@ -411,6 +475,45 @@ export function ChatWidget() {
     }
   }, [activeChatId, isAuthenticated, isOpen, loadChatHistory, loadNewMessages])
 
+  useEffect(() => {
+    if (!isAuthenticated || !isEmployerSession || !isOpen) {
+      return () => undefined
+    }
+
+    const controller = new AbortController()
+
+    async function loadEmployerApplicationsMap() {
+      try {
+        const rows = await fetchEmployerApplications(controller.signal)
+        if (controller.signal.aborted) {
+          return
+        }
+
+        const nextMap: Record<number, { vacancyId: number; vacancyTitle: string }> = {}
+        for (const row of rows) {
+          if (!row.chatId) {
+            continue
+          }
+
+          nextMap[row.chatId] = {
+            vacancyId: row.vacancyId,
+            vacancyTitle: row.vacancyTitle,
+          }
+        }
+
+        setChatVacancyById(nextMap)
+      } catch {
+        if (!controller.signal.aborted) {
+          setChatVacancyById({})
+        }
+      }
+    }
+
+    void loadEmployerApplicationsMap()
+
+    return () => controller.abort()
+  }, [isAuthenticated, isEmployerSession, isOpen])
+
   async function handleSendMessage() {
     if (!activeChatId || !messageInput.trim() || isSending) {
       return
@@ -470,6 +573,7 @@ export function ChatWidget() {
                   className={`chat-widget__list-item ${chat.id === activeChatId ? 'is-active' : ''}`}
                   onClick={() => setActiveChatId(chat.id)}
                 >
+                  <em className="chat-widget__list-subject-type">{getChatSubjectTypeLabel(chat)}</em>
                   <strong>{getChatTitle(chat)}</strong>
                   <span>{chat.lastMessage?.text || 'Без сообщений'}</span>
                   <small>{chat.lastMessage ? `${formatChatDate(chat.lastMessage.createdAt)} ${formatChatTime(chat.lastMessage.createdAt)}` : ''}</small>
@@ -481,7 +585,21 @@ export function ChatWidget() {
               {activeChat ? (
                 <>
                   <div className="chat-widget__thread-head">
-                    <strong>{getChatTitle(activeChat)}</strong>
+                    <div className="chat-widget__thread-head-title">
+                      <strong>{activeChatHeaderTitle}</strong>
+                      <span>{getChatSubjectTypeLabel(activeChat)}</span>
+                    </div>
+                    {activeVacancyLink ? (
+                      <button
+                        type="button"
+                        className="chat-widget__thread-vacancy"
+                        onClick={() => navigate(`/opportunity/${activeVacancyLink.vacancyId}`)}
+                        title="Открыть карточку вакансии"
+                      >
+                        <span>Вакансия</span>
+                        <strong>{activeVacancyLink.title}</strong>
+                      </button>
+                    ) : null}
                   </div>
                   <div className="chat-widget__messages" ref={messagesContainerRef}>
                     {isLoadingMessages ? <p>Загружаем сообщения...</p> : null}
@@ -544,3 +662,5 @@ export function ChatWidget() {
     </div>
   )
 }
+
+
