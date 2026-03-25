@@ -785,13 +785,22 @@ export function VacancyFlowPage() {
                       onChange={isVacancyFlow ? onVacancyFormChange : onEventFormChange}
                       disabled={isSubmitting}
                     >
-                      <option value={1}>Запланировано</option>
-                      <option value={2}>На модерации</option>
-                      <option value={3}>Активно</option>
-                      <option value={4}>Закрыто</option>
-                      <option value={5}>Отменено</option>
-                      <option value={6}>Отклонено</option>
-                      <option value={7}>В архиве</option>
+                      {isVacancyFlow ? (
+                        <>
+                          <option value={1}>Запланирована</option>
+                          <option value={3}>Не запланирована</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value={1}>Запланировано</option>
+                          <option value={2}>На модерации</option>
+                          <option value={3}>Активно</option>
+                          <option value={4}>Закрыто</option>
+                          <option value={5}>Отменено</option>
+                          <option value={6}>Отклонено</option>
+                          <option value={7}>В архиве</option>
+                        </>
+                      )}
                     </select>
                   </label>
                 </div>

@@ -1382,12 +1382,7 @@ export function EmployerDashboardPage() {
               Статус
               <select name="status" value={vacancyForm.status} onChange={onVacancyFormChange}>
                 <option value={1}>Запланирована</option>
-                <option value={2}>На модерации</option>
-                <option value={3}>Активна</option>
-                <option value={4}>Закрыта</option>
-                <option value={5}>Отменена</option>
-                <option value={6}>Отклонена</option>
-                <option value={7}>В архиве</option>
+                <option value={3}>Не запланирована</option>
               </select>
             </label>
             <label>
