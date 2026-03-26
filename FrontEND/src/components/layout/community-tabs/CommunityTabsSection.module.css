@@ -1,28 +1,122 @@
-﻿.section {
-  width: 100vw;
+.section {
+  width: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
   flex-direction: column;
-  gap: 30px;
-  padding-top: 70px;
-  padding-bottom: 44px;
-  background-color: white;
+  gap: 28px;
+  padding: 70px 0 0;
   margin-top: 100px;
-  margin-bottom: 100px;
+  padding-inline: 24px;
+  box-sizing: border-box;
 }
 
 .title {
+  text-align: center;
   font-size: 46px;
   font-weight: 900;
   line-height: 130%;
+  color: #1e212c;
+}
+
+.heroCard {
+  width: min(1320px, 100%);
+  /* background: #fff; */
+  /* box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12); */
+  padding: 56px 64px 44px;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .tabList {
   display: flex;
-  flex-direction: row;
-  gap: 30px;
+  flex-wrap: wrap;
+  gap: 12px;
   font-size: 16px;
+  margin-bottom: 38px;
+  justify-content: center;
+}
+
+.tabButton {
+  height: 46px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  padding: 0 16px;
+  background: transparent;
+  color: #9a9ca5;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tabButton:hover {
+  color: #0171e1;
+  border-color: rgba(1, 113, 225, 0.45);
+  transform: translateY(-1px);
+}
+
+.tabButtonActive {
+  color: #0171e1;
+  border-color: #0171e1;
+  background: rgba(1, 113, 225, 0.04);
+  box-shadow: 0 8px 20px rgba(1, 113, 225, 0.12);
+}
+
+.heroBody {
+  display: grid;
+  grid-template-columns: minmax(520px, 1fr) minmax(340px, 600px);
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.content {
+  max-width: 700px;
+  color: #424551;
+}
+
+.contentAnimated {
+  animation: community-content-switch 300ms ease;
+}
+
+@keyframes community-content-switch {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.content p {
+  margin: 0 0 18px;
+  font-size: 24px;
+  line-height: 1.6;
+}
+
+.content ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.content li {
+  margin-bottom: 10px;
+  font-size: 24px;
+  line-height: 1.45;
+}
+
+.content li:last-child {
+  margin-bottom: 0;
+}
+
+.heroImage {
+  width: 100%;
+  max-width: 600px;
+  justify-self: end;
+  object-fit: contain;
 }
 
 .contentTitle {
@@ -30,4 +124,63 @@
   font-weight: 900;
   line-height: 130%;
   margin-bottom: 24px;
+  color: #000000;
+}
+
+@media (max-width: 1200px) {
+  .heroCard {
+    padding: 36px 24px 24px;
+  }
+
+  .heroBody {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .heroImage {
+    justify-self: center;
+    max-width: 520px;
+  }
+}
+
+@media (max-width: 768px) {
+  .section {
+    margin-top: 70px;
+    gap: 20px;
+    padding-top: 50px;
+    padding-inline: 12px;
+  }
+
+  .title {
+    font-size: 32px;
+    line-height: 1.25;
+    padding: 0 16px;
+  }
+
+  .heroCard {
+    padding: 20px 16px 20px;
+  }
+
+  .tabList {
+    margin-bottom: 22px;
+    gap: 8px;
+  }
+
+  .tabButton {
+    width: 100%;
+    text-align: left;
+    justify-content: flex-start;
+    font-size: 14px;
+  }
+
+  .contentTitle {
+    font-size: 34px;
+    margin-bottom: 14px;
+  }
+
+  .content p,
+  .content li {
+    font-size: 18px;
+    line-height: 1.5;
+  }
 }
