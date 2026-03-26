@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState, type WheelEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchHomeListOpportunities } from '../../../api/opportunities'
+import { fetchEventsListOpportunities } from '../../../api/opportunities'
 import type { Opportunity, OpportunityFilters } from '../../../types/opportunity'
 import { buildOpportunityDetailsPath } from '../../../utils/opportunity-routing'
 import styles from './EventsCarouselSection.module.css'
@@ -42,8 +42,8 @@ export function EventsCarouselSection() {
       setErrorMessage('')
 
       try {
-        const response = await fetchHomeListOpportunities(eventsQuery, abortController.signal)
-        const nextItems = response.items.filter((item) => item.type === 'event').slice(0, 4)
+        const response = await fetchEventsListOpportunities(eventsQuery, abortController.signal)
+        const nextItems = response.items.slice(0, 4)
 
         setEvents(nextItems)
         setActiveIndex(0)

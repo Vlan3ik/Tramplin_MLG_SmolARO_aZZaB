@@ -36,25 +36,27 @@ export function CommunityTabsSection() {
   return (
     <section className={styles.section}>
       <h2 className={styles.title}>Стань частью IT-сообщества</h2>
-      <div className={styles.tabList}>
-        {communityTabs.map((tab, index) => (
-          <div
-            key={index}
-            style={{
-              color: activeTabIndex === index ? '#0171E1' : '#9A9CA5',
-              fontWeight: 600,
-              border: activeTabIndex === index ? '1px solid #0171E1' : '1px solid transparent',
-              borderRadius: '4px',
-              padding: '5px',
-              cursor: 'pointer',
-            }}
-            onClick={() => setActiveTabIndex(index)}
-          >
-            {tab.icon} <span>{tab.title}</span>
+      <div className={styles.heroCard}>
+        <div className={styles.tabList}>
+          {communityTabs.map((tab, index) => (
+            <button
+              key={index}
+              type="button"
+              className={`${styles.tabButton} ${activeTabIndex === index ? styles.tabButtonActive : ''}`}
+              onClick={() => setActiveTabIndex(index)}
+            >
+              {tab.icon} <span>{tab.title}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.heroBody}>
+          <div key={activeTabIndex} className={`${styles.content} ${styles.contentAnimated}`}>
+            {communityTabs[activeTabIndex]?.content}
           </div>
-        ))}
+          <img className={styles.heroImage} src="/Group 20.svg" alt="" aria-hidden />
+        </div>
       </div>
-      {communityTabs[activeTabIndex]?.content}
     </section>
   )
 }

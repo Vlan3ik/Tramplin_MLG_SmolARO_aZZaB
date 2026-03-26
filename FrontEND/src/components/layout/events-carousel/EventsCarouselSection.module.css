@@ -129,6 +129,9 @@
   background: linear-gradient(315deg, #0171e1, #87c3ff);
   height: 44px;
   padding-inline: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 4px;
   color: #fff;
