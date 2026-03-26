@@ -1,7 +1,7 @@
 ﻿import { ArrowLeft, UserPlus } from 'lucide-react'
-import { type ChangeEvent, type FormEvent, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { createAdminUser, type AdminUserUpsertRequest } from '../../api/admin'
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { createAdminUser, updateAdminUser, type AdminUser, type AdminUserUpsertRequest } from '../../api/admin'
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
@@ -18,11 +18,64 @@ function getInitialForm() {
   }
 }
 
+function parseNamesFromUsername(username: string) {
+  const chunks = username.trim().split(/\s+/).filter(Boolean)
+  return {
+    firstName: chunks[0] ?? '',
+    lastName: chunks[1] ?? '',
+  }
+}
+
+function mapUserToForm(user: AdminUser) {
+  const names = parseNamesFromUsername(user.username)
+  return {
+    email: user.email,
+    firstName: names.firstName,
+    lastName: names.lastName,
+    status: user.status,
+    seeker: user.roles.includes('seeker'),
+    employer: user.roles.includes('employer'),
+    curator: user.roles.includes('curator'),
+  }
+}
+
 export function CuratorCreateUserPage() {
+  const [searchParams] = useSearchParams()
+  const location = useLocation()
+  const routeState = location.state as { user?: AdminUser } | null
+  const userIdParam = Number(searchParams.get('userId'))
+  const editingUserId = Number.isInteger(userIdParam) && userIdParam > 0 ? userIdParam : null
+  const isEditMode = editingUserId !== null
+
   const [form, setForm] = useState(getInitialForm)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [isFormReady, setIsFormReady] = useState(!isEditMode)
+
+  const stateUser = useMemo(() => {
+    if (!isEditMode) return null
+    if (!routeState?.user) return null
+    return routeState.user.id === editingUserId ? routeState.user : null
+  }, [editingUserId, isEditMode, routeState])
+
+  useEffect(() => {
+    if (!isEditMode) {
+      setForm(getInitialForm())
+      setIsFormReady(true)
+      return
+    }
+
+    if (!stateUser) {
+      setError('Не удалось загрузить пользователя для редактирования. Откройте форму из списка пользователей.')
+      setIsFormReady(false)
+      return
+    }
+
+    setForm(mapUserToForm(stateUser))
+    setError('')
+    setIsFormReady(true)
+  }, [isEditMode, stateUser])
 
   function clearMessages() {
     setError('')
@@ -66,11 +119,16 @@ export function CuratorCreateUserPage() {
 
     setIsSaving(true)
     try {
-      await createAdminUser(payload)
-      setSuccess('Пользователь успешно создан.')
-      setForm(getInitialForm())
+      if (editingUserId) {
+        await updateAdminUser(editingUserId, payload)
+        setSuccess('Пользователь успешно обновлен.')
+      } else {
+        await createAdminUser(payload)
+        setSuccess('Пользователь успешно создан.')
+        setForm(getInitialForm())
+      }
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Не удалось создать пользователя.')
+      setError(submitError instanceof Error ? submitError.message : isEditMode ? 'Не удалось обновить пользователя.' : 'Не удалось создать пользователя.')
     } finally {
       setIsSaving(false)
     }
@@ -83,12 +141,16 @@ export function CuratorCreateUserPage() {
       <main className="container seeker-profile-page">
         <section className="dashboard-section card seeker-profile-panel admin-form-card">
           <div className="seeker-profile-panel__head">
-            <h1>Создание пользователя</h1>
+            <h1>{isEditMode ? `Редактирование пользователя #${editingUserId}` : 'Создание пользователя'}</h1>
             <Link className="btn btn--ghost" to="/dashboard/curator">
               <ArrowLeft size={14} /> Назад в кабинет
             </Link>
           </div>
-          <p className="status-line">Отдельная страница создания, чтобы не перегружать кабинет куратора.</p>
+          <p className="status-line">
+            {isEditMode
+              ? 'Отдельная страница редактирования пользователя.'
+              : 'Отдельная страница создания, чтобы не перегружать кабинет куратора.'}
+          </p>
 
           {error ? <div className="auth-feedback auth-feedback--error">{error}</div> : null}
           {success ? <div className="auth-feedback">{success}</div> : null}
@@ -128,8 +190,8 @@ export function CuratorCreateUserPage() {
             </div>
 
             <div className="favorite-card__actions full-width">
-              <button type="submit" className="btn btn--primary" disabled={isSaving}>
-                <UserPlus size={14} /> {isSaving ? 'Создаем...' : 'Создать пользователя'}
+              <button type="submit" className="btn btn--primary" disabled={isSaving || !isFormReady}>
+                <UserPlus size={14} /> {isSaving ? (isEditMode ? 'Обновляем...' : 'Создаем...') : isEditMode ? 'Обновить пользователя' : 'Создать пользователя'}
               </button>
             </div>
           </form>

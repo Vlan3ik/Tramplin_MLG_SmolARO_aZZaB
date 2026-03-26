@@ -353,6 +353,9 @@ export function CuratorDashboardPage() {
                   </div>
                   <p>Роли: {item.roles.join(', ') || 'не назначены'}</p>
                   <div className="favorite-card__actions">
+                    <Link className="btn btn--secondary" to={`/dashboard/curator/users/create?userId=${item.id}`} state={{ user: item }}>
+                      Редактировать
+                    </Link>
                     <button type="button" className="btn btn--danger" onClick={() => void onDeleteUser(item)}>Удалить</button>
                   </div>
                 </article>
