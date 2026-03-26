@@ -28,6 +28,7 @@ import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
 import type { City } from '../../types/catalog'
+import { Link } from 'react-router-dom'
 
 type AdminTabId = 'overview' | 'users' | 'companies' | 'vacancies' | 'opportunities'
 
@@ -532,6 +533,16 @@ export function CuratorDashboardPage() {
             </button>
           ))}
         </nav>
+
+        <section className="dashboard-section card seeker-profile-panel">
+          <div className="seeker-profile-panel__head">
+            <h2>Quick actions</h2>
+            <div className="admin-toolbar">
+              <Link className="btn btn--primary" to="/dashboard/curator/users/create">Create user in separate page</Link>
+              <Link className="btn btn--primary" to="/dashboard/curator/vacancies/create">Create vacancy in separate page</Link>
+            </div>
+          </div>
+        </section>
 
         {tab === 'overview' ? (
           <section className="dashboard-section card seeker-profile-panel">
