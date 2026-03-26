@@ -5,6 +5,7 @@ import { fetchCompanyById } from '../api/companies'
 import { fetchMyFollowingSubscriptions, followUser, type SubscriptionUser, unfollowUser } from '../api/subscriptions'
 import { useAuth } from '../hooks/useAuth'
 import type { CompanyDetail, CompanyOpportunity } from '../types/company'
+import { buildOpportunityDetailsPath } from '../utils/opportunity-routing'
 
 function getInitials(name: string | null) {
   const normalized = (name ?? '').trim()
@@ -42,7 +43,7 @@ function CompanyOpportunityRow({ opportunity }: { opportunity: CompanyOpportunit
       </div>
       <div className="company-profile-opportunity-row__right">
         <span>{opportunity.typeLabel}</span>
-        <Link className="btn btn--ghost" to={`/opportunity/${opportunity.id}`}>
+        <Link className="btn btn--ghost" to={buildOpportunityDetailsPath({ id: opportunity.id, entityType: opportunity.entityType })}>
           Открыть
         </Link>
       </div>

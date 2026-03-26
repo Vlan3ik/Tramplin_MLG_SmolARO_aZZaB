@@ -20,6 +20,7 @@ export type CompanyLink = {
 
 export type CompanyOpportunity = {
   id: number
+  entityType: 'vacancy' | 'opportunity'
   title: string | null
   type: OpportunityType | null
   typeLabel: string

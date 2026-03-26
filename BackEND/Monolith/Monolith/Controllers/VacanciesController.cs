@@ -39,7 +39,9 @@ public class VacanciesController(AppDbContext dbContext) : ControllerBase
                 x.Title,
                 x.Kind,
                 x.Format,
+                x.CompanyId,
                 CompanyName = x.Company.BrandName ?? x.Company.LegalName,
+                CompanyLogoUrl = x.Company.LogoUrl,
                 CityName = x.City != null ? x.City.CityName : (x.Location != null ? x.Location.City.CityName : "Unknown"),
                 x.SalaryFrom,
                 x.SalaryTo,
@@ -64,7 +66,11 @@ public class VacanciesController(AppDbContext dbContext) : ControllerBase
             x.SalaryTaxMode,
             x.PublishAt,
             x.Verified,
-            x.Tags)).ToList();
+            x.Tags)
+        {
+            CompanyId = x.CompanyId,
+            CompanyLogoUrl = x.CompanyLogoUrl
+        }).ToList();
 
         return Ok(new PagedResponse<VacancyListItemDto>(items, totalCount, page, pageSize));
     }

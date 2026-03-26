@@ -18,7 +18,11 @@ public record OpportunityListItemDto(
     int ParticipantsCount,
     bool IsParticipating,
     bool ParticipantsCanWrite,
-    IReadOnlyCollection<string> Tags);
+    IReadOnlyCollection<string> Tags)
+{
+    public long CompanyId { get; init; }
+    public string? CompanyLogoUrl { get; init; }
+}
 
 public record OpportunityDetailDto(
     long Id,

@@ -15,6 +15,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
+import clsx from 'clsx'
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { createApplication } from '../../api/applications'
@@ -63,6 +64,8 @@ import type { PublicPortfolioProjectDetail, PublicPortfolioProjectCard } from '.
 import type { PublicProfile } from '../../types/public-profile'
 import type { SeekerResume } from '../../types/resume'
 import { getFavoriteOpportunityIds, subscribeToFavoriteOpportunities } from '../../utils/favorites'
+import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
+import { getTagToneClass } from '../../utils/tag-tones'
 import { formatSkillLevelDisplay, SKILL_LEVEL_OPTIONS } from '../../utils/skill-levels'
 
 type TabId = 'responses' | 'favorites' | 'resume' | 'profile'
@@ -2830,7 +2833,11 @@ export function SeekerDashboardPage() {
               <div className="seeker-profile-hero-exact__left">
                 <div className="seeker-profile-hero-exact__skills">
                   {heroSkills.length ? (
-                    heroSkills.map((skill) => <span key={`hero-skill-${skill.tagId}`}>{skill.tagName}</span>)
+                    heroSkills.map((skill) => (
+                      <span key={`hero-skill-${skill.tagId}`} className={clsx('tag opportunity-tag', getTagToneClass(skill.tagName))}>
+                        {skill.tagName}
+                      </span>
+                    ))
                   ) : (
                     <span className="is-empty">Скиллы не заполнены</span>
                   )}
@@ -3248,7 +3255,7 @@ export function SeekerDashboardPage() {
                           </div>
                           <p>{item.description}</p>
                           <div className="favorite-card__actions">
-                            <Link className="btn btn--ghost" to={`/opportunity/${item.id}`}>
+                            <Link className="btn btn--ghost" to={buildOpportunityDetailsPath(item)}>
                               Подробнее
                             </Link>
                             <button type="button" className="btn btn--primary" disabled={Boolean(applyingIds[item.id]) || hasApplied(item.id)} onClick={() => void onApplyFromFavorites(item.id)}>

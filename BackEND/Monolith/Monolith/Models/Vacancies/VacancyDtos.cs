@@ -16,7 +16,11 @@ public record VacancyListItemDto(
     SalaryTaxMode SalaryTaxMode,
     DateTimeOffset PublishAt,
     bool VerifiedCompany,
-    IReadOnlyCollection<string> Tags);
+    IReadOnlyCollection<string> Tags)
+{
+    public long CompanyId { get; init; }
+    public string? CompanyLogoUrl { get; init; }
+}
 
 public record VacancyDetailDto(
     long Id,

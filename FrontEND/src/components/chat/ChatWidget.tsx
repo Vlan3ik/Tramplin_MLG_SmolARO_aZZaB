@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { PlatformRole } from '../../types/auth'
 import type { ChatListItem, ChatMessage } from '../../types/chat'
 import { useNavigate } from 'react-router-dom'
+import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
 
 const CHAT_POLL_OPEN_INTERVAL_MS = 20000
 const MESSAGE_POLL_INTERVAL_MS = 8000
@@ -715,7 +716,7 @@ export function ChatWidget() {
                       <button
                         type="button"
                         className="chat-widget__thread-vacancy"
-                        onClick={() => navigate(`/opportunity/${activeOpportunityLink.opportunityId}`)}
+                        onClick={() => navigate(buildOpportunityDetailsPath({ id: activeOpportunityLink.opportunityId, entityType: 'opportunity' }))}
                         title="Открыть карточку мероприятия"
                       >
                         <span>Мероприятие</span>
@@ -726,7 +727,7 @@ export function ChatWidget() {
                       <button
                         type="button"
                         className="chat-widget__thread-vacancy"
-                        onClick={() => navigate(`/opportunity/${activeTopVacancyLink.vacancyId}`)}
+                        onClick={() => navigate(buildOpportunityDetailsPath({ id: activeTopVacancyLink.vacancyId, entityType: 'vacancy' }))}
                         title="Открыть карточку вакансии"
                       >
                         <span>Вакансия</span>
@@ -783,7 +784,7 @@ export function ChatWidget() {
                                     key={`a-${attachment.id}`}
                                     type="button"
                                     className="chat-widget__thread-vacancy chat-widget__attachment-card"
-                                    onClick={() => navigate(`/opportunity/${attachment.vacancy?.vacancyId}`)}
+                                    onClick={() => navigate(buildOpportunityDetailsPath({ id: attachment.vacancy!.vacancyId, entityType: 'vacancy' }))}
                                   >
                                     <span>Рекомендация вакансии</span>
                                     <strong>{attachment.vacancy.title}</strong>
@@ -797,7 +798,7 @@ export function ChatWidget() {
                                     key={`a-${attachment.id}`}
                                     type="button"
                                     className="chat-widget__thread-vacancy chat-widget__attachment-card"
-                                    onClick={() => navigate(`/opportunity/${attachment.opportunity?.opportunityId}`)}
+                                    onClick={() => navigate(buildOpportunityDetailsPath({ id: attachment.opportunity!.opportunityId, entityType: 'opportunity' }))}
                                   >
                                     <span>Рекомендация мероприятия</span>
                                     <strong>{attachment.opportunity.title}</strong>

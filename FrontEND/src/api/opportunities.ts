@@ -1,6 +1,7 @@
 ﻿import { getJson, postJson } from './client'
 import type { PagedResponse } from '../types/catalog'
 import type { Opportunity, OpportunityDetail, OpportunityFilters, OpportunityType } from '../types/opportunity'
+import type { OpportunityEntityType } from '../utils/opportunity-routing'
 
 type KindApi = string | number | null | undefined
 type WorkFormatApi = string | number | null | undefined
@@ -9,10 +10,14 @@ type VacancyListItemApi = {
   id: number
   title: string | null
   status?: number | null
+  shortDescription?: string | null
+  fullDescription?: string | null
   kind?: KindApi
   type?: KindApi
   format?: WorkFormatApi
+  companyId?: number | null
   companyName?: string | null
+  companyLogoUrl?: string | null
   locationName?: string | null
   salaryFrom?: number | null
   salaryTo?: number | null
@@ -26,9 +31,13 @@ type OpportunityListItemApi = {
   id: number
   title: string | null
   status?: number | null
+  shortDescription?: string | null
+  fullDescription?: string | null
   kind?: KindApi
   format?: WorkFormatApi
+  companyId?: number | null
   companyName?: string | null
+  companyLogoUrl?: string | null
   locationName?: string | null
   priceType?: string | number | null
   priceAmount?: number | null
@@ -301,11 +310,11 @@ function toOpportunityFromVacancy(apiItem: VacancyListItemApi, coordinates: { la
     compensation: formatSalary(apiItem.salaryFrom, apiItem.salaryTo, apiItem.currencyCode),
     workFormat: normalizedFormat === 'onsite' ? 'Офис' : normalizedFormat === 'remote' ? 'Удаленно' : 'Гибрид',
     date: formatRelativeDate(apiItem.publishAt),
-    description: (apiItem.tags ?? []).length
-      ? `Ключевые навыки: ${(apiItem.tags ?? []).slice(0, 4).join(', ')}.`
-      : 'Описание добавляется в карточке вакансии.',
+    description: (apiItem.shortDescription ?? apiItem.fullDescription ?? '').trim() || 'Описание добавляется в карточке вакансии.',
     tags: apiItem.tags ?? [],
     verified: Boolean(apiItem.verifiedCompany),
+    companyId: apiItem.companyId ?? null,
+    companyLogoUrl: apiItem.companyLogoUrl ?? null,
     latitude: coordinates.latitude,
     longitude: coordinates.longitude,
   }
@@ -332,11 +341,11 @@ function toOpportunityFromOpportunity(
     compensation: formatPrice(apiItem.priceType, apiItem.priceAmount, apiItem.priceCurrencyCode),
     workFormat: normalizedFormat === 'onsite' ? 'Офис' : normalizedFormat === 'remote' ? 'Удаленно' : 'Гибрид',
     date: formatRelativeDate(apiItem.publishAt),
-    description: (apiItem.tags ?? []).length
-      ? `Ключевые теги: ${(apiItem.tags ?? []).slice(0, 4).join(', ')}.`
-      : 'Описание добавляется в карточке возможности.',
+    description: (apiItem.shortDescription ?? apiItem.fullDescription ?? '').trim() || 'Описание добавляется в карточке возможности.',
     tags: apiItem.tags ?? [],
     verified: Boolean(apiItem.verifiedCompany),
+    companyId: apiItem.companyId ?? null,
+    companyLogoUrl: apiItem.companyLogoUrl ?? null,
     latitude: coordinates.latitude,
     longitude: coordinates.longitude,
   }
@@ -693,6 +702,8 @@ function mapOpportunityFromFeature(feature: MapOpportunityFeatureApi): Opportuni
     description: props?.shortDescription ?? props?.fullDescription ?? 'Описание добавляется в карточке возможности.',
     tags: props?.tags ?? [],
     verified: Boolean(props?.company?.verified),
+    companyId: props?.company?.id ?? null,
+    companyLogoUrl: null,
     latitude,
     longitude,
     entityType: entityType ?? undefined,
@@ -852,6 +863,7 @@ function mapFromVacancyDetail(response: VacancyDetailApi): OpportunityDetail {
 
   return {
     id: response.id,
+    entityType: 'vacancy',
     title: response.title ?? 'Без названия',
     type,
     status: response.status ?? 3,
@@ -868,9 +880,10 @@ function mapFromVacancyDetail(response: VacancyDetailApi): OpportunityDetail {
     isParticipating: false,
     tags: response.tags ?? [],
     verified: response.company?.verified ?? false,
+    companyId: response.company?.id ?? null,
+    companyLogoUrl: null,
     latitude: response.location?.latitude ?? null,
     longitude: response.location?.longitude ?? null,
-    companyId: response.company?.id ?? null,
     companyWebsiteUrl: response.company?.websiteUrl ?? null,
     companyPublicEmail: response.company?.publicEmail ?? null,
     address: toAddress(response.location),
@@ -883,6 +896,7 @@ function mapFromOpportunityDetail(response: OpportunityDetailApi): OpportunityDe
 
   return {
     id: response.id,
+    entityType: 'opportunity',
     title: response.title ?? 'Без названия',
     type,
     status: response.status ?? 3,
@@ -899,9 +913,10 @@ function mapFromOpportunityDetail(response: OpportunityDetailApi): OpportunityDe
     isParticipating: Boolean(response.isParticipating),
     tags: response.tags ?? [],
     verified: response.company?.verified ?? false,
+    companyId: response.company?.id ?? null,
+    companyLogoUrl: null,
     latitude: response.location?.latitude ?? null,
     longitude: response.location?.longitude ?? null,
-    companyId: response.company?.id ?? null,
     companyWebsiteUrl: response.company?.websiteUrl ?? null,
     companyPublicEmail: response.company?.publicEmail ?? null,
     address: toAddress(response.location),
@@ -921,6 +936,7 @@ export async function fetchOpportunityById(id: number, signal?: AbortSignal): Pr
 
   return {
     id: detail.id,
+    entityType: detail.entityType,
     title: detail.title,
     type: detail.type,
     status: detail.status,
@@ -932,6 +948,8 @@ export async function fetchOpportunityById(id: number, signal?: AbortSignal): Pr
     description: detail.description,
     tags: detail.tags,
     verified: detail.verified,
+    companyId: detail.companyId,
+    companyLogoUrl: detail.companyLogoUrl,
     latitude: detail.latitude ?? null,
     longitude: detail.longitude ?? null,
   }
@@ -947,7 +965,21 @@ function toAddress(location: VacancyDetailApi['location'] | OpportunityDetailApi
   return parts.length ? parts.join(', ') : 'Адрес не указан'
 }
 
-export async function fetchOpportunityDetailById(id: number, signal?: AbortSignal): Promise<OpportunityDetail> {
+export async function fetchOpportunityDetailById(
+  id: number,
+  signal?: AbortSignal,
+  preferredEntityType?: OpportunityEntityType | null,
+): Promise<OpportunityDetail> {
+  if (preferredEntityType === 'vacancy') {
+    const vacancyResponse = await getJson<VacancyDetailApi>(`/vacancies/${id}`, { signal, withAuth: false })
+    return mapFromVacancyDetail(vacancyResponse)
+  }
+
+  if (preferredEntityType === 'opportunity') {
+    const opportunityResponse = await getJson<OpportunityDetailApi>(`/opportunities/${id}`, { signal, withAuth: false })
+    return mapFromOpportunityDetail(opportunityResponse)
+  }
+
   try {
     const vacancyResponse = await getJson<VacancyDetailApi>(`/vacancies/${id}`, { signal, withAuth: false })
     return mapFromVacancyDetail(vacancyResponse)

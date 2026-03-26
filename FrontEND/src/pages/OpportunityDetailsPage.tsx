@@ -1,6 +1,6 @@
 ﻿import { CalendarClock, CheckCircle2, Clock3, Link2, MapPin, Share2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { createApplication } from '../api/applications'
 import { shareOpportunityToUser, shareVacancyToUser } from '../api/chats'
 import { fetchMyContacts } from '../api/contacts'
@@ -12,6 +12,7 @@ import { useApplications } from '../hooks/useApplications'
 import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityDetail } from '../types/opportunity'
 import { typeLabel } from '../types/opportunity'
+import type { OpportunityEntityType } from '../utils/opportunity-routing'
 import { isFavoriteOpportunity, subscribeToFavoriteOpportunities, toggleFavoriteOpportunity } from '../utils/favorites'
 
 function formatAbsoluteDate(value: string | null) {
@@ -42,6 +43,7 @@ function buildMapLink(opportunity: OpportunityDetail) {
 
 export function OpportunityDetailsPage() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
   const { session } = useAuth()
   const { hasApplied } = useApplications()
 
@@ -60,6 +62,10 @@ export function OpportunityDetailsPage() {
   const [selectedShareUserId, setSelectedShareUserId] = useState<number | null>(null)
 
   const opportunityId = Number(id)
+  const preferredEntityType = useMemo(() => {
+    const value = searchParams.get('entityType')
+    return value === 'vacancy' || value === 'opportunity' ? (value as OpportunityEntityType) : null
+  }, [searchParams])
 
   useEffect(() => {
     if (!Number.isFinite(opportunityId) || opportunityId <= 0) {
@@ -75,7 +81,7 @@ export function OpportunityDetailsPage() {
       setErrorMessage('')
 
       try {
-        const detail = await fetchOpportunityDetailById(opportunityId, controller.signal)
+        const detail = await fetchOpportunityDetailById(opportunityId, controller.signal, preferredEntityType)
 
         if (controller.signal.aborted) {
           return
@@ -114,7 +120,7 @@ export function OpportunityDetailsPage() {
     void loadData()
 
     return () => controller.abort()
-  }, [opportunityId])
+  }, [opportunityId, preferredEntityType])
 
   useEffect(() => {
     const unsubscribe = subscribeToFavoriteOpportunities(() => {

@@ -14,7 +14,8 @@ type SearchHeroProps = {
 }
 
 const HERO_IFRAME_URL =
-    'https://luxespa-smolensk.ru/'
+    'https://f1522a5f98994b28bc6f9e7fab68bc03.elf.site'
+    // 'https://luxespa-smolensk.ru/'
       // 'https://g.igroutka.ru/games/1652/1u2NbYJlreRAtwo7/3fdb3fff-ce9a-467e-aa21-a2f103202af3/index.html'
   // 'https://igroutka.ru/loader/game/54272/'
 
