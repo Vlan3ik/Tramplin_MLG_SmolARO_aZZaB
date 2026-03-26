@@ -19,6 +19,7 @@ import type { SearchSuggestItem } from '../types/search'
 import { CommunityTabsSection } from '../components/layout/community-tabs/CommunityTabsSection'
 import { EventsCarouselSection } from '../components/layout/events-carousel/EventsCarouselSection'
 import { useSearchParams } from 'react-router-dom'
+import { useCity } from '../contexts/CityContext'
 
 const defaultFilters: OpportunityFilters = {
   types: [],
@@ -32,6 +33,7 @@ const defaultFilters: OpportunityFilters = {
 
 export function HomePage() {
   const { session } = useAuth()
+  const { selectedCity, selectedCityId } = useCity()
   const { hasApplied } = useApplications()
   const [searchParams] = useSearchParams()
 
@@ -62,10 +64,10 @@ export function HomePage() {
       page: 1,
       pageSize: 24,
       search: appliedSearch,
-      cityId: null,
+      cityId: selectedCityId,
       filters,
     }),
-    [appliedSearch, filters],
+    [appliedSearch, filters, selectedCityId],
   )
 
   const mapQuery = useMemo(
@@ -141,8 +143,14 @@ export function HomePage() {
       setViewMode('map')
     }
 
-    const lat = Number(searchParams.get('lat'))
-    const lng = Number(searchParams.get('lng'))
+    const rawLat = searchParams.get('lat')
+    const rawLng = searchParams.get('lng')
+    if (rawLat === null || rawLng === null) {
+      return
+    }
+
+    const lat = Number(rawLat)
+    const lng = Number(rawLng)
 
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
       setMapJumpRequest({
@@ -151,6 +159,17 @@ export function HomePage() {
       })
     }
   }, [searchParams])
+
+  useEffect(() => {
+    if (selectedCity?.latitude == null || selectedCity.longitude == null) {
+      return
+    }
+
+    setMapJumpRequest({
+      token: Date.now(),
+      lngLat: [selectedCity.longitude, selectedCity.latitude],
+    })
+  }, [selectedCityId, selectedCity?.latitude, selectedCity?.longitude])
 
   useEffect(() => {
     if (viewMode !== 'map' || !mapBounds) {
