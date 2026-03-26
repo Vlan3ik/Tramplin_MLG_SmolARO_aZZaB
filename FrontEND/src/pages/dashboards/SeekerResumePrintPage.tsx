@@ -122,11 +122,6 @@ export function SeekerResumePrintPage() {
               <p>{profile?.username ? `@${profile.username}` : 'Публичный профиль'}</p>
             </div>
           </div>
-          <div className="resume-print-page__header-actions no-print">
-            <button type="button" className="btn btn--primary" onClick={() => window.print()}>
-              Скачать через печать
-            </button>
-          </div>
         </header>
 
         {loading ? <p className="resume-print-page__state">Подготавливаем печатную версию...</p> : null}
