@@ -17,6 +17,9 @@ import { RegisterPage } from './pages/RegisterPage'
 import { ResumesPage } from './pages/ResumesPage'
 import { VacancyFlowPage } from './pages/VacancyFlowPage'
 import { CuratorDashboardPage } from './pages/dashboards/CuratorDashboardPage'
+import { CuratorCreateCompanyPage } from './pages/dashboards/CuratorCreateCompanyPage'
+import { CuratorCreateUserPage } from './pages/dashboards/CuratorCreateUserPage'
+import { CuratorCreateVacancyPage } from './pages/dashboards/CuratorCreateVacancyPage'
 import { EmployerDashboardPage } from './pages/dashboards/EmployerDashboardPage'
 import { SeekerDashboardPage } from './pages/dashboards/SeekerDashboardPage'
 import { SeekerPortfolioProjectPage } from './pages/dashboards/SeekerPortfolioProjectPage'
@@ -75,6 +78,9 @@ function App() {
 
         <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Curator]} />}>
           <Route path="dashboard/curator" element={<CuratorDashboardPage />} />
+          <Route path="dashboard/curator/users/create" element={<CuratorCreateUserPage />} />
+          <Route path="dashboard/curator/companies/create" element={<CuratorCreateCompanyPage />} />
+          <Route path="dashboard/curator/vacancies/create" element={<CuratorCreateVacancyPage />} />
         </Route>
 
         <Route element={<ProtectedRoute />}>
