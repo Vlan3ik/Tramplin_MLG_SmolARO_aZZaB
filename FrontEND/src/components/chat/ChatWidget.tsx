@@ -1,4 +1,4 @@
-﻿import { MessageCircle, Send, X } from 'lucide-react'
+﻿import { ChevronLeft, ChevronRight, MessageCircle, Send, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchChatDetail, fetchChatMessages, fetchEmployerChatDetail, fetchEmployerChats, fetchMyChats, markChatRead, sendChatMediaMessage, sendChatMessage } from '../../api/chats'
 import { fetchEmployerApplications } from '../../api/employer'
@@ -10,6 +10,14 @@ import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
 
 const CHAT_POLL_OPEN_INTERVAL_MS = 20000
 const MESSAGE_POLL_INTERVAL_MS = 8000
+const CHAT_PANEL_ANIMATION_MS = 240
+
+type MediaViewerItem = {
+  id: number
+  type: 1 | 2
+  url: string
+  fileName: string
+}
 
 function isAbortError(error: unknown) {
   if (error instanceof DOMException && error.name === 'AbortError') {
@@ -164,6 +172,34 @@ function getAvatarInitials(displayName: string | null | undefined, username: str
   return '?'
 }
 
+function getFileQueueKey(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}`
+}
+
+function getMessageMediaItems(message: ChatMessage) {
+  const items: MediaViewerItem[] = []
+
+  for (const attachment of message.attachments) {
+    if ((attachment.type === 1 || attachment.type === 2) && attachment.url) {
+      items.push({
+        id: attachment.id,
+        type: attachment.type,
+        url: attachment.url,
+        fileName: attachment.fileName ?? (attachment.type === 1 ? 'Изображение' : 'Видео'),
+      })
+    }
+  }
+
+  return items
+}
+
+function getMediaIndex(items: MediaViewerItem[], attachmentId: number) {
+  return Math.max(
+    0,
+    items.findIndex((item) => item.id === attachmentId),
+  )
+}
+
 export function ChatWidget() {
   const { session, isAuthenticated } = useAuth()
   const currentUserId = session?.user?.id
@@ -171,10 +207,12 @@ export function ChatWidget() {
   const navigate = useNavigate()
 
   const [isOpen, setIsOpen] = useState(false)
+  const [isPanelRendered, setIsPanelRendered] = useState(false)
   const [chats, setChats] = useState<ChatListItem[]>([])
   const [activeChatId, setActiveChatId] = useState<number | null>(null)
   const [messagesByChat, setMessagesByChat] = useState<Record<number, ChatMessage[]>>({})
   const [messageInput, setMessageInput] = useState('')
+  const [queuedFiles, setQueuedFiles] = useState<File[]>([])
   const [isLoadingChats, setIsLoadingChats] = useState(false)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isSending, setIsSending] = useState(false)
@@ -182,6 +220,8 @@ export function ChatWidget() {
   const [pendingOpenChatId, setPendingOpenChatId] = useState<number | null>(null)
   const [chatVacancyById, setChatVacancyById] = useState<Record<number, { vacancyId: number; vacancyTitle: string }>>({})
   const [chatLinkedCardById, setChatLinkedCardById] = useState<Record<number, any>>({})
+  const [mediaViewerItems, setMediaViewerItems] = useState<MediaViewerItem[]>([])
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0)
 
   const chatsInFlightRef = useRef(false)
   const historyInFlightByChatRef = useRef<Record<number, boolean>>({})
@@ -192,9 +232,53 @@ export function ChatWidget() {
   const activeChatIdRef = useRef<number | null>(activeChatId)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const panelUnmountTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
     activeChatIdRef.current = activeChatId
+  }, [activeChatId])
+
+  useEffect(() => {
+    if (isOpen) {
+      if (panelUnmountTimeoutRef.current) {
+        window.clearTimeout(panelUnmountTimeoutRef.current)
+        panelUnmountTimeoutRef.current = null
+      }
+      setIsPanelRendered(true)
+      return
+    }
+
+    if (!isPanelRendered) {
+      return
+    }
+
+    panelUnmountTimeoutRef.current = window.setTimeout(() => {
+      setIsPanelRendered(false)
+      panelUnmountTimeoutRef.current = null
+    }, CHAT_PANEL_ANIMATION_MS)
+
+    return () => {
+      if (panelUnmountTimeoutRef.current) {
+        window.clearTimeout(panelUnmountTimeoutRef.current)
+        panelUnmountTimeoutRef.current = null
+      }
+    }
+  }, [isOpen, isPanelRendered])
+
+  useEffect(
+    () => () => {
+      if (panelUnmountTimeoutRef.current) {
+        window.clearTimeout(panelUnmountTimeoutRef.current)
+      }
+    },
+    [],
+  )
+
+  useEffect(() => {
+    setQueuedFiles([])
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }, [activeChatId])
 
   const activeChat = useMemo(() => chats.find((chat) => chat.id === activeChatId) ?? null, [activeChatId, chats])
@@ -269,6 +353,10 @@ export function ChatWidget() {
 
     return null
   }, [activeChat, activeMessages, currentUserId])
+  const hasUnreadChats = useMemo(() => chats.some((chat) => chat.lastMessage && chat.lastMessage.senderUserId !== currentUserId), [chats, currentUserId])
+  const hasComposerContent = messageInput.trim().length > 0 || queuedFiles.length > 0
+  const isMediaViewerOpen = mediaViewerItems.length > 0
+  const activeViewerItem = mediaViewerItems[activeMediaIndex]
 
   useEffect(() => {
     if (!isOpen || !activeChatId) {
@@ -595,6 +683,40 @@ export function ChatWidget() {
     return () => controller.abort()
   }, [isAuthenticated, isEmployerSession, isOpen])
 
+  useEffect(() => {
+    if (!isMediaViewerOpen) {
+      return
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMediaViewerItems([])
+        return
+      }
+
+      if (event.key === 'ArrowRight') {
+        setActiveMediaIndex((current) => {
+          if (mediaViewerItems.length <= 1) {
+            return current
+          }
+          return (current + 1) % mediaViewerItems.length
+        })
+      }
+
+      if (event.key === 'ArrowLeft') {
+        setActiveMediaIndex((current) => {
+          if (mediaViewerItems.length <= 1) {
+            return current
+          }
+          return (current - 1 + mediaViewerItems.length) % mediaViewerItems.length
+        })
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isMediaViewerOpen, mediaViewerItems.length])
+
   async function handleSendMessage() {
     if (!activeChatId || !messageInput.trim() || isSending) {
       return
@@ -624,8 +746,8 @@ export function ChatWidget() {
     }
   }
 
-  async function handleUploadMedia(files: FileList | null) {
-    if (!activeChatId || !files || files.length === 0 || isSending) {
+  async function handleUploadMedia(files: File[]) {
+    if (!activeChatId || !files.length || isSending) {
       return
     }
 
@@ -634,7 +756,7 @@ export function ChatWidget() {
 
     try {
       const formData = new FormData()
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         formData.append('files', file)
       }
       if (messageInput.trim()) {
@@ -653,6 +775,7 @@ export function ChatWidget() {
       })
 
       setMessageInput('')
+      setQueuedFiles([])
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -664,6 +787,70 @@ export function ChatWidget() {
     }
   }
 
+  function handleFileInputChange(files: FileList | null) {
+    if (!files || files.length === 0) {
+      return
+    }
+
+    setQueuedFiles((currentFiles) => {
+      const map = new Map<string, File>()
+
+      for (const file of currentFiles) {
+        map.set(getFileQueueKey(file), file)
+      }
+
+      for (const file of Array.from(files)) {
+        map.set(getFileQueueKey(file), file)
+      }
+
+      return Array.from(map.values())
+    })
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  function handleRemoveQueuedFile(file: File) {
+    const key = getFileQueueKey(file)
+    setQueuedFiles((currentFiles) => currentFiles.filter((item) => getFileQueueKey(item) !== key))
+  }
+
+  async function handleComposerSubmit() {
+    if (!activeChatId || isSending) {
+      return
+    }
+
+    if (queuedFiles.length > 0) {
+      await handleUploadMedia(queuedFiles)
+      return
+    }
+
+    await handleSendMessage()
+  }
+
+  function openMediaViewer(items: MediaViewerItem[], startIndex: number) {
+    if (!items.length) {
+      return
+    }
+
+    setMediaViewerItems(items)
+    setActiveMediaIndex(startIndex)
+  }
+
+  function closeMediaViewer() {
+    setMediaViewerItems([])
+    setActiveMediaIndex(0)
+  }
+
+  function showPrevMedia() {
+    setActiveMediaIndex((current) => (current - 1 + mediaViewerItems.length) % mediaViewerItems.length)
+  }
+
+  function showNextMedia() {
+    setActiveMediaIndex((current) => (current + 1) % mediaViewerItems.length)
+  }
+
   if (!isAuthenticated) {
     return null
   }
@@ -673,180 +860,252 @@ export function ChatWidget() {
   const currentUserDisplayName = session?.user?.username?.trim() || 'Вы'
 
   return (
-    <div className="chat-widget">
-      {isOpen ? (
-        <section className="chat-widget__panel card" aria-label="Чаты">
-          <header className="chat-widget__head">
-            <strong>Чаты</strong>
-            <button type="button" className="btn btn--icon" onClick={() => setIsOpen(false)} aria-label="Свернуть чат">
-              <X size={16} />
-            </button>
-          </header>
+    <>
+      <div className={`chat-widget ${isOpen ? 'is-open' : ''} ${isPanelRendered ? 'is-animating' : ''}`}>
+        {isPanelRendered ? (
+          <section className={`chat-widget__panel card ${isOpen ? 'is-open' : ''}`} aria-label="Чаты">
+            <header className="chat-widget__head">
+              <strong>Чаты</strong>
+              <button type="button" className="btn btn--icon" onClick={() => setIsOpen(false)} aria-label="Свернуть чат">
+                <X size={16} />
+              </button>
+            </header>
 
-          <div className="chat-widget__body">
-            <aside className="chat-widget__list">
-              {isLoadingChats ? <p>Загружаем...</p> : null}
-              {!isLoadingChats && !chats.length ? <p>Чатов пока нет.</p> : null}
-              {chats.map((chat) => (
-                <button
-                  key={chat.id}
-                  type="button"
-                  className={`chat-widget__list-item ${chat.id === activeChatId ? 'is-active' : ''}`}
-                  onClick={() => setActiveChatId(chat.id)}
-                >
-                  <strong>{getChatTitle(chat)}</strong>
-                  <span>{getMessagePreview(chat.lastMessage)}</span>
-                </button>
-              ))}
-            </aside>
+            <div className="chat-widget__body">
+              <aside className="chat-widget__list">
+                {isLoadingChats ? <p>Загружаем...</p> : null}
+                {!isLoadingChats && !chats.length ? <p>Чатов пока нет.</p> : null}
+                {chats.map((chat) => (
+                  <button
+                    key={chat.id}
+                    type="button"
+                    className={`chat-widget__list-item ${chat.id === activeChatId ? 'is-active' : ''}`}
+                    onClick={() => setActiveChatId(chat.id)}
+                  >
+                    <strong>{getChatTitle(chat)}</strong>
+                    <span>{getMessagePreview(chat.lastMessage)}</span>
+                  </button>
+                ))}
+              </aside>
 
-            <div className="chat-widget__thread">
-              {activeChat ? (
-                <>
-                  <div className="chat-widget__thread-head">
-                    <div className="chat-widget__thread-head-title">
-                      <strong>{activeChatHeaderTitle}</strong>
-                      {activeDirectUsername ? (
-                        <button type="button" className="chat-widget__thread-link" onClick={() => navigate(`/dashboard/seeker/${encodeURIComponent(activeDirectUsername)}`)}>
-                          Профиль пользователя
+              <div className="chat-widget__thread">
+                {activeChat ? (
+                  <>
+                    <div className="chat-widget__thread-head">
+                      <div className="chat-widget__thread-head-title">
+                        <strong>{activeChatHeaderTitle}</strong>
+                        {activeDirectUsername ? (
+                          <button type="button" className="chat-widget__thread-link" onClick={() => navigate(`/dashboard/seeker/${encodeURIComponent(activeDirectUsername)}`)}>
+                            Профиль пользователя
+                          </button>
+                        ) : null}
+                      </div>
+                      {activeOpportunityLink ? (
+                        <button
+                          type="button"
+                          className="chat-widget__thread-vacancy"
+                          onClick={() => navigate(buildOpportunityDetailsPath({ id: activeOpportunityLink.opportunityId, entityType: 'opportunity' }))}
+                          title="Открыть карточку мероприятия"
+                        >
+                          <span>Мероприятие</span>
+                          <strong>{activeOpportunityLink.title}</strong>
+                        </button>
+                      ) : null}
+                      {activeTopVacancyLink ? (
+                        <button
+                          type="button"
+                          className="chat-widget__thread-vacancy"
+                          onClick={() => navigate(buildOpportunityDetailsPath({ id: activeTopVacancyLink.vacancyId, entityType: 'vacancy' }))}
+                          title="Открыть карточку вакансии"
+                        >
+                          <span>Вакансия</span>
+                          <strong>{activeTopVacancyLink.title}</strong>
                         </button>
                       ) : null}
                     </div>
-                    {activeOpportunityLink ? (
-                      <button
-                        type="button"
-                        className="chat-widget__thread-vacancy"
-                        onClick={() => navigate(buildOpportunityDetailsPath({ id: activeOpportunityLink.opportunityId, entityType: 'opportunity' }))}
-                        title="Открыть карточку мероприятия"
-                      >
-                        <span>Мероприятие</span>
-                        <strong>{activeOpportunityLink.title}</strong>
-                      </button>
-                    ) : null}
-                    {activeTopVacancyLink ? (
-                      <button
-                        type="button"
-                        className="chat-widget__thread-vacancy"
-                        onClick={() => navigate(buildOpportunityDetailsPath({ id: activeTopVacancyLink.vacancyId, entityType: 'vacancy' }))}
-                        title="Открыть карточку вакансии"
-                      >
-                        <span>Вакансия</span>
-                        <strong>{activeTopVacancyLink.title}</strong>
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="chat-widget__messages" ref={messagesContainerRef}>
-                    {isLoadingMessages ? <p>Загружаем сообщения...</p> : null}
-                    {!isLoadingMessages && !activeMessages.length ? <p>Сообщений пока нет.</p> : null}
-                    {activeMessages.map((message) => {
-                      const isMine = message.senderUserId === currentUserId
-                      const displayName = (isMine ? currentUserDisplayName : message.senderDisplayName)?.trim() || 'Пользователь'
-                      const username = isMine ? currentUserUsername : message.senderUsername
-                      const usernameLabel = getUsernameLabel(username)
-                      const avatarUrl = isMine ? currentUserAvatarUrl : message.senderAvatarUrl
-                      const avatarInitials = getAvatarInitials(displayName, username)
+                    <div className="chat-widget__messages" ref={messagesContainerRef}>
+                      {isLoadingMessages ? <p>Загружаем сообщения...</p> : null}
+                      {!isLoadingMessages && !activeMessages.length ? <p>Сообщений пока нет.</p> : null}
+                      {activeMessages.map((message) => {
+                        const isMine = message.senderUserId === currentUserId
+                        const displayName = (isMine ? currentUserDisplayName : message.senderDisplayName)?.trim() || 'Пользователь'
+                        const username = isMine ? currentUserUsername : message.senderUsername
+                        const usernameLabel = getUsernameLabel(username)
+                        const avatarUrl = isMine ? currentUserAvatarUrl : message.senderAvatarUrl
+                        const avatarInitials = getAvatarInitials(displayName, username)
+                        const mediaItems = getMessageMediaItems(message)
 
-                      return (
-                        <article key={message.id} className={`chat-widget__message ${isMine ? 'is-mine' : ''} ${message.isSystem ? 'is-system' : ''}`}>
-                          <div className="chat-widget__message-avatar" aria-hidden="true">
-                            {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{avatarInitials}</span>}
-                          </div>
-                          <div className="chat-widget__message-bubble">
-                            <div className="chat-widget__message-meta">
-                              <strong>{displayName}</strong>
-                              {usernameLabel ? <span>{usernameLabel}</span> : null}
+                        return (
+                          <article key={message.id} className={`chat-widget__message ${isMine ? 'is-mine' : ''} ${message.isSystem ? 'is-system' : ''}`}>
+                            <div className="chat-widget__message-avatar" aria-hidden="true">
+                              {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{avatarInitials}</span>}
                             </div>
-                            <p>{message.text}</p>
-                            {message.attachments.map((attachment) => {
-                              if (attachment.type === 1 && attachment.url) {
-                                return (
-                                  <a key={`a-${attachment.id}`} className="chat-widget__media-thumb" href={attachment.url} target="_blank" rel="noreferrer">
-                                    <img src={attachment.url} alt={attachment.fileName ?? 'image'} />
-                                  </a>
-                                )
-                              }
+                            <div className="chat-widget__message-bubble">
+                              <div className="chat-widget__message-meta">
+                                <strong>{displayName}</strong>
+                                {usernameLabel ? <span>{usernameLabel}</span> : null}
+                              </div>
+                              <p>{message.text}</p>
+                              {message.attachments.map((attachment) => {
+                                if (attachment.type === 1 && attachment.url) {
+                                  return (
+                                    <button
+                                      key={`a-${attachment.id}`}
+                                      type="button"
+                                      className="chat-widget__media-thumb"
+                                      onClick={() => openMediaViewer(mediaItems, getMediaIndex(mediaItems, attachment.id))}
+                                      aria-label="Открыть изображение"
+                                    >
+                                      <img src={attachment.url} alt={attachment.fileName ?? 'Изображение'} />
+                                    </button>
+                                  )
+                                }
 
-                              if (attachment.type === 2 && attachment.url) {
-                                return <video key={`a-${attachment.id}`} className="chat-widget__media-video" src={attachment.url} controls />
-                              }
+                                if (attachment.type === 2 && attachment.url) {
+                                  return (
+                                    <button
+                                      key={`a-${attachment.id}`}
+                                      type="button"
+                                      className="chat-widget__media-thumb chat-widget__media-thumb--video"
+                                      onClick={() => openMediaViewer(mediaItems, getMediaIndex(mediaItems, attachment.id))}
+                                      aria-label="Открыть видео"
+                                    >
+                                      <video className="chat-widget__media-video" src={attachment.url} muted playsInline preload="metadata" />
+                                      <span>Видео</span>
+                                    </button>
+                                  )
+                                }
 
-                              if (attachment.type === 3 && attachment.url) {
-                                return (
-                                  <a key={`a-${attachment.id}`} className="chat-widget__media-file" href={attachment.url} target="_blank" rel="noreferrer">
-                                    {attachment.fileName ?? 'Файл'} {formatFileSize(attachment.sizeBytes)}
-                                  </a>
-                                )
-                              }
+                                if (attachment.type === 3 && attachment.url) {
+                                  return (
+                                    <a key={`a-${attachment.id}`} className="chat-widget__media-file" href={attachment.url} target="_blank" rel="noreferrer">
+                                      {attachment.fileName ?? 'Файл'} {formatFileSize(attachment.sizeBytes)}
+                                    </a>
+                                  )
+                                }
 
-                              if (attachment.type === 4 && attachment.vacancy) {
-                                return (
-                                  <button
-                                    key={`a-${attachment.id}`}
-                                    type="button"
-                                    className="chat-widget__thread-vacancy chat-widget__attachment-card"
-                                    onClick={() => navigate(buildOpportunityDetailsPath({ id: attachment.vacancy!.vacancyId, entityType: 'vacancy' }))}
-                                  >
-                                    <span>Рекомендация вакансии</span>
-                                    <strong>{attachment.vacancy.title}</strong>
-                                  </button>
-                                )
-                              }
+                                if (attachment.type === 4 && attachment.vacancy) {
+                                  return (
+                                    <button
+                                      key={`a-${attachment.id}`}
+                                      type="button"
+                                      className="chat-widget__thread-vacancy chat-widget__attachment-card"
+                                      onClick={() => navigate(buildOpportunityDetailsPath({ id: attachment.vacancy!.vacancyId, entityType: 'vacancy' }))}
+                                    >
+                                      <span>Рекомендация вакансии</span>
+                                      <strong>{attachment.vacancy.title}</strong>
+                                    </button>
+                                  )
+                                }
 
-                              if (attachment.type === 5 && attachment.opportunity) {
-                                return (
-                                  <button
-                                    key={`a-${attachment.id}`}
-                                    type="button"
-                                    className="chat-widget__thread-vacancy chat-widget__attachment-card"
-                                    onClick={() => navigate(buildOpportunityDetailsPath({ id: attachment.opportunity!.opportunityId, entityType: 'opportunity' }))}
-                                  >
-                                    <span>Рекомендация мероприятия</span>
-                                    <strong>{attachment.opportunity.title}</strong>
-                                  </button>
-                                )
-                              }
+                                if (attachment.type === 5 && attachment.opportunity) {
+                                  return (
+                                    <button
+                                      key={`a-${attachment.id}`}
+                                      type="button"
+                                      className="chat-widget__thread-vacancy chat-widget__attachment-card"
+                                      onClick={() => navigate(buildOpportunityDetailsPath({ id: attachment.opportunity!.opportunityId, entityType: 'opportunity' }))}
+                                    >
+                                      <span>Рекомендация мероприятия</span>
+                                      <strong>{attachment.opportunity.title}</strong>
+                                    </button>
+                                  )
+                                }
 
-                              return null
-                            })}
-                            <small>{formatChatTime(message.createdAt)}</small>
+                                return null
+                              })}
+                              <small>{formatChatTime(message.createdAt)}</small>
+                            </div>
+                          </article>
+                        )
+                      })}
+                    </div>
+                    <div className="chat-widget__composer">
+                      <div className="chat-widget__composer-top">
+                        <input ref={fileInputRef} type="file" multiple className="chat-widget__file-input" onChange={(event) => handleFileInputChange(event.target.files)} />
+                        <button type="button" className="chat-widget__attach-btn" onClick={() => fileInputRef.current?.click()} disabled={!activeChatId || isSending}>
+                          <span>Прикрепить</span>
+                        </button>
+                        {queuedFiles.length ? (
+                          <div className="chat-widget__file-chips" aria-live="polite">
+                            {queuedFiles.map((file) => (
+                              <span key={getFileQueueKey(file)} className="chat-widget__file-chip">
+                                <span>{file.name}</span>
+                                <small>{formatFileSize(file.size)}</small>
+                                <button type="button" onClick={() => handleRemoveQueuedFile(file)} aria-label={`Удалить файл ${file.name}`}>
+                                  <X size={13} />
+                                </button>
+                              </span>
+                            ))}
                           </div>
-                        </article>
-                      )
-                    })}
-                  </div>
-                  <div className="chat-widget__composer">
-                    <input ref={fileInputRef} type="file" multiple className="chat-widget__file-input" onChange={(event) => void handleUploadMedia(event.target.files)} />
-                    <input
-                      value={messageInput}
-                      onChange={(event) => setMessageInput(event.target.value)}
-                      placeholder="Введите сообщение..."
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          void handleSendMessage()
-                        }
-                      }}
-                    />
-                    <button type="button" className="btn btn--primary" disabled={isSending || !messageInput.trim()} onClick={() => void handleSendMessage()}>
-                      <Send size={16} />
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="chat-widget__empty">Выберите чат в списке.</div>
-              )}
+                        ) : null}
+                      </div>
+                      <div className="chat-widget__composer-row">
+                        <input
+                          value={messageInput}
+                          onChange={(event) => setMessageInput(event.target.value)}
+                          placeholder="Введите сообщение..."
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                              event.preventDefault()
+                              void handleComposerSubmit()
+                            }
+                          }}
+                        />
+                        <button type="button" className="btn btn--primary" disabled={isSending || !hasComposerContent} onClick={() => void handleComposerSubmit()}>
+                          <Send size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="chat-widget__empty">Выберите чат в списке.</div>
+                )}
+              </div>
             </div>
-          </div>
 
-          {errorMessage ? <div className="auth-feedback auth-feedback--error">{errorMessage}</div> : null}
-        </section>
-      ) : null}
+            {errorMessage ? <div className="auth-feedback auth-feedback--error">{errorMessage}</div> : null}
+          </section>
+        ) : null}
+      </div>
 
-      <button type="button" className="chat-widget__fab" onClick={() => setIsOpen((currentState) => !currentState)} aria-label="Открыть чаты">
+      <button
+        type="button"
+        className={`chat-widget__fab ${isOpen ? 'is-open' : ''} ${hasUnreadChats && !isOpen ? 'has-alert' : ''}`}
+        onClick={() => setIsOpen((currentState) => !currentState)}
+        aria-label="Открыть чаты"
+      >
         <MessageCircle size={20} />
       </button>
-    </div>
+
+      {isMediaViewerOpen && activeViewerItem ? (
+        <div className="chat-widget__viewer" role="dialog" aria-modal="true" aria-label="Просмотр медиа" onClick={closeMediaViewer}>
+          <div className="chat-widget__viewer-backdrop" />
+          <div className="chat-widget__viewer-content" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="chat-widget__viewer-close" onClick={closeMediaViewer} aria-label="Закрыть просмотр">
+              <X size={18} />
+            </button>
+            {mediaViewerItems.length > 1 ? (
+              <button type="button" className="chat-widget__viewer-nav chat-widget__viewer-nav--prev" onClick={showPrevMedia} aria-label="Предыдущее медиа">
+                <ChevronLeft size={20} />
+              </button>
+            ) : null}
+            {activeViewerItem.type === 1 ? (
+              <img src={activeViewerItem.url} alt={activeViewerItem.fileName} className="chat-widget__viewer-image" />
+            ) : (
+              <video src={activeViewerItem.url} className="chat-widget__viewer-video" controls autoPlay />
+            )}
+            {mediaViewerItems.length > 1 ? (
+              <button type="button" className="chat-widget__viewer-nav chat-widget__viewer-nav--next" onClick={showNextMedia} aria-label="Следующее медиа">
+                <ChevronRight size={20} />
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </>
   )
 }
+
 
 
