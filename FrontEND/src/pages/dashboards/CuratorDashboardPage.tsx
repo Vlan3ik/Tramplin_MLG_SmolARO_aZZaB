@@ -285,7 +285,13 @@ export function CuratorDashboardPage() {
             <span>ADM</span>
           </div>
           <div className="seeker-profile-hero__content">
-            <h1>Кабинет администратора</h1>
+            <div className="seeker-profile-panel__head">
+              <h1>Кабинет администратора</h1>
+              <div className="admin-toolbar">
+                <Link className="btn btn--primary" to="/dashboard/curator/users/create">Создать пользователя</Link>
+                <Link className="btn btn--primary" to="/dashboard/curator/companies/create">Создать компанию</Link>
+              </div>
+            </div>
             <p>Управление пользователями, компаниями и модерацией вакансий/мероприятий.</p>
             <div className="seeker-profile-hero__meta">
               <span><Users size={14} />{usersTotal} пользователей</span>
@@ -310,16 +316,6 @@ export function CuratorDashboardPage() {
             </button>
           ))}
         </nav>
-
-        <section className="dashboard-section card seeker-profile-panel">
-          <div className="seeker-profile-panel__head">
-            <h2>Быстрые действия</h2>
-            <div className="admin-toolbar">
-              <Link className="btn btn--primary" to="/dashboard/curator/users/create">Создать пользователя</Link>
-              <Link className="btn btn--primary" to="/dashboard/curator/companies/create">Создать компанию</Link>
-            </div>
-          </div>
-        </section>
 
         {tab === 'overview' ? (
           <section className="dashboard-section card seeker-profile-panel">
