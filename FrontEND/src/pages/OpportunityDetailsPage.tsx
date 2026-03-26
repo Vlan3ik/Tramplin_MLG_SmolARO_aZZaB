@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { createApplication } from '../api/applications'
 import { shareOpportunityToUser, shareVacancyToUser } from '../api/chats'
 import { fetchMyContacts } from '../api/contacts'
+import { addOpportunityToFavorites, addVacancyToFavorites, removeOpportunityFromFavorites, removeVacancyFromFavorites } from '../api/favorites'
 import { fetchHomeOpportunities, fetchOpportunityDetailById, participateInOpportunity } from '../api/opportunities'
 import { fetchMyFollowerSubscriptions, fetchMyFollowingSubscriptions } from '../api/subscriptions'
 import { OpportunityLocationMap } from '../components/home/OpportunityLocationMap'
@@ -13,7 +14,6 @@ import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityDetail } from '../types/opportunity'
 import { typeLabel } from '../types/opportunity'
 import type { OpportunityEntityType } from '../utils/opportunity-routing'
-import { isFavoriteOpportunity, subscribeToFavoriteOpportunities, toggleFavoriteOpportunity } from '../utils/favorites'
 
 function formatAbsoluteDate(value: string | null) {
   if (!value) {
@@ -39,6 +39,18 @@ function buildMapLink(opportunity: OpportunityDetail) {
   }
 
   return `https://yandex.ru/maps/?text=${encodeURIComponent(opportunity.address || opportunity.location)}`
+}
+
+function getFriendFavoritesLabel(count: number) {
+  if (count <= 0) {
+    return ''
+  }
+
+  if (count === 1) {
+    return 'В избранном у 1 друга'
+  }
+
+  return `В избранном у ${count} друзей`
 }
 
 export function OpportunityDetailsPage() {
@@ -89,7 +101,7 @@ export function OpportunityDetailsPage() {
 
         setOpportunity(detail)
         setEventParticipating(Boolean(detail.isParticipating))
-        setIsFavorite(isFavoriteOpportunity(detail.id))
+        setIsFavorite(Boolean(detail.isFavoriteByMe))
 
         const similarResponse = await fetchHomeOpportunities(
           {
@@ -122,16 +134,6 @@ export function OpportunityDetailsPage() {
     return () => controller.abort()
   }, [opportunityId, preferredEntityType])
 
-  useEffect(() => {
-    const unsubscribe = subscribeToFavoriteOpportunities(() => {
-      if (opportunity) {
-        setIsFavorite(isFavoriteOpportunity(opportunity.id))
-      }
-    })
-
-    return unsubscribe
-  }, [opportunity])
-
   const applied = useMemo(() => {
     if (!opportunity) {
       return false
@@ -144,15 +146,36 @@ export function OpportunityDetailsPage() {
     return hasApplied(opportunity.id)
   }, [eventParticipating, opportunity, hasApplied])
 
-  function handleToggleFavorite() {
+  async function handleToggleFavorite() {
     if (!opportunity) {
       return
     }
 
-    const nextValue = toggleFavoriteOpportunity(opportunity.id)
-    setIsFavorite(nextValue)
-    setActionError(false)
-    setActionMessage(nextValue ? 'Вакансия добавлена в избранное.' : 'Вакансия удалена из избранного.')
+    const nextValue = !isFavorite
+
+    try {
+      if (opportunity.entityType === 'vacancy') {
+        if (nextValue) {
+          await addVacancyToFavorites(opportunity.id)
+        } else {
+          await removeVacancyFromFavorites(opportunity.id)
+        }
+      } else {
+        if (nextValue) {
+          await addOpportunityToFavorites(opportunity.id)
+        } else {
+          await removeOpportunityFromFavorites(opportunity.id)
+        }
+      }
+
+      setIsFavorite(nextValue)
+      setOpportunity((current) => (current ? { ...current, isFavoriteByMe: nextValue } : current))
+      setActionError(false)
+      setActionMessage(nextValue ? 'Добавлено в избранное.' : 'Удалено из избранного.')
+    } catch (error) {
+      setActionError(true)
+      setActionMessage(error instanceof Error ? error.message : 'Не удалось обновить избранное.')
+    }
   }
 
   async function handleApply() {
@@ -325,9 +348,10 @@ export function OpportunityDetailsPage() {
           <button className="btn btn--primary" type="button" disabled={isApplying || applied} onClick={() => void handleApply()}>
             {isApplying ? 'Отправляем...' : applied ? 'Отклик отправлен' : opportunity.type !== 'vacancy' && opportunity.type !== 'internship' ? 'Записаться' : 'Откликнуться'}
           </button>
-          <button className={`btn ${isFavorite ? 'btn--primary' : 'btn--ghost'}`} type="button" onClick={handleToggleFavorite}>
+          <button className={`btn ${isFavorite ? 'btn--primary' : 'btn--ghost'}`} type="button" onClick={() => void handleToggleFavorite()}>
             {isFavorite ? 'В избранном' : 'В избранное'}
           </button>
+          {opportunity.friendFavoritesCount > 0 ? <div className="status-line">{getFriendFavoritesLabel(opportunity.friendFavoritesCount)}</div> : null}
           <a className="btn btn--ghost" href={buildMapLink(opportunity)} target="_blank" rel="noreferrer">
             Открыть карту
           </a>

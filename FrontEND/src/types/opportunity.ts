@@ -21,6 +21,10 @@ export type Opportunity = {
   favoriteCompany?: boolean
   latitude?: number | null
   longitude?: number | null
+  publishAt: string | null
+  tagMatchCount: number
+  isFavoriteByMe: boolean
+  friendFavoritesCount: number
 }
 
 export type OpportunityDetail = Opportunity & {

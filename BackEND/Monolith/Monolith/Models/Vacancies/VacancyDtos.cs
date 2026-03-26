@@ -20,6 +20,9 @@ public record VacancyListItemDto(
 {
     public long CompanyId { get; init; }
     public string? CompanyLogoUrl { get; init; }
+    public int TagMatchCount { get; init; }
+    public bool IsFavoriteByMe { get; init; }
+    public int FriendFavoritesCount { get; init; }
 }
 
 public record VacancyDetailDto(
@@ -38,4 +41,9 @@ public record VacancyDetailDto(
     SalaryTaxMode SalaryTaxMode,
     CompanyShortDto Company,
     LocationDto? Location,
-    IReadOnlyCollection<string> Tags);
+    IReadOnlyCollection<string> Tags)
+{
+    public int TagMatchCount { get; init; }
+    public bool IsFavoriteByMe { get; init; }
+    public int FriendFavoritesCount { get; init; }
+}

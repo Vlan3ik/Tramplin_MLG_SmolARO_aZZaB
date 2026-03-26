@@ -22,6 +22,9 @@ public record OpportunityListItemDto(
 {
     public long CompanyId { get; init; }
     public string? CompanyLogoUrl { get; init; }
+    public int TagMatchCount { get; init; }
+    public bool IsFavoriteByMe { get; init; }
+    public int FriendFavoritesCount { get; init; }
 }
 
 public record OpportunityDetailDto(
@@ -42,7 +45,12 @@ public record OpportunityDetailDto(
     bool IsParticipating,
     CompanyShortDto Company,
     LocationDto? Location,
-    IReadOnlyCollection<string> Tags);
+    IReadOnlyCollection<string> Tags)
+{
+    public int TagMatchCount { get; init; }
+    public bool IsFavoriteByMe { get; init; }
+    public int FriendFavoritesCount { get; init; }
+}
 
 public record CompanyShortDto(long Id, string Name, bool Verified, string? WebsiteUrl, string? PublicEmail);
 

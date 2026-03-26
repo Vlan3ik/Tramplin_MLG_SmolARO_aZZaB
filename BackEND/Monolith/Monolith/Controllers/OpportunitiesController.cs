@@ -29,14 +29,18 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
         var page = query.Page <= 0 ? 1 : query.Page;
         var pageSize = query.PageSize <= 0 ? 20 : Math.Min(query.PageSize, 100);
         var currentUserId = TryGetCurrentUserId();
+        var viewerTagIds = currentUserId is null
+            ? Array.Empty<long>()
+            : await dbContext.CandidateResumeSkills
+                .AsNoTracking()
+                .Where(x => x.UserId == currentUserId.Value)
+                .Select(x => x.TagId)
+                .ToArrayAsync(cancellationToken);
 
         var baseQuery = BuildFilteredQuery(query);
         var totalCount = await baseQuery.CountAsync(cancellationToken);
 
         var rows = await baseQuery
-            .OrderByDescending(x => x.PublishAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
             .Select(x => new
             {
                 x.Id,
@@ -56,9 +60,38 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
                 Verified = x.Company.Status == CompanyStatus.Verified,
                 ParticipantsCount = x.Participants.Count,
                 IsParticipating = currentUserId != null && x.Participants.Any(p => p.UserId == currentUserId.Value),
+                TagMatchCount = viewerTagIds.Length == 0 ? 0 : x.OpportunityTags.Count(t => viewerTagIds.Contains(t.TagId)),
                 Tags = x.OpportunityTags.Select(t => t.Tag.Name).ToArray()
             })
+            .OrderByDescending(x => x.TagMatchCount)
+            .ThenByDescending(x => x.PublishAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
+
+        var opportunityIds = rows.Select(x => x.Id).ToArray();
+        var favoriteByMeIds = new HashSet<long>();
+        var friendFavoriteCounts = new Dictionary<long, int>();
+        if (currentUserId is not null && opportunityIds.Length > 0)
+        {
+            var favoriteList = await dbContext.UserOpportunityFavorites
+                .AsNoTracking()
+                .Where(x => x.UserId == currentUserId.Value && x.OpportunityId != null && opportunityIds.Contains(x.OpportunityId.Value))
+                .Select(x => x.OpportunityId!.Value)
+                .ToListAsync(cancellationToken);
+            favoriteByMeIds = favoriteList.ToHashSet();
+
+            var mutualFriendIds = await GetMutualFriendIds(currentUserId.Value, cancellationToken);
+            if (mutualFriendIds.Length > 0)
+            {
+                friendFavoriteCounts = await dbContext.UserOpportunityFavorites
+                    .AsNoTracking()
+                    .Where(x => x.OpportunityId != null && opportunityIds.Contains(x.OpportunityId.Value) && mutualFriendIds.Contains(x.UserId))
+                    .GroupBy(x => x.OpportunityId!.Value)
+                    .Select(x => new { OpportunityId = x.Key, Count = x.Count() })
+                    .ToDictionaryAsync(x => x.OpportunityId, x => x.Count, cancellationToken);
+            }
+        }
 
         var items = rows.Select(x => new OpportunityListItemDto(
             x.Id,
@@ -79,7 +112,10 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
             x.Tags)
         {
             CompanyId = x.CompanyId,
-            CompanyLogoUrl = x.CompanyLogoUrl
+            CompanyLogoUrl = x.CompanyLogoUrl,
+            TagMatchCount = x.TagMatchCount,
+            IsFavoriteByMe = favoriteByMeIds.Contains(x.Id),
+            FriendFavoritesCount = friendFavoriteCounts.GetValueOrDefault(x.Id)
         }).ToList();
 
         return Ok(new PagedResponse<OpportunityListItemDto>(items, totalCount, page, pageSize));
@@ -150,6 +186,30 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
                 opportunity.Company.PublicEmail),
             locationDto,
             opportunity.OpportunityTags.Select(t => t.Tag.Name).ToArray());
+
+        if (currentUserId is not null)
+        {
+            var viewerTagIds = await dbContext.CandidateResumeSkills
+                .AsNoTracking()
+                .Where(x => x.UserId == currentUserId.Value)
+                .Select(x => x.TagId)
+                .ToArrayAsync(cancellationToken);
+            var tagSet = viewerTagIds.ToHashSet();
+            var mutualFriendIds = await GetMutualFriendIds(currentUserId.Value, cancellationToken);
+
+            dto = dto with
+            {
+                TagMatchCount = viewerTagIds.Length == 0 ? 0 : opportunity.OpportunityTags.Count(t => tagSet.Contains(t.TagId)),
+                IsFavoriteByMe = await dbContext.UserOpportunityFavorites
+                    .AsNoTracking()
+                    .AnyAsync(x => x.UserId == currentUserId.Value && x.OpportunityId == id, cancellationToken),
+                FriendFavoritesCount = mutualFriendIds.Length == 0
+                    ? 0
+                    : await dbContext.UserOpportunityFavorites
+                        .AsNoTracking()
+                        .CountAsync(x => x.OpportunityId == id && mutualFriendIds.Contains(x.UserId), cancellationToken)
+            };
+        }
 
         return Ok(dto);
     }
@@ -340,5 +400,33 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
     {
         var value = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
         return long.TryParse(value, out var userId) ? userId : null;
+    }
+
+    private Task<long[]> GetMutualFriendIds(long userId, CancellationToken cancellationToken)
+    {
+        var following = dbContext.UserSubscriptions
+            .AsNoTracking()
+            .Where(x => x.FollowerUserId == userId);
+        var followers = dbContext.UserSubscriptions
+            .AsNoTracking()
+            .Where(x => x.FollowingUserId == userId);
+
+        var mutualSubscriptionIds = following
+            .Join(
+                followers,
+                left => left.FollowingUserId,
+                right => right.FollowerUserId,
+                (left, _) => left.FollowingUserId)
+            .Distinct();
+
+        var contactIds = dbContext.UserContacts
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .Select(x => x.ContactUserId);
+
+        return mutualSubscriptionIds
+            .Union(contactIds)
+            .Distinct()
+            .ToArrayAsync(cancellationToken);
     }
 }

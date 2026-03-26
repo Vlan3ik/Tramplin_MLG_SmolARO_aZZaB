@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createApplication } from '../api/applications'
+import { addOpportunityToFavorites, addVacancyToFavorites, removeOpportunityFromFavorites, removeVacancyFromFavorites } from '../api/favorites'
 import {
   fetchHomeListOpportunities,
   fetchMapOpportunities,
@@ -276,6 +277,37 @@ export function HomePage() {
     }
   }
 
+  async function handleToggleFavorite(opportunity: Opportunity, nextValue: boolean) {
+    try {
+      if (opportunity.entityType === 'vacancy') {
+        if (nextValue) {
+          await addVacancyToFavorites(opportunity.id)
+        } else {
+          await removeVacancyFromFavorites(opportunity.id)
+        }
+      } else {
+        if (nextValue) {
+          await addOpportunityToFavorites(opportunity.id)
+        } else {
+          await removeOpportunityFromFavorites(opportunity.id)
+        }
+      }
+
+      setListItems((current) =>
+        current.map((item) => (item.id === opportunity.id && item.entityType === opportunity.entityType ? { ...item, isFavoriteByMe: nextValue } : item)),
+      )
+      setMapItems((current) =>
+        current.map((item) => (item.id === opportunity.id && item.entityType === opportunity.entityType ? { ...item, isFavoriteByMe: nextValue } : item)),
+      )
+
+      return nextValue
+    } catch (error) {
+      setActionError(true)
+      setActionMessage(error instanceof Error ? error.message : 'Не удалось обновить избранное.')
+      return !nextValue
+    }
+  }
+
   return (
     <>
       <SearchHero
@@ -353,6 +385,7 @@ export function HomePage() {
                       opportunity={item}
                       isApplying={Boolean(applyingIds[item.id])}
                       isApplied={hasApplied(item.id)}
+                      onToggleFavorite={(currentOpportunity, nextValue) => handleToggleFavorite(currentOpportunity, nextValue)}
                       onApply={(currentOpportunity) => {
                         void handleApply(currentOpportunity)
                       }}

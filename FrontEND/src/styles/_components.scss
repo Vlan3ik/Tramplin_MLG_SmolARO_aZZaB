@@ -672,6 +672,25 @@
     z-index: 2;
   }
 
+  &__friend-favorite {
+    position: absolute;
+    top: 0.9rem;
+    right: 3.7rem;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.22rem 0.6rem;
+    background: rgba(21, 128, 61, 0.12);
+    color: #166534;
+    font-size: 0.72rem;
+    font-weight: 600;
+    max-width: 17.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   &__head {
     display: block;
     padding-right: 2.8rem;

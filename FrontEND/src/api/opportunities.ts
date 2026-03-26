@@ -25,6 +25,9 @@ type VacancyListItemApi = {
   publishAt?: string
   verifiedCompany?: boolean
   tags?: string[] | null
+  tagMatchCount?: number | null
+  isFavoriteByMe?: boolean | null
+  friendFavoritesCount?: number | null
 }
 
 type OpportunityListItemApi = {
@@ -46,6 +49,9 @@ type OpportunityListItemApi = {
   verifiedCompany?: boolean
   participantsCanWrite?: boolean
   tags?: string[] | null
+  tagMatchCount?: number | null
+  isFavoriteByMe?: boolean | null
+  friendFavoritesCount?: number | null
 }
 
 type VacancyDetailApi = {
@@ -78,6 +84,9 @@ type VacancyDetailApi = {
     houseNumber?: string | null
   } | null
   tags?: string[] | null
+  tagMatchCount?: number | null
+  isFavoriteByMe?: boolean | null
+  friendFavoritesCount?: number | null
 }
 
 type OpportunityDetailApi = {
@@ -111,6 +120,9 @@ type OpportunityDetailApi = {
     houseNumber?: string | null
   } | null
   tags?: string[] | null
+  tagMatchCount?: number | null
+  isFavoriteByMe?: boolean | null
+  friendFavoritesCount?: number | null
 }
 
 type MapOpportunityFeatureApi = {
@@ -317,6 +329,10 @@ function toOpportunityFromVacancy(apiItem: VacancyListItemApi, coordinates: { la
     companyLogoUrl: apiItem.companyLogoUrl ?? null,
     latitude: coordinates.latitude,
     longitude: coordinates.longitude,
+    publishAt: apiItem.publishAt ?? null,
+    tagMatchCount: apiItem.tagMatchCount ?? 0,
+    isFavoriteByMe: Boolean(apiItem.isFavoriteByMe),
+    friendFavoritesCount: apiItem.friendFavoritesCount ?? 0,
   }
 }
 
@@ -348,6 +364,10 @@ function toOpportunityFromOpportunity(
     companyLogoUrl: apiItem.companyLogoUrl ?? null,
     latitude: coordinates.latitude,
     longitude: coordinates.longitude,
+    publishAt: apiItem.publishAt ?? null,
+    tagMatchCount: apiItem.tagMatchCount ?? 0,
+    isFavoriteByMe: Boolean(apiItem.isFavoriteByMe),
+    friendFavoritesCount: apiItem.friendFavoritesCount ?? 0,
   }
 }
 function parseMapEntityType(value: string | number | null | undefined) {
@@ -427,6 +447,30 @@ function applyClientFilters(items: Opportunity[], filters: OpportunityFilters) {
     }
 
     return true
+  })
+}
+
+function toUnixTime(value: string | null) {
+  if (!value) {
+    return 0
+  }
+
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+function sortByRecommendation(items: Opportunity[]) {
+  return items.sort((a, b) => {
+    if (b.tagMatchCount !== a.tagMatchCount) {
+      return b.tagMatchCount - a.tagMatchCount
+    }
+
+    const publishDiff = toUnixTime(b.publishAt) - toUnixTime(a.publishAt)
+    if (publishDiff !== 0) {
+      return publishDiff
+    }
+
+    return b.id - a.id
   })
 }
 
@@ -707,6 +751,10 @@ function mapOpportunityFromFeature(feature: MapOpportunityFeatureApi): Opportuni
     latitude,
     longitude,
     entityType: entityType ?? undefined,
+    publishAt: props?.publishAt ?? null,
+    tagMatchCount: 0,
+    isFavoriteByMe: false,
+    friendFavoritesCount: 0,
   }
 }
 export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: AbortSignal) {
@@ -717,10 +765,10 @@ export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: Ab
   const needOpportunities = shouldRequestOpportunities(query.filters)
   const [vacanciesResponse, opportunitiesResponse, mapResponse] = await Promise.all([
     needVacancies
-      ? getJson<PagedResponse<VacancyListItemApi>>(`/vacancies?${queryString}`, { signal, withAuth: false })
+      ? getJson<PagedResponse<VacancyListItemApi>>(`/vacancies?${queryString}`, { signal })
       : Promise.resolve(createEmptyPagedResponse<VacancyListItemApi>(query.page ?? 1, query.pageSize ?? 24)),
     needOpportunities
-      ? getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal, withAuth: false })
+      ? getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal })
       : Promise.resolve(createEmptyPagedResponse<OpportunityListItemApi>(query.page ?? 1, query.pageSize ?? 24)),
     getJson<MapOpportunityResponseApi>(`/map/opportunities?${mapQueryString}`, { signal, withAuth: false }),
   ])
@@ -763,7 +811,7 @@ export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: Ab
     return toOpportunityFromOpportunity(item, coordinates)
   })
 
-  const items = applyClientFilters([...vacancyItems, ...opportunityItems], query.filters).sort((a, b) => b.id - a.id)
+  const items = sortByRecommendation(applyClientFilters([...vacancyItems, ...opportunityItems], query.filters))
 
   return {
     items,
@@ -778,10 +826,10 @@ export async function fetchHomeListOpportunities(query: HomeSearchQuery, signal?
   const needOpportunities = shouldRequestOpportunities(query.filters)
   const [vacanciesResponse, opportunitiesResponse] = await Promise.all([
     needVacancies
-      ? getJson<PagedResponse<VacancyListItemApi>>(`/vacancies?${queryString}`, { signal, withAuth: false })
+      ? getJson<PagedResponse<VacancyListItemApi>>(`/vacancies?${queryString}`, { signal })
       : Promise.resolve(createEmptyPagedResponse<VacancyListItemApi>(query.page ?? 1, query.pageSize ?? 24)),
     needOpportunities
-      ? getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal, withAuth: false })
+      ? getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal })
       : Promise.resolve(createEmptyPagedResponse<OpportunityListItemApi>(query.page ?? 1, query.pageSize ?? 24)),
   ])
 
@@ -799,7 +847,7 @@ export async function fetchHomeListOpportunities(query: HomeSearchQuery, signal?
     }),
   )
 
-  const items = applyClientFilters([...vacancyItems, ...opportunityItems], query.filters).sort((a, b) => b.id - a.id)
+  const items = sortByRecommendation(applyClientFilters([...vacancyItems, ...opportunityItems], query.filters))
 
   return {
     items,
@@ -810,7 +858,7 @@ export async function fetchHomeListOpportunities(query: HomeSearchQuery, signal?
 export async function fetchEventsListOpportunities(query: HomeSearchQuery, signal?: AbortSignal) {
   async function requestItems(currentQuery: HomeSearchQuery) {
     const opportunitiesQueryString = buildOpportunitiesQueryString(currentQuery)
-    const opportunitiesResponse = await getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal, withAuth: false })
+    const opportunitiesResponse = await getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal })
 
     const items = (opportunitiesResponse.items ?? [])
       .map((item) =>
@@ -820,7 +868,18 @@ export async function fetchEventsListOpportunities(query: HomeSearchQuery, signa
         }),
       )
       .filter((item) => item.type === 'event')
-      .sort((a, b) => b.id - a.id)
+      .sort((a, b) => {
+        if (b.tagMatchCount !== a.tagMatchCount) {
+          return b.tagMatchCount - a.tagMatchCount
+        }
+
+        const publishDiff = toUnixTime(b.publishAt) - toUnixTime(a.publishAt)
+        if (publishDiff !== 0) {
+          return publishDiff
+        }
+
+        return b.id - a.id
+      })
 
     return {
       items,
@@ -887,6 +946,9 @@ function mapFromVacancyDetail(response: VacancyDetailApi): OpportunityDetail {
     companyWebsiteUrl: response.company?.websiteUrl ?? null,
     companyPublicEmail: response.company?.publicEmail ?? null,
     address: toAddress(response.location),
+    tagMatchCount: response.tagMatchCount ?? 0,
+    isFavoriteByMe: Boolean(response.isFavoriteByMe),
+    friendFavoritesCount: response.friendFavoritesCount ?? 0,
   }
 }
 function mapFromOpportunityDetail(response: OpportunityDetailApi): OpportunityDetail {
@@ -920,6 +982,9 @@ function mapFromOpportunityDetail(response: OpportunityDetailApi): OpportunityDe
     companyWebsiteUrl: response.company?.websiteUrl ?? null,
     companyPublicEmail: response.company?.publicEmail ?? null,
     address: toAddress(response.location),
+    tagMatchCount: response.tagMatchCount ?? 0,
+    isFavoriteByMe: Boolean(response.isFavoriteByMe),
+    friendFavoritesCount: response.friendFavoritesCount ?? 0,
   }
 }
 function isProbablyNotFoundError(error: unknown) {
@@ -952,6 +1017,10 @@ export async function fetchOpportunityById(id: number, signal?: AbortSignal): Pr
     companyLogoUrl: detail.companyLogoUrl,
     latitude: detail.latitude ?? null,
     longitude: detail.longitude ?? null,
+    publishAt: detail.publishAt,
+    tagMatchCount: detail.tagMatchCount,
+    isFavoriteByMe: detail.isFavoriteByMe,
+    friendFavoritesCount: detail.friendFavoritesCount,
   }
 }
 
@@ -971,17 +1040,17 @@ export async function fetchOpportunityDetailById(
   preferredEntityType?: OpportunityEntityType | null,
 ): Promise<OpportunityDetail> {
   if (preferredEntityType === 'vacancy') {
-    const vacancyResponse = await getJson<VacancyDetailApi>(`/vacancies/${id}`, { signal, withAuth: false })
+    const vacancyResponse = await getJson<VacancyDetailApi>(`/vacancies/${id}`, { signal })
     return mapFromVacancyDetail(vacancyResponse)
   }
 
   if (preferredEntityType === 'opportunity') {
-    const opportunityResponse = await getJson<OpportunityDetailApi>(`/opportunities/${id}`, { signal, withAuth: false })
+    const opportunityResponse = await getJson<OpportunityDetailApi>(`/opportunities/${id}`, { signal })
     return mapFromOpportunityDetail(opportunityResponse)
   }
 
   try {
-    const vacancyResponse = await getJson<VacancyDetailApi>(`/vacancies/${id}`, { signal, withAuth: false })
+    const vacancyResponse = await getJson<VacancyDetailApi>(`/vacancies/${id}`, { signal })
     return mapFromVacancyDetail(vacancyResponse)
   } catch (vacancyError) {
     if (!isProbablyNotFoundError(vacancyError)) {
@@ -989,7 +1058,7 @@ export async function fetchOpportunityDetailById(
     }
   }
 
-  const opportunityResponse = await getJson<OpportunityDetailApi>(`/opportunities/${id}`, { signal, withAuth: false })
+  const opportunityResponse = await getJson<OpportunityDetailApi>(`/opportunities/${id}`, { signal })
   return mapFromOpportunityDetail(opportunityResponse)
 }
 

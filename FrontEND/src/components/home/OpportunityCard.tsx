@@ -6,7 +6,7 @@ import type { Opportunity } from '../../types/opportunity'
 import { typeLabel } from '../../types/opportunity'
 import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
 import { getTagToneClass } from '../../utils/tag-tones'
-import { isFavoriteOpportunity, subscribeToFavoriteOpportunities, toggleFavoriteOpportunity } from '../../utils/favorites'
+import { isFavoriteOpportunity, toggleFavoriteOpportunity } from '../../utils/favorites'
 
 type OpportunityCardProps = {
   opportunity: Opportunity
@@ -14,6 +14,7 @@ type OpportunityCardProps = {
   isApplying?: boolean
   isApplied?: boolean
   onApply?: (opportunity: Opportunity) => void
+  onToggleFavorite?: (opportunity: Opportunity, nextValue: boolean) => Promise<boolean | void> | boolean | void
 }
 
 function getApplyLabel(opportunity: Opportunity, isApplying: boolean, isApplied: boolean, isClosed: boolean) {
@@ -35,20 +36,28 @@ function getInitials(name: string) {
     .join('')
 }
 
-export function OpportunityCard({ opportunity, compact = false, isApplying = false, isApplied = false, onApply }: OpportunityCardProps) {
+function getFriendFavoritesLabel(count: number) {
+  if (count <= 0) {
+    return ''
+  }
+
+  if (count === 1) {
+    return 'В избранном у 1 друга'
+  }
+
+  return `В избранном у ${count} друзей`
+}
+
+export function OpportunityCard({ opportunity, compact = false, isApplying = false, isApplied = false, onApply, onToggleFavorite }: OpportunityCardProps) {
   const navigate = useNavigate()
-  const [isFavorite, setIsFavorite] = useState(() => isFavoriteOpportunity(opportunity.id))
+  const [isFavorite, setIsFavorite] = useState(() => (opportunity.isFavoriteByMe ? true : isFavoriteOpportunity(opportunity.id)))
   const favoriteLabel = useMemo(() => (isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'), [isFavorite])
   const detailsPath = useMemo(() => buildOpportunityDetailsPath(opportunity), [opportunity])
   const isClosed = opportunity.status >= 4
 
   useEffect(() => {
-    const unsubscribe = subscribeToFavoriteOpportunities(() => {
-      setIsFavorite(isFavoriteOpportunity(opportunity.id))
-    })
-
-    return unsubscribe
-  }, [opportunity.id])
+    setIsFavorite(opportunity.isFavoriteByMe)
+  }, [opportunity.isFavoriteByMe])
 
   function handleOpenDetails() {
     navigate(detailsPath)
@@ -61,9 +70,16 @@ export function OpportunityCard({ opportunity, compact = false, isApplying = fal
     }
   }
 
-  function handleFavoriteToggle(event: MouseEvent<HTMLButtonElement>) {
+  async function handleFavoriteToggle(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation()
-    const nextValue = toggleFavoriteOpportunity(opportunity.id)
+    const nextValue = onToggleFavorite ? !isFavorite : toggleFavoriteOpportunity(opportunity.id)
+    if (onToggleFavorite) {
+      const result = await onToggleFavorite(opportunity, nextValue)
+      if (typeof result === 'boolean') {
+        setIsFavorite(result)
+        return
+      }
+    }
     setIsFavorite(nextValue)
   }
 
@@ -81,6 +97,7 @@ export function OpportunityCard({ opportunity, compact = false, isApplying = fal
       <button className={clsx('btn btn--icon opportunity-card__favorite', isFavorite && 'btn--icon-active')} type="button" aria-label={favoriteLabel} onClick={handleFavoriteToggle}>
         <Bookmark size={16} fill={isFavorite ? 'currentColor' : 'none'} />
       </button>
+      {opportunity.friendFavoritesCount > 0 ? <span className="opportunity-card__friend-favorite">{getFriendFavoritesLabel(opportunity.friendFavoritesCount)}</span> : null}
 
       <div className="opportunity-card__head">
         <div className="opportunity-card__content">

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarDays, RefreshCw, Search, SlidersHorizontal } from 'lucide-react'
+import { addOpportunityToFavorites, removeOpportunityFromFavorites } from '../api/favorites'
 import { fetchEventsListOpportunities, participateInOpportunity } from '../api/opportunities'
 import { FilterModal } from '../components/home/FilterModal'
 import { OpportunityCard } from '../components/home/OpportunityCard'
@@ -126,6 +127,23 @@ export function EventsPage() {
     }
   }
 
+  async function handleToggleFavorite(opportunity: Opportunity, nextValue: boolean) {
+    try {
+      if (nextValue) {
+        await addOpportunityToFavorites(opportunity.id)
+      } else {
+        await removeOpportunityFromFavorites(opportunity.id)
+      }
+
+      setItems((current) => current.map((item) => (item.id === opportunity.id ? { ...item, isFavoriteByMe: nextValue } : item)))
+      return nextValue
+    } catch (error) {
+      setStatusError(true)
+      setStatusMessage(error instanceof Error ? error.message : 'Не удалось обновить избранное.')
+      return !nextValue
+    }
+  }
+
   const hasFilters =
     filters.formats.length > 0 ||
     filters.statuses.length > 0 ||
@@ -233,6 +251,7 @@ export function EventsPage() {
                     opportunity={item}
                     isApplying={Boolean(applyingIds[item.id])}
                     isApplied={Boolean(participatingIds[item.id])}
+                    onToggleFavorite={(currentOpportunity, nextValue) => handleToggleFavorite(currentOpportunity, nextValue)}
                     onApply={(currentOpportunity) => {
                       void handleParticipate(currentOpportunity)
                     }}

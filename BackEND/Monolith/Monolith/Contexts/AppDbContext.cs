@@ -23,6 +23,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ContactRequest> ContactRequests => Set<ContactRequest>();
     public DbSet<UserContact> UserContacts => Set<UserContact>();
     public DbSet<UserSubscription> UserSubscriptions => Set<UserSubscription>();
+    public DbSet<UserOpportunityFavorite> UserOpportunityFavorites => Set<UserOpportunityFavorite>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<TagGroup> TagGroups => Set<TagGroup>();
@@ -342,6 +343,29 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(x => x.FollowingUserId);
             entity.HasOne(x => x.FollowerUser).WithMany(x => x.FollowingSubscriptions).HasForeignKey(x => x.FollowerUserId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.FollowingUser).WithMany(x => x.FollowerSubscriptions).HasForeignKey(x => x.FollowingUserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserOpportunityFavorite>(entity =>
+        {
+            entity.ToTable(
+                "user_opportunity_favorites",
+                table => table.HasCheckConstraint(
+                    "ck_user_opportunity_favorites_ref",
+                    @"(vacancy_id IS NOT NULL AND opportunity_id IS NULL)
+                  OR (vacancy_id IS NULL AND opportunity_id IS NOT NULL)"));
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.VacancyId).HasColumnName("vacancy_id");
+            entity.Property(x => x.OpportunityId).HasColumnName("opportunity_id");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => new { x.UserId, x.VacancyId }).IsUnique().HasFilter("vacancy_id IS NOT NULL");
+            entity.HasIndex(x => new { x.UserId, x.OpportunityId }).IsUnique().HasFilter("opportunity_id IS NOT NULL");
+            entity.HasIndex(x => x.VacancyId);
+            entity.HasIndex(x => x.OpportunityId);
+            entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Vacancy).WithMany().HasForeignKey(x => x.VacancyId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Opportunity).WithMany().HasForeignKey(x => x.OpportunityId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<City>(entity =>
