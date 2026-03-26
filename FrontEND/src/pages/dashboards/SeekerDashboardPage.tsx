@@ -33,6 +33,7 @@ import {
   updateSeekerSettings,
 } from '../../api/me'
 import { uploadMyAvatar, uploadMyProfileBanner } from '../../api/media'
+import { fetchMyFavorites } from '../../api/favorites'
 import { fetchOpportunityById, fetchOpportunityDetailById, participateInOpportunity } from '../../api/opportunities'
 import {
   createMyPortfolioProject,
@@ -63,7 +64,6 @@ import type { Opportunity } from '../../types/opportunity'
 import type { PublicPortfolioProjectDetail, PublicPortfolioProjectCard } from '../../types/portfolio'
 import type { PublicProfile } from '../../types/public-profile'
 import type { SeekerResume } from '../../types/resume'
-import { getFavoriteOpportunityIds, subscribeToFavoriteOpportunities } from '../../utils/favorites'
 import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
 import { getSubscriptionActionLabel } from '../../utils/subscription-labels'
 import { getTagToneClass } from '../../utils/tag-tones'
@@ -1011,7 +1011,6 @@ export function SeekerDashboardPage() {
   const [cities, setCities] = useState<City[]>([])
   const [tags, setTags] = useState<TagListItem[]>([])
   const [favoriteOpportunities, setFavoriteOpportunities] = useState<Opportunity[]>([])
-  const [favoriteIds, setFavoriteIds] = useState<number[]>(() => getFavoriteOpportunityIds())
   const [responsesSearch, setResponsesSearch] = useState('')
   const [responsesStatusFilter, setResponsesStatusFilter] = useState<'all' | number>('all')
   const [responsesKindFilter, setResponsesKindFilter] = useState<'all' | 'vacancy' | 'event'>('all')
@@ -1341,14 +1340,6 @@ export function SeekerDashboardPage() {
   }, [isPublicReadOnlyMode, resume])
 
   useEffect(() => {
-    const unsubscribe = subscribeToFavoriteOpportunities(() => {
-      setFavoriteIds(getFavoriteOpportunityIds())
-    })
-
-    return unsubscribe
-  }, [])
-
-  useEffect(() => {
     if (isPublicReadOnlyMode) {
       setSubscriptionProjectsByUser({})
       return
@@ -1421,35 +1412,94 @@ export function SeekerDashboardPage() {
       setLoadingFavorites(true)
       setFavoritesError('')
 
-      if (!favoriteIds.length) {
-        setFavoriteOpportunities([])
-        setLoadingFavorites(false)
-        return
+      try {
+        const favorites = await fetchMyFavorites(controller.signal)
+
+        if (controller.signal.aborted) {
+          return
+        }
+
+        const favoriteVacancyIds = favorites.vacancyIds ?? []
+        const favoriteOpportunityIds = favorites.opportunityIds ?? []
+        if (!favoriteVacancyIds.length && !favoriteOpportunityIds.length) {
+          setFavoriteOpportunities([])
+          return
+        }
+
+        const [vacancyResults, opportunityResults] = await Promise.all([
+          Promise.allSettled(
+            favoriteVacancyIds.map((id) => fetchOpportunityDetailById(id, controller.signal, 'vacancy')),
+          ),
+          Promise.allSettled(
+            favoriteOpportunityIds.map((id) => fetchOpportunityDetailById(id, controller.signal, 'opportunity')),
+          ),
+        ])
+
+        if (controller.signal.aborted) {
+          return
+        }
+
+        const resolved = [...vacancyResults, ...opportunityResults]
+          .filter((result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof fetchOpportunityDetailById>>> => result.status === 'fulfilled')
+          .map((result) => result.value)
+          .map((detail) => ({
+            id: detail.id,
+            entityType: detail.entityType,
+            title: detail.title,
+            type: detail.type,
+            status: detail.status,
+            company: detail.company,
+            location: detail.location,
+            compensation: detail.compensation,
+            workFormat: detail.workFormat,
+            date: detail.date,
+            description: detail.description,
+            tags: detail.tags,
+            verified: detail.verified,
+            companyId: detail.companyId,
+            companyLogoUrl: detail.companyLogoUrl,
+            latitude: detail.latitude ?? null,
+            longitude: detail.longitude ?? null,
+            publishAt: detail.publishAt,
+            tagMatchCount: detail.tagMatchCount,
+            isFavoriteByMe: detail.isFavoriteByMe,
+            friendFavoritesCount: detail.friendFavoritesCount,
+          }))
+          .sort((a, b) => {
+            if (b.tagMatchCount !== a.tagMatchCount) {
+              return b.tagMatchCount - a.tagMatchCount
+            }
+
+            const leftPublish = a.publishAt ? Date.parse(a.publishAt) : 0
+            const rightPublish = b.publishAt ? Date.parse(b.publishAt) : 0
+            if (rightPublish !== leftPublish) {
+              return rightPublish - leftPublish
+            }
+
+            return b.id - a.id
+          })
+
+        setFavoriteOpportunities(resolved)
+
+        if (!resolved.length && (favoriteVacancyIds.length || favoriteOpportunityIds.length)) {
+          setFavoritesError('Не удалось загрузить избранные вакансии.')
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setFavoriteOpportunities([])
+          setFavoritesError(error instanceof Error ? error.message : 'Не удалось загрузить избранные вакансии.')
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoadingFavorites(false)
+        }
       }
-
-      const results = await Promise.allSettled(favoriteIds.map((id) => fetchOpportunityById(id, controller.signal)))
-
-      if (controller.signal.aborted) {
-        return
-      }
-
-      const resolved = results
-        .filter((result): result is PromiseFulfilledResult<Opportunity> => result.status === 'fulfilled')
-        .map((result) => result.value)
-
-      setFavoriteOpportunities(resolved)
-
-      if (!resolved.length && favoriteIds.length) {
-        setFavoritesError('Не удалось загрузить избранные вакансии.')
-      }
-
-      setLoadingFavorites(false)
     }
 
     void loadFavorites()
 
     return () => controller.abort()
-  }, [favoriteIds, isPublicReadOnlyMode])
+  }, [isPublicReadOnlyMode])
 
   useEffect(() => {
     if (isPublicReadOnlyMode || !applications.length) {
