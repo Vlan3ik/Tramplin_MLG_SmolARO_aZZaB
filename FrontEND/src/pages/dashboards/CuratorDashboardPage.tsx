@@ -1,8 +1,6 @@
 import { Building2, CheckCircle2, FileWarning, ShieldCheck, Users } from 'lucide-react'
-import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  createAdminCompany,
-  createAdminUser,
   deleteAdminCompany,
   deleteAdminOpportunity,
   deleteAdminUser,
@@ -12,22 +10,17 @@ import {
   fetchAdminUsers,
   fetchAdminVacancies,
   rejectAdminCompany,
-  updateAdminCompany,
   updateAdminOpportunityStatus,
-  updateAdminUser,
   updateAdminVacancyStatus,
   verifyAdminCompany,
   type AdminCompany,
   type AdminOpportunity,
   type AdminUser,
-  type AdminUserUpsertRequest,
   type AdminVacancy,
 } from '../../api/admin'
-import { fetchCities } from '../../api/catalog'
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
-import type { City } from '../../types/catalog'
 import { Link } from 'react-router-dom'
 
 type AdminTabId = 'overview' | 'users' | 'companies' | 'vacancies' | 'opportunities'
@@ -82,17 +75,8 @@ const vacancyKindLabel: Record<number, string> = {
   2: 'Работа',
 }
 
-function parseNamesFromUsername(username: string) {
-  const chunks = username.trim().split(/\s+/).filter(Boolean)
-  return {
-    firstName: chunks[0] ?? 'User',
-    lastName: chunks[1] ?? 'Name',
-  }
-}
-
 export function CuratorDashboardPage() {
   const [tab, setTab] = useState<AdminTabId>('overview')
-  const [cities, setCities] = useState<City[]>([])
 
   const [users, setUsers] = useState<AdminUser[]>([])
   const [companies, setCompanies] = useState<AdminCompany[]>([])
@@ -110,42 +94,13 @@ export function CuratorDashboardPage() {
   const [opportunitiesSearch, setOpportunitiesSearch] = useState('')
 
   const [loading, setLoading] = useState(true)
-  const [savingUser, setSavingUser] = useState(false)
-  const [savingCompany, setSavingCompany] = useState(false)
   const [processingCompanyId, setProcessingCompanyId] = useState<number | null>(null)
   const [processingVacancyId, setProcessingVacancyId] = useState<number | null>(null)
   const [processingOpportunityId, setProcessingOpportunityId] = useState<number | null>(null)
 
-  const [editingUserId, setEditingUserId] = useState<number | null>(null)
-  const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null)
-
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  const [userForm, setUserForm] = useState({
-    email: '',
-    firstName: '',
-    lastName: '',
-    status: 1,
-    seeker: false,
-    employer: true,
-    curator: false,
-  })
-
-  const [companyForm, setCompanyForm] = useState({
-    legalName: '',
-    brandName: '',
-    legalType: 1,
-    taxId: '',
-    registrationNumber: '',
-    industry: '',
-    description: '',
-    baseCityId: '',
-    websiteUrl: '',
-    publicEmail: '',
-    publicPhone: '',
-    status: 2,
-  })
 
   async function loadUsers() {
     const response = await fetchAdminUsers({ page: 1, pageSize: 30, search: usersSearch })
@@ -175,14 +130,9 @@ export function CuratorDashboardPage() {
     let active = true
     setLoading(true)
 
-    Promise.allSettled([fetchCities(), loadUsers(), loadCompanies(), loadVacancies(), loadOpportunities()])
+    Promise.allSettled([loadUsers(), loadCompanies(), loadVacancies(), loadOpportunities()])
       .then((results) => {
         if (!active) return
-
-        const [citiesResult] = results
-        if (citiesResult.status === 'fulfilled') {
-          setCities(citiesResult.value)
-        }
 
         const failed = results.find((item) => item.status === 'rejected')
         if (failed?.status === 'rejected') {
@@ -213,183 +163,11 @@ export function CuratorDashboardPage() {
     setSuccess('')
   }
 
-  function resetUserForm() {
-    setUserForm({
-      email: '',
-      firstName: '',
-      lastName: '',
-      status: 1,
-      seeker: false,
-      employer: true,
-      curator: false,
-    })
-    setEditingUserId(null)
-  }
-
-  function resetCompanyForm() {
-    setCompanyForm({
-      legalName: '',
-      brandName: '',
-      legalType: 1,
-      taxId: '',
-      registrationNumber: '',
-      industry: '',
-      description: '',
-      baseCityId: '',
-      websiteUrl: '',
-      publicEmail: '',
-      publicPhone: '',
-      status: 2,
-    })
-    setEditingCompanyId(null)
-  }
-
-  function onUserInputChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
-    const { name, value, type } = event.target
-    const checked = (event.target as HTMLInputElement).checked
-    setUserForm((state) => ({
-      ...state,
-      [name]: type === 'checkbox' ? checked : name === 'status' ? Number(value) : value,
-    }))
-  }
-
-  function onCompanyInputChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
-    const { name, value } = event.target
-    setCompanyForm((state) => ({
-      ...state,
-      [name]: name === 'legalType' || name === 'status' ? Number(value) : value,
-    }))
-  }
-
-  function getUserRolesFromForm() {
-    const roles: number[] = []
-    if (userForm.seeker) roles.push(1)
-    if (userForm.employer) roles.push(2)
-    if (userForm.curator) roles.push(3)
-    return roles
-  }
-
-  async function onSubmitUser(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    clearMessages()
-
-    const roles = getUserRolesFromForm()
-    if (!roles.length) {
-      setError('Выберите хотя бы одну роль пользователя.')
-      return
-    }
-
-    const payload: AdminUserUpsertRequest = {
-      email: userForm.email,
-      firstName: userForm.firstName,
-      lastName: userForm.lastName,
-      status: userForm.status,
-      roles,
-    }
-
-    setSavingUser(true)
-    try {
-      if (editingUserId) {
-        await updateAdminUser(editingUserId, payload)
-        setSuccess('Пользователь обновлен.')
-      } else {
-        await createAdminUser(payload)
-        setSuccess('Пользователь создан.')
-      }
-      resetUserForm()
-      await loadUsers()
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Не удалось сохранить пользователя.')
-    } finally {
-      setSavingUser(false)
-    }
-  }
-
-  async function onSubmitCompany(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    clearMessages()
-
-    const cityId = Number(companyForm.baseCityId)
-    if (!Number.isInteger(cityId) || cityId <= 0) {
-      setError('Выберите базовый город компании.')
-      return
-    }
-
-    const payload = {
-      legalName: companyForm.legalName,
-      brandName: companyForm.brandName,
-      legalType: companyForm.legalType,
-      taxId: companyForm.taxId,
-      registrationNumber: companyForm.registrationNumber,
-      industry: companyForm.industry,
-      description: companyForm.description,
-      baseCityId: cityId,
-      websiteUrl: companyForm.websiteUrl,
-      publicEmail: companyForm.publicEmail,
-      publicPhone: companyForm.publicPhone,
-      status: companyForm.status,
-    }
-
-    setSavingCompany(true)
-    try {
-      if (editingCompanyId) {
-        await updateAdminCompany(editingCompanyId, payload)
-        setSuccess('Компания обновлена.')
-      } else {
-        await createAdminCompany(payload)
-        setSuccess('Компания создана.')
-      }
-      resetCompanyForm()
-      await loadCompanies()
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Не удалось сохранить компанию.')
-    } finally {
-      setSavingCompany(false)
-    }
-  }
-
-  function onEditUser(item: AdminUser) {
-    const names = parseNamesFromUsername(item.username)
-    setUserForm({
-      email: item.email,
-      firstName: names.firstName,
-      lastName: names.lastName,
-      status: item.status,
-      seeker: item.roles.includes('seeker'),
-      employer: item.roles.includes('employer'),
-      curator: item.roles.includes('curator'),
-    })
-    setEditingUserId(item.id)
-    setTab('users')
-    clearMessages()
-  }
-
-  function onEditCompany(item: AdminCompany) {
-    setCompanyForm({
-      legalName: item.legalName,
-      brandName: item.brandName,
-      legalType: 1,
-      taxId: '',
-      registrationNumber: '',
-      industry: item.industry,
-      description: '',
-      baseCityId: item.baseCityId > 0 ? String(item.baseCityId) : '',
-      websiteUrl: '',
-      publicEmail: '',
-      publicPhone: '',
-      status: item.status,
-    })
-    setEditingCompanyId(item.id)
-    setTab('companies')
-    clearMessages()
-  }
-
   async function onDeleteUser(item: AdminUser) {
     if (typeof window !== 'undefined' && !window.confirm(`Удалить пользователя ${item.email}?`)) return
     clearMessages()
     try {
       await deleteAdminUser(item.id)
-      if (editingUserId === item.id) resetUserForm()
       setSuccess('Пользователь удален.')
       await loadUsers()
     } catch (deleteError) {
@@ -402,7 +180,6 @@ export function CuratorDashboardPage() {
     clearMessages()
     try {
       await deleteAdminCompany(item.id)
-      if (editingCompanyId === item.id) resetCompanyForm()
       setSuccess('Компания удалена.')
       await loadCompanies()
     } catch (deleteError) {
@@ -536,10 +313,10 @@ export function CuratorDashboardPage() {
 
         <section className="dashboard-section card seeker-profile-panel">
           <div className="seeker-profile-panel__head">
-            <h2>Quick actions</h2>
+            <h2>Быстрые действия</h2>
             <div className="admin-toolbar">
-              <Link className="btn btn--primary" to="/dashboard/curator/users/create">Create user in separate page</Link>
-              <Link className="btn btn--primary" to="/dashboard/curator/vacancies/create">Create vacancy in separate page</Link>
+              <Link className="btn btn--primary" to="/dashboard/curator/users/create">Создать пользователя</Link>
+              <Link className="btn btn--primary" to="/dashboard/curator/vacancies/create">Создать вакансию</Link>
             </div>
           </div>
         </section>
@@ -566,34 +343,6 @@ export function CuratorDashboardPage() {
               </div>
             </div>
 
-            <details className="admin-inline-form">
-              <summary>{editingUserId ? `Edit user #${editingUserId}` : 'Inline user form'}</summary>
-              <form className="form-grid form-grid--two admin-form-card" onSubmit={onSubmitUser}>
-              <h3>{editingUserId ? `Редактирование пользователя #${editingUserId}` : 'Создание пользователя'}</h3>
-              <label>Email<input type="email" name="email" value={userForm.email} onChange={onUserInputChange} required /></label>
-              <label>Имя<input type="text" name="firstName" value={userForm.firstName} onChange={onUserInputChange} required /></label>
-              <label>Фамилия<input type="text" name="lastName" value={userForm.lastName} onChange={onUserInputChange} required /></label>
-              <label>
-                Статус
-                <select name="status" value={userForm.status} onChange={onUserInputChange}>
-                  <option value={1}>Активен</option>
-                  <option value={2}>Заблокирован</option>
-                  <option value={3}>Удален</option>
-                </select>
-              </label>
-              <div className="admin-checkbox-row">
-                <label className="employer-checkbox"><input type="checkbox" name="seeker" checked={userForm.seeker} onChange={onUserInputChange} />Соискатель</label>
-                <label className="employer-checkbox"><input type="checkbox" name="employer" checked={userForm.employer} onChange={onUserInputChange} />Работодатель</label>
-                <label className="employer-checkbox"><input type="checkbox" name="curator" checked={userForm.curator} onChange={onUserInputChange} />Куратор</label>
-              </div>
-              <div className="favorite-card__actions">
-                <button type="submit" className="btn btn--primary" disabled={savingUser}>
-                  {savingUser ? 'Сохраняем...' : editingUserId ? 'Обновить пользователя' : 'Создать пользователя'}
-                </button>
-                {editingUserId ? <button type="button" className="btn btn--ghost" onClick={resetUserForm}>Отменить редактирование</button> : null}
-              </div>
-              </form>
-            </details>
 
             <div className="admin-list-grid">
               {users.map((item) => (
@@ -604,7 +353,6 @@ export function CuratorDashboardPage() {
                   </div>
                   <p>Роли: {item.roles.join(', ') || 'не назначены'}</p>
                   <div className="favorite-card__actions">
-                    <button type="button" className="btn btn--secondary" onClick={() => onEditUser(item)}>Редактировать</button>
                     <button type="button" className="btn btn--danger" onClick={() => void onDeleteUser(item)}>Удалить</button>
                   </div>
                 </article>
@@ -623,50 +371,6 @@ export function CuratorDashboardPage() {
               </div>
             </div>
 
-            <form className="form-grid form-grid--two admin-form-card" onSubmit={onSubmitCompany}>
-              <h3>{editingCompanyId ? `Редактирование компании #${editingCompanyId}` : 'Создание компании'}</h3>
-              <label>Юридическое название<input name="legalName" value={companyForm.legalName} onChange={onCompanyInputChange} required /></label>
-              <label>Бренд<input name="brandName" value={companyForm.brandName} onChange={onCompanyInputChange} /></label>
-              <label>
-                Тип
-                <select name="legalType" value={companyForm.legalType} onChange={onCompanyInputChange}>
-                  <option value={1}>Юридическое лицо</option>
-                  <option value={2}>ИП</option>
-                </select>
-              </label>
-              <label>ИНН<input name="taxId" value={companyForm.taxId} onChange={onCompanyInputChange} required /></label>
-              <label>Регистрационный номер<input name="registrationNumber" value={companyForm.registrationNumber} onChange={onCompanyInputChange} required /></label>
-              <label>Индустрия<input name="industry" value={companyForm.industry} onChange={onCompanyInputChange} required /></label>
-              <label>
-                Базовый город
-                <select name="baseCityId" value={companyForm.baseCityId} onChange={onCompanyInputChange} required>
-                  <option value="">Выберите город</option>
-                  {cities.map((city) => (
-                    <option key={city.id} value={city.id}>{city.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Статус
-                <select name="status" value={companyForm.status} onChange={onCompanyInputChange}>
-                  <option value={1}>Черновик</option>
-                  <option value={2}>На верификации</option>
-                  <option value={3}>Подтверждена</option>
-                  <option value={4}>Отклонена</option>
-                  <option value={5}>Заблокирована</option>
-                </select>
-              </label>
-              <label>Сайт<input name="websiteUrl" value={companyForm.websiteUrl} onChange={onCompanyInputChange} /></label>
-              <label>Публичный email<input name="publicEmail" value={companyForm.publicEmail} onChange={onCompanyInputChange} /></label>
-              <label>Публичный телефон<input name="publicPhone" value={companyForm.publicPhone} onChange={onCompanyInputChange} /></label>
-              <label className="full-width">Описание<textarea rows={3} name="description" value={companyForm.description} onChange={onCompanyInputChange} required /></label>
-              <div className="favorite-card__actions full-width">
-                <button type="submit" className="btn btn--primary" disabled={savingCompany}>
-                  {savingCompany ? 'Сохраняем...' : editingCompanyId ? 'Обновить компанию' : 'Создать компанию'}
-                </button>
-                {editingCompanyId ? <button type="button" className="btn btn--ghost" onClick={resetCompanyForm}>Отменить редактирование</button> : null}
-              </div>
-            </form>
 
             <div className="admin-list-grid">
               {companies.map((item) => (
@@ -677,7 +381,6 @@ export function CuratorDashboardPage() {
                   </div>
                   <p>Индустрия: {item.industry || 'не указана'}</p>
                   <div className="favorite-card__actions">
-                    <button type="button" className="btn btn--secondary" onClick={() => onEditCompany(item)}>Редактировать</button>
                     <button type="button" className="btn btn--ghost" disabled={processingCompanyId === item.id} onClick={() => void onVerifyCompany(item)}>
                       <CheckCircle2 size={14} /> Подтвердить
                     </button>

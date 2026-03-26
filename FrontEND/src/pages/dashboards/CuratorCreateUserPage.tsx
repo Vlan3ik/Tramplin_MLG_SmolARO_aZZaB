@@ -52,7 +52,7 @@ export function CuratorCreateUserPage() {
 
     const roles = getRoles()
     if (!roles.length) {
-      setError('Select at least one role.')
+      setError('Выберите хотя бы одну роль.')
       return
     }
 
@@ -67,10 +67,10 @@ export function CuratorCreateUserPage() {
     setIsSaving(true)
     try {
       await createAdminUser(payload)
-      setSuccess('User created successfully.')
+      setSuccess('Пользователь успешно создан.')
       setForm(getInitialForm())
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Failed to create user.')
+      setError(submitError instanceof Error ? submitError.message : 'Не удалось создать пользователя.')
     } finally {
       setIsSaving(false)
     }
@@ -83,12 +83,12 @@ export function CuratorCreateUserPage() {
       <main className="container seeker-profile-page">
         <section className="dashboard-section card seeker-profile-panel admin-form-card">
           <div className="seeker-profile-panel__head">
-            <h1>Create User</h1>
+            <h1>Создание пользователя</h1>
             <Link className="btn btn--ghost" to="/dashboard/curator">
-              <ArrowLeft size={14} /> Back to dashboard
+              <ArrowLeft size={14} /> Назад в кабинет
             </Link>
           </div>
-          <p className="status-line">Separate workspace for user creation. This keeps the curator dashboard clean.</p>
+          <p className="status-line">Отдельная страница создания, чтобы не перегружать кабинет куратора.</p>
 
           {error ? <div className="auth-feedback auth-feedback--error">{error}</div> : null}
           {success ? <div className="auth-feedback">{success}</div> : null}
@@ -99,37 +99,37 @@ export function CuratorCreateUserPage() {
               <input type="email" name="email" value={form.email} onChange={onInputChange} required />
             </label>
             <label>
-              First name
+              Имя
               <input type="text" name="firstName" value={form.firstName} onChange={onInputChange} required />
             </label>
             <label>
-              Last name
+              Фамилия
               <input type="text" name="lastName" value={form.lastName} onChange={onInputChange} required />
             </label>
             <label>
-              Status
+              Статус
               <select name="status" value={form.status} onChange={onInputChange}>
-                <option value={1}>Active</option>
-                <option value={2}>Blocked</option>
-                <option value={3}>Deleted</option>
+                <option value={1}>Активен</option>
+                <option value={2}>Заблокирован</option>
+                <option value={3}>Удален</option>
               </select>
             </label>
 
             <div className="admin-checkbox-row full-width">
               <label className="employer-checkbox">
-                <input type="checkbox" name="seeker" checked={form.seeker} onChange={onInputChange} /> Seeker
+                <input type="checkbox" name="seeker" checked={form.seeker} onChange={onInputChange} /> Соискатель
               </label>
               <label className="employer-checkbox">
-                <input type="checkbox" name="employer" checked={form.employer} onChange={onInputChange} /> Employer
+                <input type="checkbox" name="employer" checked={form.employer} onChange={onInputChange} /> Работодатель
               </label>
               <label className="employer-checkbox">
-                <input type="checkbox" name="curator" checked={form.curator} onChange={onInputChange} /> Curator
+                <input type="checkbox" name="curator" checked={form.curator} onChange={onInputChange} /> Куратор
               </label>
             </div>
 
             <div className="favorite-card__actions full-width">
               <button type="submit" className="btn btn--primary" disabled={isSaving}>
-                <UserPlus size={14} /> {isSaving ? 'Creating...' : 'Create user'}
+                <UserPlus size={14} /> {isSaving ? 'Создаем...' : 'Создать пользователя'}
               </button>
             </div>
           </form>
@@ -139,3 +139,4 @@ export function CuratorCreateUserPage() {
     </div>
   )
 }
+

@@ -73,7 +73,7 @@ export function CuratorCreateVacancyPage() {
       })
       .catch((loadError) => {
         if (!active) return
-        setError(loadError instanceof Error ? loadError.message : 'Failed to load reference data.')
+        setError(loadError instanceof Error ? loadError.message : 'Не удалось загрузить справочники.')
       })
       .finally(() => {
         if (active) setLoadingRefs(false)
@@ -106,12 +106,12 @@ export function CuratorCreateVacancyPage() {
     const createdByUserId = Number(form.createdByUserId)
 
     if (!Number.isInteger(companyId) || companyId <= 0) {
-      setError('Select a company.')
+      setError('Выберите компанию.')
       return
     }
 
     if (!Number.isInteger(createdByUserId) || createdByUserId <= 0) {
-      setError('Select an author user.')
+      setError('Выберите автора вакансии.')
       return
     }
 
@@ -137,10 +137,10 @@ export function CuratorCreateVacancyPage() {
     setIsSaving(true)
     try {
       await createAdminVacancy(payload)
-      setSuccess('Vacancy created successfully.')
+      setSuccess('Вакансия успешно создана.')
       setForm(getInitialForm())
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Failed to create vacancy.')
+      setError(submitError instanceof Error ? submitError.message : 'Не удалось создать вакансию.')
     } finally {
       setIsSaving(false)
     }
@@ -153,22 +153,22 @@ export function CuratorCreateVacancyPage() {
       <main className="container seeker-profile-page">
         <section className="dashboard-section card seeker-profile-panel admin-form-card">
           <div className="seeker-profile-panel__head">
-            <h1>Create Vacancy</h1>
+            <h1>Создание вакансии</h1>
             <Link className="btn btn--ghost" to="/dashboard/curator">
-              <ArrowLeft size={14} /> Back to dashboard
+              <ArrowLeft size={14} /> Назад в кабинет
             </Link>
           </div>
-          <p className="status-line">Separate workspace for vacancy creation with all required references.</p>
+          <p className="status-line">Отдельная страница создания вакансии со всеми справочниками.</p>
 
-          {loadingRefs ? <p>Loading references...</p> : null}
+          {loadingRefs ? <p>Загружаем справочники...</p> : null}
           {error ? <div className="auth-feedback auth-feedback--error">{error}</div> : null}
           {success ? <div className="auth-feedback">{success}</div> : null}
 
           <form className="form-grid form-grid--two" onSubmit={onSubmit}>
             <label>
-              Company
+              Компания
               <select name="companyId" value={form.companyId} onChange={onInputChange} required>
-                <option value="">Select company</option>
+                <option value="">Выберите компанию</option>
                 {companies.map((company) => (
                   <option key={company.id} value={company.id}>
                     {company.brandName || company.legalName} (#{company.id})
@@ -177,9 +177,9 @@ export function CuratorCreateVacancyPage() {
               </select>
             </label>
             <label>
-              Author user
+              Автор
               <select name="createdByUserId" value={form.createdByUserId} onChange={onInputChange} required>
-                <option value="">Select user</option>
+                <option value="">Выберите пользователя</option>
                 {users.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.email} (#{user.id})
@@ -189,46 +189,46 @@ export function CuratorCreateVacancyPage() {
             </label>
 
             <label>
-              Title
+              Название
               <input name="title" value={form.title} onChange={onInputChange} required />
             </label>
             <label>
-              Publish at
+              Дата публикации
               <input type="datetime-local" name="publishAt" value={form.publishAt} onChange={onInputChange} required />
             </label>
 
             <label>
-              Kind
+              Тип
               <select name="kind" value={form.kind} onChange={onInputChange}>
-                <option value={1}>Internship</option>
-                <option value={2}>Job</option>
+                <option value={1}>Стажировка</option>
+                <option value={2}>Работа</option>
               </select>
             </label>
             <label>
-              Format
+              Формат
               <select name="format" value={form.format} onChange={onInputChange}>
-                <option value={1}>Office</option>
-                <option value={2}>Hybrid</option>
-                <option value={3}>Remote</option>
+                <option value={1}>Офис</option>
+                <option value={2}>Гибрид</option>
+                <option value={3}>Удаленно</option>
               </select>
             </label>
 
             <label>
-              Status
+              Статус
               <select name="status" value={form.status} onChange={onInputChange}>
-                <option value={1}>Draft</option>
-                <option value={2}>On moderation</option>
-                <option value={3}>Active</option>
-                <option value={4}>Finished</option>
-                <option value={5}>Canceled</option>
-                <option value={6}>Rejected</option>
-                <option value={7}>Archive</option>
+                <option value={1}>Черновик</option>
+                <option value={2}>На модерации</option>
+                <option value={3}>Активно</option>
+                <option value={4}>Завершено</option>
+                <option value={5}>Отменено</option>
+                <option value={6}>Отклонено</option>
+                <option value={7}>Архив</option>
               </select>
             </label>
             <label>
-              City (optional)
+              Город (необязательно)
               <select name="cityId" value={form.cityId} onChange={onInputChange}>
-                <option value="">No city</option>
+                <option value="">Без города</option>
                 {cities.map((city) => (
                   <option key={city.id} value={city.id}>
                     {city.name}
@@ -238,48 +238,48 @@ export function CuratorCreateVacancyPage() {
             </label>
 
             <label>
-              Location ID (optional)
+              ID локации (необязательно)
               <input name="locationId" value={form.locationId} onChange={onInputChange} />
             </label>
             <label>
-              Application deadline (optional)
+              Срок отклика (необязательно)
               <input type="datetime-local" name="applicationDeadline" value={form.applicationDeadline} onChange={onInputChange} />
             </label>
 
             <label>
-              Salary from (optional)
+              Зарплата от (необязательно)
               <input type="number" name="salaryFrom" value={form.salaryFrom} onChange={onInputChange} />
             </label>
             <label>
-              Salary to (optional)
+              Зарплата до (необязательно)
               <input type="number" name="salaryTo" value={form.salaryTo} onChange={onInputChange} />
             </label>
 
             <label>
-              Currency
+              Валюта
               <input name="currencyCode" value={form.currencyCode} onChange={onInputChange} />
             </label>
             <label>
-              Tax mode
+              Налоговый режим
               <select name="salaryTaxMode" value={form.salaryTaxMode} onChange={onInputChange}>
-                <option value={1}>Gross</option>
-                <option value={2}>Net</option>
-                <option value={3}>Undefined</option>
+                <option value={1}>До налогов</option>
+                <option value={2}>После налогов</option>
+                <option value={3}>Не указано</option>
               </select>
             </label>
 
             <label className="full-width">
-              Short description
+              Краткое описание
               <textarea rows={3} name="shortDescription" value={form.shortDescription} onChange={onInputChange} required />
             </label>
             <label className="full-width">
-              Full description
+              Полное описание
               <textarea rows={5} name="fullDescription" value={form.fullDescription} onChange={onInputChange} required />
             </label>
 
             <div className="favorite-card__actions full-width">
               <button type="submit" className="btn btn--primary" disabled={isSaving || loadingRefs}>
-                <BriefcaseBusiness size={14} /> {isSaving ? 'Creating...' : 'Create vacancy'}
+                <BriefcaseBusiness size={14} /> {isSaving ? 'Создаем...' : 'Создать вакансию'}
               </button>
             </div>
           </form>
@@ -289,3 +289,4 @@ export function CuratorCreateVacancyPage() {
     </div>
   )
 }
+
