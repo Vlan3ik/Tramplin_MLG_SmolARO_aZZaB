@@ -14,6 +14,7 @@ import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityDetail } from '../types/opportunity'
 import { typeLabel } from '../types/opportunity'
 import type { OpportunityEntityType } from '../utils/opportunity-routing'
+import { getTagDisplayLabel } from '../utils/tag-labels'
 
 function formatAbsoluteDate(value: string | null) {
   if (!value) {
@@ -390,7 +391,7 @@ export function OpportunityDetailsPage() {
               {opportunity.tags.length ? (
                 opportunity.tags.map((tag) => (
                   <span key={tag} className="tag">
-                    {tag}
+                    {getTagDisplayLabel(tag)}
                   </span>
                 ))
               ) : (

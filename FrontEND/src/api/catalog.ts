@@ -56,10 +56,18 @@ export async function fetchCities(signal?: AbortSignal) {
   return items
 }
 
-export function fetchTags(signal?: AbortSignal) {
-  return getJson<TagListItem[]>('/catalog/tags', {
+type TagListResponse = TagListItem[] | { items?: TagListItem[] | null }
+
+export async function fetchTags(signal?: AbortSignal) {
+  const response = await getJson<TagListResponse>('/catalog/tags', {
     signal,
   })
+
+  if (Array.isArray(response)) {
+    return response
+  }
+
+  return Array.isArray(response.items) ? response.items : []
 }
 
 export async function fetchTagGroups(signal?: AbortSignal) {

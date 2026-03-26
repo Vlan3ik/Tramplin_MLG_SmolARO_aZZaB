@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import type { Opportunity } from '../../types/opportunity'
 import { typeLabel } from '../../types/opportunity'
 import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
+import { getTagDisplayLabel } from '../../utils/tag-labels'
 import { getTagToneClass } from '../../utils/tag-tones'
 import { isFavoriteOpportunity, toggleFavoriteOpportunity } from '../../utils/favorites'
 
@@ -155,7 +156,7 @@ export function OpportunityCard({ opportunity, compact = false, isApplying = fal
         <div className="tag-row">
           {opportunity.tags.slice(0, 6).map((tag) => (
             <span key={tag} className={clsx('tag opportunity-tag', getTagToneClass(tag))}>
-              {tag}
+              {getTagDisplayLabel(tag)}
             </span>
           ))}
         </div>

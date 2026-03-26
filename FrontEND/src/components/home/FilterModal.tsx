@@ -1,8 +1,9 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
-import { fetchTechnologyTags } from '../../api/catalog'
-import type { TagListItem } from '../../types/catalog'
+import { fetchTagGroups, fetchTags } from '../../api/catalog'
+import type { TagGroup, TagListItem } from '../../types/catalog'
 import type { OpportunityFilters } from '../../types/opportunity'
+import { getTagDisplayLabel, getTagGroupDisplayLabel } from '../../utils/tag-labels'
 
 type FilterModalProps = {
   isOpen: boolean
@@ -10,6 +11,12 @@ type FilterModalProps = {
   onApply: (filters: OpportunityFilters) => void
   onClose: () => void
   onReset: () => void
+}
+
+type TagSection = {
+  key: string
+  label: string
+  tags: TagListItem[]
 }
 
 const formatOptions = [
@@ -25,24 +32,74 @@ const typeOptions = [
   { value: 'mentorship', label: 'Менторство' },
 ] as const
 
-const statusOptions = [
-  { value: 1, label: 'Запланировано' },
-  { value: 2, label: 'На модерации' },
-  { value: 3, label: 'Активно' },
-  { value: 4, label: 'Закрыто' },
-  { value: 5, label: 'Отменено' },
-  { value: 6, label: 'Отклонено' },
-  { value: 7, label: 'В архиве' },
-]
-
 function toggleArrayValue<T>(values: T[], value: T) {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value]
 }
 
+function normalizeGroupToken(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9а-яё]/gi, '')
+}
+
+function isVacancyTypeGroup(groupCode: string, groupName: string) {
+  const normalizedCode = normalizeGroupToken(groupCode)
+  const normalizedName = normalizeGroupToken(groupName)
+
+  return (
+    normalizedCode.includes('vacancytype') ||
+    normalizedCode.includes('vacancykind') ||
+    normalizedName.includes('типвакансии')
+  )
+}
+
+function buildTagSections(tags: TagListItem[], groups: TagGroup[]) {
+  const groupsById = new Map<number, TagGroup>()
+  const groupsByCode = new Map<string, TagGroup>()
+
+  for (const group of groups) {
+    groupsById.set(group.id, group)
+    groupsByCode.set(group.code, group)
+  }
+
+  const grouped = new Map<string, TagSection>()
+
+  for (const tag of tags) {
+    const knownGroup = groupsById.get(tag.groupId) ?? groupsByCode.get(tag.groupCode)
+    const groupCode = knownGroup?.code ?? tag.groupCode ?? ''
+    const groupLabel = knownGroup?.name ?? tag.groupCode ?? 'Прочее'
+
+    if (isVacancyTypeGroup(groupCode, groupLabel)) {
+      continue
+    }
+
+    const sectionKey = knownGroup ? `group-${knownGroup.id}` : `group-code-${groupCode || 'other'}`
+    const section = grouped.get(sectionKey)
+
+    if (section) {
+      section.tags.push(tag)
+      continue
+    }
+
+    grouped.set(sectionKey, {
+      key: sectionKey,
+      label: groupLabel,
+      tags: [tag],
+    })
+  }
+
+  return Array.from(grouped.values())
+    .map((section) => ({
+      ...section,
+      tags: [...section.tags].sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'ru'))
+}
+
 export function FilterModal({ isOpen, filters, onApply, onClose, onReset }: FilterModalProps) {
   const [draft, setDraft] = useState<OpportunityFilters>(filters)
-  const [technologyTags, setTechnologyTags] = useState<TagListItem[]>([])
+  const [tagSections, setTagSections] = useState<TagSection[]>([])
+  const [allTags, setAllTags] = useState<TagListItem[]>([])
   const [isTagsLoading, setIsTagsLoading] = useState(false)
+  const [isTagsLoaded, setIsTagsLoaded] = useState(false)
   const [tagsError, setTagsError] = useState('')
 
   useEffect(() => {
@@ -54,7 +111,7 @@ export function FilterModal({ isOpen, filters, onApply, onClose, onReset }: Filt
   }, [filters, isOpen])
 
   useEffect(() => {
-    if (!isOpen || technologyTags.length > 0 || isTagsLoading) {
+    if (!isOpen || isTagsLoaded) {
       return
     }
 
@@ -62,10 +119,14 @@ export function FilterModal({ isOpen, filters, onApply, onClose, onReset }: Filt
     setIsTagsLoading(true)
     setTagsError('')
 
-    void fetchTechnologyTags(controller.signal)
-      .then((items) => {
+    void Promise.all([
+      fetchTags(controller.signal),
+      fetchTagGroups(controller.signal).catch(() => []),
+    ])
+      .then(([tags, groups]) => {
         if (!controller.signal.aborted) {
-          setTechnologyTags(items)
+          setAllTags(tags)
+          setTagSections(buildTagSections(tags, groups))
         }
       })
       .catch((error: unknown) => {
@@ -76,17 +137,17 @@ export function FilterModal({ isOpen, filters, onApply, onClose, onReset }: Filt
       .finally(() => {
         if (!controller.signal.aborted) {
           setIsTagsLoading(false)
+          setIsTagsLoaded(true)
         }
       })
 
     return () => controller.abort()
-  }, [isOpen, isTagsLoading, technologyTags.length])
+  }, [isOpen, isTagsLoaded])
 
   const hasActiveFilters = useMemo(
     () =>
       draft.types.length > 0 ||
       draft.formats.length > 0 ||
-      draft.statuses.length > 0 ||
       draft.tagIds.length > 0 ||
       draft.salaryFrom != null ||
       draft.salaryTo != null ||
@@ -132,27 +193,53 @@ export function FilterModal({ isOpen, filters, onApply, onClose, onReset }: Filt
           </section>
 
           <section className="filter-group">
-            <h4>Навыки</h4>
             {isTagsLoading ? <p>Загружаем навыки...</p> : null}
             {!isTagsLoading && tagsError ? <p className="filters-modal__error">{tagsError}</p> : null}
             {!isTagsLoading && !tagsError ? (
-              <div className="filter-group__options filter-group__options--scroll">
-                {technologyTags.map((tag) => (
-                  <label key={tag.id}>
-                    <input
-                      type="checkbox"
-                      checked={draft.tagIds.includes(tag.id)}
-                      onChange={() =>
-                        setDraft((current) => ({
-                          ...current,
-                          tagIds: toggleArrayValue(current.tagIds, tag.id),
-                        }))
-                      }
-                    />
-                    <span>{tag.name}</span>
-                  </label>
-                ))}
-              </div>
+              tagSections.length ? (
+                tagSections.map((section) => (
+                  <div className="filter-group__section" key={section.key}>
+                    <h5>{getTagGroupDisplayLabel(section.label)}</h5>
+                    <div className="filter-group__options filter-group__options--scroll">
+                      {section.tags.map((tag) => (
+                        <label key={tag.id}>
+                          <input
+                            type="checkbox"
+                            checked={draft.tagIds.includes(tag.id)}
+                            onChange={() =>
+                              setDraft((current) => ({
+                                ...current,
+                                tagIds: toggleArrayValue(current.tagIds, tag.id),
+                              }))
+                            }
+                          />
+                          <span>{getTagDisplayLabel(tag.name)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : allTags.length ? (
+                <div className="filter-group__options filter-group__options--scroll">
+                  {allTags.map((tag) => (
+                    <label key={tag.id}>
+                      <input
+                        type="checkbox"
+                        checked={draft.tagIds.includes(tag.id)}
+                        onChange={() =>
+                          setDraft((current) => ({
+                            ...current,
+                            tagIds: toggleArrayValue(current.tagIds, tag.id),
+                          }))
+                        }
+                      />
+                      <span>{getTagDisplayLabel(tag.name)}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p>Теги не найдены.</p>
+              )
             ) : null}
           </section>
 
@@ -216,40 +303,22 @@ export function FilterModal({ isOpen, filters, onApply, onClose, onReset }: Filt
           </section>
 
           <section className="filter-group">
-            <h4>Статусы</h4>
-            <div className="filter-group__options">
-              {statusOptions.map((option) => (
-                <label key={option.value}>
-                  <input
-                    type="checkbox"
-                    checked={draft.statuses.includes(option.value)}
-                    onChange={() =>
-                      setDraft((current) => ({
-                        ...current,
-                        statuses: toggleArrayValue(current.statuses, option.value),
-                      }))
-                    }
-                  />
-                  <span>{option.label}</span>
-                </label>
-              ))}
+            <h4>Дополнительно</h4>
+            <div className="toggle-list">
+              <label className="toggle-item">
+                <span>Только верифицированные компании</span>
+                <input
+                  type="checkbox"
+                  checked={draft.verifiedOnly}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      verifiedOnly: event.target.checked,
+                    }))
+                  }
+                />
+              </label>
             </div>
-          </section>
-
-          <section className="filter-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={draft.verifiedOnly}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    verifiedOnly: event.target.checked,
-                  }))
-                }
-              />
-              <span>Только верифицированные компании</span>
-            </label>
           </section>
         </div>
 
@@ -269,7 +338,7 @@ export function FilterModal({ isOpen, filters, onApply, onClose, onReset }: Filt
             type="button"
             className="btn btn--primary"
             onClick={() => {
-              onApply(draft)
+              onApply({ ...draft, statuses: [] })
               onClose()
             }}
           >
