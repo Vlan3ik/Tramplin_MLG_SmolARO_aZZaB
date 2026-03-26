@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { CalendarDays, CheckCircle2, RefreshCw, Search, SlidersHorizontal } from 'lucide-react'
+import { CalendarDays, RefreshCw, Search, SlidersHorizontal } from 'lucide-react'
 import { fetchEventsListOpportunities, participateInOpportunity } from '../api/opportunities'
+import { FilterModal } from '../components/home/FilterModal'
 import { OpportunityCard } from '../components/home/OpportunityCard'
 import { useAuth } from '../hooks/useAuth'
 import { useCity } from '../contexts/CityContext'
-import type { Opportunity, OpportunityType } from '../types/opportunity'
+import type { Opportunity, OpportunityFilters, OpportunityType } from '../types/opportunity'
 
-const defaultFormats = ['remote', 'hybrid', 'onsite']
+const defaultFilters: OpportunityFilters = {
+  types: ['event'],
+  formats: [],
+  tagIds: [],
+  salaryFrom: null,
+  salaryTo: null,
+  statuses: [],
+  verifiedOnly: false,
+}
 
 export function EventsPage() {
   const { selectedCityId } = useCity()
@@ -15,9 +23,8 @@ export function EventsPage() {
 
   const [searchInput, setSearchInput] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
-  const [formats, setFormats] = useState<string[]>([])
-  const [statuses, setStatuses] = useState<number[]>([])
-  const [verifiedOnly, setVerifiedOnly] = useState(false)
+  const [filters, setFilters] = useState<OpportunityFilters>(defaultFilters)
+  const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
   const [items, setItems] = useState<Opportunity[]>([])
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -34,16 +41,11 @@ export function EventsPage() {
       search: appliedSearch,
       cityId: selectedCityId,
       filters: {
+        ...filters,
         types: ['event'] as OpportunityType[],
-        formats,
-        tagIds: [],
-        salaryFrom: null,
-        salaryTo: null,
-        statuses,
-        verifiedOnly,
       },
     }),
-    [appliedSearch, formats, selectedCityId, statuses, verifiedOnly],
+    [appliedSearch, filters, selectedCityId],
   )
 
   const loadEvents = useCallback(
@@ -80,27 +82,10 @@ export function EventsPage() {
     setAppliedSearch((valueOverride ?? searchInput).trim())
   }
 
-  function toggleFormat(value: string) {
-    setFormats((current) => (current.includes(value) ? current.filter((item) => item !== value) : [...current, value]))
-  }
-
-  function toggleStatusGroup(values: number[]) {
-    setStatuses((current) => {
-      const hasAll = values.every((value) => current.includes(value))
-      if (hasAll) {
-        return current.filter((value) => !values.includes(value))
-      }
-
-      return Array.from(new Set([...current, ...values]))
-    })
-  }
-
   function handleResetFilters() {
     setSearchInput('')
     setAppliedSearch('')
-    setFormats([])
-    setStatuses([])
-    setVerifiedOnly(false)
+    setFilters(defaultFilters)
   }
 
   async function handleParticipate(opportunity: Opportunity) {
@@ -141,7 +126,14 @@ export function EventsPage() {
     }
   }
 
-  const hasFilters = formats.length > 0 || statuses.length > 0 || verifiedOnly || Boolean(appliedSearch.trim())
+  const hasFilters =
+    filters.formats.length > 0 ||
+    filters.statuses.length > 0 ||
+    filters.tagIds.length > 0 ||
+    filters.salaryFrom != null ||
+    filters.salaryTo != null ||
+    filters.verifiedOnly ||
+    Boolean(appliedSearch.trim())
 
   return (
     <div className="events-page">
@@ -150,7 +142,7 @@ export function EventsPage() {
           <div className="events-page__hero-copy">
             <span className="events-page__eyebrow">
               <CalendarDays size={16} />
-              Раздел мероприятий
+              Мероприятия
             </span>
             <h1>Мероприятия</h1>
             <p>
@@ -158,22 +150,23 @@ export function EventsPage() {
               записывайтесь прямо из карточки.
             </p>
           </div>
-
-          <div className="events-page__hero-card card">
-            <strong>Почему это удобно</strong>
-            <ul>
-              <li>Актуальные события из API</li>
-              <li>Единый стиль карточек с главной</li>
-              <li>Быстрая запись в один клик</li>
-            </ul>
-            <Link className="btn btn--primary" to="/vacancy-flow?type=event">
-              Создать мероприятие
-            </Link>
-          </div>
         </div>
       </section>
 
       <section className="container events-page__content">
+        <FilterModal
+          isOpen={isFiltersModalOpen}
+          filters={filters}
+          onApply={(nextFilters) =>
+            setFilters({
+              ...nextFilters,
+              types: ['event'],
+            })
+          }
+          onReset={() => setFilters(defaultFilters)}
+          onClose={() => setIsFiltersModalOpen(false)}
+        />
+
         {statusMessage ? <div className={`state-card ${statusError ? 'state-card--error' : ''}`}>{statusMessage}</div> : null}
 
         <div className="events-page__toolbar card">
@@ -200,7 +193,7 @@ export function EventsPage() {
             Сброс
           </button>
 
-          <button type="button" className="btn btn--ghost" aria-disabled="true">
+          <button type="button" className="btn btn--ghost" onClick={() => setIsFiltersModalOpen(true)}>
             <SlidersHorizontal size={16} />
             Фильтры
           </button>
@@ -212,47 +205,6 @@ export function EventsPage() {
               <div>
                 <strong>Найдено: {total}</strong>
                 <span>Сначала новые, затем по популярности</span>
-              </div>
-              <div className="events-page__chips">
-                {defaultFormats.map((format) => (
-                  <button
-                    key={format}
-                    type="button"
-                    className={formats.includes(format) ? 'is-active' : ''}
-                    onClick={() => toggleFormat(format)}
-                  >
-                    {format === 'remote' ? 'Онлайн' : format === 'hybrid' ? 'Гибрид' : 'Офлайн'}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className={verifiedOnly ? 'is-active' : ''}
-                  onClick={() => setVerifiedOnly((current) => !current)}
-                >
-                  <CheckCircle2 size={14} />
-                  Проверенные
-                </button>
-                <button
-                  type="button"
-                  className={[1, 2].every((status) => statuses.includes(status)) ? 'is-active' : ''}
-                  onClick={() => toggleStatusGroup([1, 2])}
-                >
-                  Запланированные
-                </button>
-                <button
-                  type="button"
-                  className={statuses.includes(3) ? 'is-active' : ''}
-                  onClick={() => toggleStatusGroup([3])}
-                >
-                  Активные
-                </button>
-                <button
-                  type="button"
-                  className={[4, 5, 6, 7].every((status) => statuses.includes(status)) ? 'is-active' : ''}
-                  onClick={() => toggleStatusGroup([4, 5, 6, 7])}
-                >
-                  Закрытые
-                </button>
               </div>
             </div>
 
@@ -289,16 +241,6 @@ export function EventsPage() {
               </div>
             ) : null}
           </div>
-
-          <aside className="events-page__aside card">
-            <strong>Что внутри</strong>
-            <p>Страница подхватывает данные из общего слоя `opportunities` и показывает только мероприятия.</p>
-            <ul>
-              <li>Поиск по названию, теме и компании</li>
-              <li>Фильтр по формату участия</li>
-              <li>Отдельная запись в мероприятие из карточки</li>
-            </ul>
-          </aside>
         </div>
       </section>
     </div>

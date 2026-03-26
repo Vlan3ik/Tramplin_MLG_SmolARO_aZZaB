@@ -3,6 +3,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useNavigate } from 'react-router-dom'
 import type { Opportunity } from '../../types/opportunity'
+import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
 import { isFavoriteOpportunity, subscribeToFavoriteOpportunities } from '../../utils/favorites'
 import {
   isMapItemViewed,
@@ -336,15 +337,15 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
             ) : null}
             {displayedItems.map((item) => (
               <article
-                key={item.id}
+                key={`${resolveEntityType(item)}-${item.id}`}
                 className="map-mini-card"
                 role="button"
                 tabIndex={0}
-                onClick={() => navigate(`/opportunity/${item.id}`)}
+                onClick={() => navigate(buildOpportunityDetailsPath(item))}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault()
-                    navigate(`/opportunity/${item.id}`)
+                    navigate(buildOpportunityDetailsPath(item))
                   }
                 }}
               >

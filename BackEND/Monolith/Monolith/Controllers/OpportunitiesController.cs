@@ -43,7 +43,9 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
                 x.Title,
                 x.Kind,
                 x.Format,
+                x.CompanyId,
                 CompanyName = x.Company.BrandName ?? x.Company.LegalName,
+                CompanyLogoUrl = x.Company.LogoUrl,
                 CityName = x.City != null ? x.City.CityName : (x.Location != null ? x.Location.City.CityName : "Unknown"),
                 x.PriceType,
                 x.PriceAmount,
@@ -74,7 +76,11 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
             x.ParticipantsCount,
             x.IsParticipating,
             x.ParticipantsCanWrite,
-            x.Tags)).ToList();
+            x.Tags)
+        {
+            CompanyId = x.CompanyId,
+            CompanyLogoUrl = x.CompanyLogoUrl
+        }).ToList();
 
         return Ok(new PagedResponse<OpportunityListItemDto>(items, totalCount, page, pageSize));
     }

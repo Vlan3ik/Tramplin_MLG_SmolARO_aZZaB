@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom'
 import { fetchHomeListOpportunities } from '../../../api/opportunities'
 import type { Opportunity, OpportunityFilters } from '../../../types/opportunity'
+import { buildOpportunityDetailsPath } from '../../../utils/opportunity-routing'
 import styles from './EventsCarouselSection.module.css'
 
 const eventsQuery: {
@@ -149,7 +150,7 @@ function EventCard({ event }: { event: Opportunity }) {
         <span className={styles.cardDescription}>{event.description}</span>
       </div>
 
-      <Link className={styles.cardButton} to={`/opportunity/${event.id}`}>
+      <Link className={styles.cardButton} to={buildOpportunityDetailsPath(event)}>
         Подробнее
       </Link>
     </article>

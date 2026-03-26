@@ -24,6 +24,7 @@ type CompanyLinkApi = {
 
 type CompanyOpportunityApi = {
   id: number
+  entityType?: string | null
   title: string | null
   type: string | number | null
   format: string | number | null
@@ -117,9 +118,11 @@ function parseWorkFormat(value: CompanyOpportunityApi['format']): string | null 
 function toCompanyOpportunity(opportunity: CompanyOpportunityApi): CompanyOpportunity {
   const type = parseOpportunityType(opportunity.type)
   const format = parseWorkFormat(opportunity.format)
+  const entityType = opportunity.entityType?.toLowerCase().includes('vacancy') ? 'vacancy' : 'opportunity'
 
   return {
     id: opportunity.id,
+    entityType,
     title: opportunity.title,
     type,
     typeLabel: type ? typeLabel[type] : 'Возможность',
