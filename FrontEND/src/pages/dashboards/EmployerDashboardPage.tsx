@@ -40,7 +40,6 @@ type EmployerTabId = 'overview' | 'company' | 'create' | 'opportunities' | 'appl
 const employerTabs: Array<{ id: EmployerTabId; label: string }> = [
   { id: 'overview', label: 'Обзор' },
   { id: 'company', label: 'Профиль компании' },
-  { id: 'create', label: 'Создать возможность' },
   { id: 'opportunities', label: 'Мои возможности' },
   { id: 'applications', label: 'Отклики' },
   { id: 'verification', label: 'Верификация' },
@@ -77,6 +76,11 @@ const publishStatusGroupValues = {
   planned: [1, 2],
   active: [3],
   closed: [4, 5, 6, 7],
+} as const
+const applicationStatusGroupValues = {
+  new: [1],
+  progress: [2, 3, 4],
+  closed: [5, 6, 7],
 } as const
 
 const employerOpportunityStatusLabel: Record<number, string> = {
@@ -297,6 +301,8 @@ export function EmployerDashboardPage() {
   const [opportunitySearch, setOpportunitySearch] = useState('')
   const [opportunitySourceFilter, setOpportunitySourceFilter] = useState<'all' | 'vacancy' | 'opportunity'>('all')
   const [opportunityStatusesFilter, setOpportunityStatusesFilter] = useState<number[]>([])
+  const [applicationSearch, setApplicationSearch] = useState('')
+  const [applicationStatusesFilter, setApplicationStatusesFilter] = useState<number[]>([])
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -552,6 +558,34 @@ export function EmployerDashboardPage() {
   }, [opportunities, opportunitySearch, opportunitySourceFilter, opportunityStatusesFilter])
 
   const hasOpportunityFilters = opportunitySourceFilter !== 'all' || opportunityStatusesFilter.length > 0 || Boolean(opportunitySearch.trim())
+  const filteredApplications = useMemo(() => {
+    const normalizedSearch = applicationSearch.trim().toLowerCase()
+
+    return applications.filter((application) => {
+      if (applicationStatusesFilter.length > 0 && !applicationStatusesFilter.includes(application.status)) {
+        return false
+      }
+
+      if (!normalizedSearch) {
+        return true
+      }
+
+      const haystack = [
+        application.vacancyTitle,
+        application.candidateName,
+        applicationStatusLabel[application.status] ?? `Статус ${application.status}`,
+      ]
+        .join(' ')
+        .toLowerCase()
+
+      return haystack.includes(normalizedSearch)
+    })
+  }, [applicationSearch, applicationStatusesFilter, applications])
+  const hasApplicationFilters = applicationStatusesFilter.length > 0 || Boolean(applicationSearch.trim())
+  const availableApplicationStatuses = useMemo(
+    () => Array.from(new Set(applications.map((item) => item.status))).sort((a, b) => a - b),
+    [applications],
+  )
 
   const selectedCandidateResume = selectedApplicationDetail?.candidateResume ?? null
 
@@ -579,6 +613,22 @@ export function EmployerDashboardPage() {
     setOpportunitySearch('')
     setOpportunitySourceFilter('all')
     setOpportunityStatusesFilter([])
+  }
+
+  function toggleApplicationStatusGroup(values: number[]) {
+    setApplicationStatusesFilter((current) => {
+      const hasAll = values.every((value) => current.includes(value))
+      if (hasAll) {
+        return current.filter((value) => !values.includes(value))
+      }
+
+      return Array.from(new Set([...current, ...values]))
+    })
+  }
+
+  function resetApplicationFilters() {
+    setApplicationSearch('')
+    setApplicationStatusesFilter([])
   }
 
   function onCreateFormChange(event: ChangeEvent<HTMLInputElement>) {
@@ -1148,13 +1198,17 @@ export function EmployerDashboardPage() {
         <section className="container seeker-profile-page">
           <header className="card seeker-profile-hero employer-profile-hero">
             <div className="seeker-profile-hero__avatar employer-profile-hero__avatar">
-              <span>
-                <Building2 size={28} />
-              </span>
+              {company?.logoUrl ? (
+                <img src={company.logoUrl} alt={`Логотип ${companyName}`} />
+              ) : (
+                <span>
+                  <Building2 size={28} />
+                </span>
+              )}
             </div>
             <div className="seeker-profile-hero__content">
               <h1>{companyName}</h1>
-              <p>Личный кабинет работодателя: профиль компании, публикации, отклики и верификация.</p>
+              <p></p>
               <div className="seeker-profile-hero__meta">
                 <span className={`status-chip status-chip--${companyStatusToneClass}`}>{companyStatusText}</span>
                 <span>
@@ -1172,6 +1226,9 @@ export function EmployerDashboardPage() {
               </div>
             </div>
             <div className="seeker-profile-hero__actions">
+              <button type="button" className="btn btn--secondary" onClick={() => onTabSelect('create')} disabled={!company}>
+                Создать возможность
+              </button>
               <button type="button" className="btn btn--primary" onClick={() => setTab('verification')} disabled={!company}>
                 <ShieldCheck size={16} />
                 Перейти к верификации
@@ -1698,18 +1755,74 @@ export function EmployerDashboardPage() {
 
               {tab === 'applications' ? <section className="dashboard-section card seeker-profile-panel">
         <h2>Отклики</h2>
+        {applications.length ? (
+          <div className="employer-applications-toolbar">
+            <label>
+              Поиск
+              <input
+                type="text"
+                value={applicationSearch}
+                onChange={(event) => setApplicationSearch(event.target.value)}
+                placeholder="Вакансия, кандидат или статус"
+              />
+            </label>
+            <div className="employer-applications-toolbar__chips">
+              <button
+                type="button"
+                className={`btn btn--ghost ${applicationStatusGroupValues.new.every((status) => applicationStatusesFilter.includes(status)) ? 'is-active' : ''}`}
+                onClick={() => toggleApplicationStatusGroup([...applicationStatusGroupValues.new])}
+              >
+                Новые
+              </button>
+              <button
+                type="button"
+                className={`btn btn--ghost ${applicationStatusGroupValues.progress.every((status) => applicationStatusesFilter.includes(status)) ? 'is-active' : ''}`}
+                onClick={() => toggleApplicationStatusGroup([...applicationStatusGroupValues.progress])}
+              >
+                В работе
+              </button>
+              <button
+                type="button"
+                className={`btn btn--ghost ${applicationStatusGroupValues.closed.every((status) => applicationStatusesFilter.includes(status)) ? 'is-active' : ''}`}
+                onClick={() => toggleApplicationStatusGroup([...applicationStatusGroupValues.closed])}
+              >
+                Закрытые
+              </button>
+              {availableApplicationStatuses.map((status) => (
+                <button
+                  key={`application-status-${status}`}
+                  type="button"
+                  className={`btn btn--ghost ${applicationStatusesFilter.includes(status) ? 'is-active' : ''}`}
+                  onClick={() => toggleApplicationStatusGroup([status])}
+                >
+                  {applicationStatusLabel[status] ?? `Статус ${status}`}
+                </button>
+              ))}
+              <button type="button" className="btn btn--ghost" onClick={resetApplicationFilters} disabled={!hasApplicationFilters}>
+                Сброс
+              </button>
+            </div>
+          </div>
+        ) : null}
         {!applications.length ? (
           <p>Откликов пока нет.</p>
+        ) : !filteredApplications.length ? (
+          <p>По текущим фильтрам отклики не найдены.</p>
         ) : (
-          <div className="status-table">
-            {applications.map((application) => (
-              <div key={application.id}>
-                <span>
-                  <MessageSquare size={14} />
-                  {application.vacancyTitle} — {application.candidateName}
-                </span>
-                <div className="employer-application-actions">
+          <div className="employer-applications-list">
+            {filteredApplications.map((application) => (
+              <article key={application.id} className="employer-application-card">
+                <div className="employer-application-card__head">
+                  <h3>{application.vacancyTitle}</h3>
                   <span className="status-chip">{applicationStatusLabel[application.status] ?? `Статус ${application.status}`}</span>
+                </div>
+                <div className="employer-application-card__meta">
+                  <MessageSquare size={14} />
+                  <span>{application.candidateName}</span>
+                  <span>Отклик: {formatDate(application.createdAt)}</span>
+                  <span>Обновлено: {formatDate(application.updatedAt)}</span>
+                </div>
+                <div className="employer-application-actions">
                   <select
                     value={String(applicationStatusDrafts[application.id] ?? application.status)}
                     onChange={(event) => onApplicationStatusDraftChange(application.id, Number(event.target.value))}
@@ -1743,7 +1856,7 @@ export function EmployerDashboardPage() {
                     {loadingApplicationDetailId === application.id ? 'Загружаем...' : 'Профиль кандидата'}
                   </button>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         )}
