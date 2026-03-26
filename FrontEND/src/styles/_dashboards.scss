@@ -1478,6 +1478,16 @@
   align-items: start;
 }
 
+.subscriptions-row__profile--clickable {
+  cursor: pointer;
+}
+
+.subscriptions-row__profile--clickable:focus-visible {
+  outline: 2px solid rgba(38, 107, 230, 0.5);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
 .subscriptions-row__avatar {
   width: 74px;
   height: 74px;
