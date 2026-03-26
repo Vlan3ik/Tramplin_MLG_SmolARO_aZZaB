@@ -316,7 +316,7 @@ export function CuratorDashboardPage() {
             <h2>Быстрые действия</h2>
             <div className="admin-toolbar">
               <Link className="btn btn--primary" to="/dashboard/curator/users/create">Создать пользователя</Link>
-              <Link className="btn btn--primary" to="/dashboard/curator/vacancies/create">Создать вакансию</Link>
+              <Link className="btn btn--primary" to="/dashboard/curator/companies/create">Создать компанию</Link>
             </div>
           </div>
         </section>
@@ -384,6 +384,9 @@ export function CuratorDashboardPage() {
                   </div>
                   <p>Индустрия: {item.industry || 'не указана'}</p>
                   <div className="favorite-card__actions">
+                    <Link className="btn btn--secondary" to={`/dashboard/curator/companies/create?companyId=${item.id}`} state={{ company: item }}>
+                      Редактировать
+                    </Link>
                     <button type="button" className="btn btn--ghost" disabled={processingCompanyId === item.id} onClick={() => void onVerifyCompany(item)}>
                       <CheckCircle2 size={14} /> Подтвердить
                     </button>
