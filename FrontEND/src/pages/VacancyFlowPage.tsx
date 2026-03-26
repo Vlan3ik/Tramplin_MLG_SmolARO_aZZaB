@@ -1,4 +1,5 @@
-﻿import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
+import { ArrowLeft } from 'lucide-react'
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { fetchCities, fetchTags } from '../api/catalog'
 import { createEmployerOpportunity, createEmployerVacancy } from '../api/employer'
@@ -6,6 +7,9 @@ import { reverseGeocode, type ReverseGeocodeResult } from '../api/map'
 import { MapPointPicker, type MapPoint } from '../components/forms/MapPointPicker'
 import { DateInput } from '../components/forms/DateInput'
 import { TagPicker } from '../components/forms/TagPicker'
+import { Footer } from '../components/layout/Footer'
+import { MainHeader } from '../components/layout/MainHeader'
+import { TopServiceBar } from '../components/layout/TopServiceBar'
 import type { City, TagListItem } from '../types/catalog'
 import './VacancyFlowPage.css'
 
@@ -274,6 +278,15 @@ export function VacancyFlowPage() {
     goStep(prev)
   }
 
+  function onReturnBack() {
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
+
+    navigate('/dashboard/employer')
+  }
+
   function onVacancyFormChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     const { name, value } = event.target
     setVacancyForm((state) => ({
@@ -521,10 +534,19 @@ export function VacancyFlowPage() {
   }
 
   return (
-    <div className="vf-page">
-      <main className="vf-content">
-        <section className="vf-section">
-          <Stepper activeStep={currentStep} />
+    <div className="app-shell">
+      <TopServiceBar />
+      <MainHeader />
+      <main>
+        <section className="container seeker-profile-page">
+          <section className="vf-page vf-section">
+            <div className="vf-top-actions">
+              <button type="button" className="vf-back-link" onClick={onReturnBack}>
+                <ArrowLeft size={16} />
+                Вернуться назад
+              </button>
+            </div>
+            <Stepper activeStep={currentStep} />
 
           {loadingCatalogs ? <p className="vf-note">Загружаем справочники платформы...</p> : null}
           {error ? <p className="vf-message vf-message--error">{error}</p> : null}
@@ -815,9 +837,11 @@ export function VacancyFlowPage() {
                 </div>
               </div>
             ) : null}
-          </div>
+            </div>
+          </section>
         </section>
       </main>
+      <Footer />
     </div>
   )
 }

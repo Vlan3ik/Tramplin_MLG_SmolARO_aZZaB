@@ -8,24 +8,8 @@
   --vf-soft: #f3f8ff;
   --vf-card: #fff;
 
-  min-height: 100%;
   font-family: Inter, sans-serif;
   color: var(--vf-text);
-  overflow-x: clip;
-  background:
-    radial-gradient(circle at 12% 8%, #dceeff 0%, transparent 40%),
-    radial-gradient(circle at 90% 0%, #eaf4ff 0%, transparent 35%),
-    #f8fbff;
-}
-
-.vf-content {
-  width: min(1240px, calc(100% - 40px));
-  margin: 0 auto 20px;
-  padding-top: 14px;
-}
-
-main:has(.vf-page) {
-  min-height: auto;
 }
 
 .vf-section {
@@ -361,6 +345,32 @@ main:has(.vf-page) {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+}
+
+.vf-top-actions {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.vf-back-link {
+  border: 0;
+  background: transparent;
+  color: #4b5f7a;
+  min-height: 34px;
+  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.vf-back-link:hover {
+  color: var(--vf-primary);
+  transform: translateX(-1px);
 }
 
 .vf-stepper {
