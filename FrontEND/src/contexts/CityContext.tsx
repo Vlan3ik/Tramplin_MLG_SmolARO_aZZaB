@@ -65,7 +65,7 @@ function persistManualSelectionState(isManual: boolean) {
 }
 
 function resolveFallbackCityId(cities: City[]) {
-  const preferredCity = cities.find((city) => city.name.toLowerCase() === 'РјРѕСЃРєРІР°')
+  const preferredCity = cities.find((city) => city.name.toLowerCase() === 'москва')
   return preferredCity?.id ?? cities[0]?.id ?? null
 }
 
@@ -245,7 +245,7 @@ export function CityProvider({ children }: CityProviderProps) {
           return
         }
 
-        setErrorMessage(error instanceof Error ? error.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃРїРёСЃРѕРє РіРѕСЂРѕРґРѕРІ.')
+        setErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить список городов.')
       } finally {
         if (!isDisposed) {
           setIsLoadingCities(false)

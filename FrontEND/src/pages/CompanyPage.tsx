@@ -1,4 +1,4 @@
-﻿import { BriefcaseBusiness, Building2, Globe, Link2, Mail, MapPin, Phone, ShieldCheck } from 'lucide-react'
+import { BriefcaseBusiness, Building2, Globe, Link2, Mail, MapPin, Phone, ShieldCheck } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { fetchCompanyById } from '../api/companies'
@@ -10,7 +10,7 @@ import { getSubscriptionActionLabel } from '../utils/subscription-labels'
 
 function getInitials(name: string | null) {
   const normalized = (name ?? '').trim()
-  if (!normalized) return 'Рљ'
+  if (!normalized) return 'К'
 
   const parts = normalized.split(/\s+/).filter(Boolean)
   const initials = parts
@@ -18,13 +18,13 @@ function getInitials(name: string | null) {
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
 
-  return initials || 'Рљ'
+  return initials || 'К'
 }
 
 function formatAbsoluteDate(value: string | null | undefined) {
-  if (!value) return 'РќРµ СѓРєР°Р·Р°РЅРѕ'
+  if (!value) return 'Не указано'
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'РќРµ СѓРєР°Р·Р°РЅРѕ'
+  if (Number.isNaN(date.getTime())) return 'Не указано'
 
   return date.toLocaleDateString('ru-RU', {
     day: 'numeric',
@@ -37,15 +37,15 @@ function CompanyOpportunityRow({ opportunity }: { opportunity: CompanyOpportunit
   return (
     <article className="company-profile-opportunity-row">
       <div>
-        <h3>{opportunity.title ?? 'Р‘РµР· РЅР°Р·РІР°РЅРёСЏ'}</h3>
+        <h3>{opportunity.title ?? 'Без названия'}</h3>
         <p>
-          {opportunity.formatLabel} вЂў РћРїСѓР±Р»РёРєРѕРІР°РЅРѕ: {formatAbsoluteDate(opportunity.publishAt)}
+          {opportunity.formatLabel} • Опубликовано: {formatAbsoluteDate(opportunity.publishAt)}
         </p>
       </div>
       <div className="company-profile-opportunity-row__right">
         <span>{opportunity.typeLabel}</span>
         <Link className="btn btn--ghost" to={buildOpportunityDetailsPath({ id: opportunity.id, entityType: opportunity.entityType })}>
-          РћС‚РєСЂС‹С‚СЊ
+          Открыть
         </Link>
       </div>
     </article>
@@ -98,7 +98,7 @@ export function CompanyPage() {
   useEffect(() => {
     if (!companyId) {
       setIsLoading(false)
-      setErrorMessage('РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РєРѕРјРїР°РЅРёРё.')
+      setErrorMessage('Некорректный идентификатор компании.')
       return
     }
 
@@ -114,7 +114,7 @@ export function CompanyPage() {
         setCompanyDetail(detail)
       } catch (error) {
         if (controller.signal.aborted) return
-        setErrorMessage(error instanceof Error ? error.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РєРѕРјРїР°РЅРёРё.')
+        setErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить информацию о компании.')
       } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false)
@@ -154,7 +154,7 @@ export function CompanyPage() {
         setIsFollowingMe(followerUserId != null)
       } catch (error) {
         if (!controller.signal.aborted) {
-          setFollowErrorMessage(error instanceof Error ? error.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃС‚Р°С‚СѓСЃ РїРѕРґРїРёСЃРєРё.')
+          setFollowErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить статус подписки.')
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -171,7 +171,7 @@ export function CompanyPage() {
   if (isLoading) {
     return (
       <section className="container company-page">
-        <div className="state-card">Р—Р°РіСЂСѓР¶Р°РµРј РїСЂРѕС„РёР»СЊ РєРѕРјРїР°РЅРёРё...</div>
+        <div className="state-card">Загружаем профиль компании...</div>
       </section>
     )
   }
@@ -179,7 +179,7 @@ export function CompanyPage() {
   if (!companyDetail || errorMessage) {
     return (
       <section className="container company-page">
-        <div className="state-card state-card--error">{errorMessage || 'РљРѕРјРїР°РЅРёСЏ РЅРµ РЅР°Р№РґРµРЅР°.'}</div>
+        <div className="state-card state-card--error">{errorMessage || 'Компания не найдена.'}</div>
       </section>
     )
   }
@@ -195,7 +195,7 @@ export function CompanyPage() {
     }
 
     if (!isAuthenticated) {
-      setFollowErrorMessage('Р§С‚РѕР±С‹ РїРѕРґРїРёСЃР°С‚СЊСЃСЏ, РІРѕР№РґРёС‚Рµ РІ Р°РєРєР°СѓРЅС‚.')
+      setFollowErrorMessage('Чтобы подписаться, войдите в аккаунт.')
       return
     }
 
@@ -227,7 +227,7 @@ export function CompanyPage() {
         // Keep optimistic state when refresh request fails.
       }
     } catch (error) {
-      setFollowErrorMessage(error instanceof Error ? error.message : 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ РїРѕРґРїРёСЃРєСѓ.')
+      setFollowErrorMessage(error instanceof Error ? error.message : 'Не удалось обновить подписку.')
       setIsFollowedByMe((current) => !current)
     } finally {
       setIsFollowSubmitting(false)
@@ -238,7 +238,7 @@ export function CompanyPage() {
     <section className="company-profile-page">
       <header className="company-profile-hero">
         <div className="company-profile-hero__inner">
-          <p className="company-profile-hero__subtitle">{subtitle || 'РџСЂРѕС„РёР»СЊ РєРѕРјРїР°РЅРёРё'}</p>
+          <p className="company-profile-hero__subtitle">{subtitle || 'Профиль компании'}</p>
           <div className="company-profile-hero__avatar">
             {companyDetail.logoUrl ? <img src={companyDetail.logoUrl} alt={`${displayName} logo`} /> : <span>{getInitials(displayName)}</span>}
           </div>
@@ -252,12 +252,12 @@ export function CompanyPage() {
             <div className="company-profile-hero__socials">
               {socialLinks.length ? (
                 socialLinks.map((link, index) => (
-                  <a key={`${link.url ?? 'link'}-${index}`} href={link.url ?? '#'} target="_blank" rel="noreferrer" title={link.label ?? link.url ?? 'РЎСЃС‹Р»РєР°'}>
+                  <a key={`${link.url ?? 'link'}-${index}`} href={link.url ?? '#'} target="_blank" rel="noreferrer" title={link.label ?? link.url ?? 'Ссылка'}>
                     <Link2 size={18} />
                   </a>
                 ))
               ) : (
-                <span>РЎСЃС‹Р»РєРё РЅРµ СѓРєР°Р·Р°РЅС‹</span>
+                <span>Ссылки не указаны</span>
               )}
             </div>
           </div>
@@ -272,40 +272,40 @@ export function CompanyPage() {
       <div className="container company-profile-page__content">
         <nav className="company-profile-tabs">
           <button type="button" className={activeTab === 'info' ? 'is-active' : ''} onClick={() => setActiveTab('info')}>
-            РРЅС„РѕСЂРјР°С†РёСЏ
+            Информация
           </button>
           <button type="button" className={activeTab === 'opportunities' ? 'is-active' : ''} onClick={() => setActiveTab('opportunities')}>
-            РђРєС‚РёРІРЅС‹Рµ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё
+            Активные возможности
           </button>
         </nav>
 
         {activeTab === 'info' ? (
           <section className="company-profile-info">
             <article className="company-profile-card">
-              <h2>РРЅС„Рѕ</h2>
+              <h2>Инфо</h2>
               <div className="company-profile-fact-list">
-                <div><span>Р“РѕСЂРѕРґ</span><strong>{companyDetail.cityName || 'РќРµ СѓРєР°Р·Р°РЅ'}</strong></div>
-                <div><span>Р®СЂРёРґРёС‡РµСЃРєРёРµ РґР°РЅРЅС‹Рµ</span><strong>{companyDetail.legalName || 'РќРµ СѓРєР°Р·Р°РЅС‹'}</strong></div>
-                <div><span>Р‘СЂРµРЅРґ</span><strong>{companyDetail.brandName || displayName}</strong></div>
-                <div><span>РћС‚СЂР°СЃР»СЊ</span><strong>{companyDetail.industry || 'РќРµ СѓРєР°Р·Р°РЅР°'}</strong></div>
+                <div><span>Город</span><strong>{companyDetail.cityName || 'Не указан'}</strong></div>
+                <div><span>Юридические данные</span><strong>{companyDetail.legalName || 'Не указаны'}</strong></div>
+                <div><span>Бренд</span><strong>{companyDetail.brandName || displayName}</strong></div>
+                <div><span>Отрасль</span><strong>{companyDetail.industry || 'Не указана'}</strong></div>
                 <div>
-                  <span>РЎС‚Р°С‚СѓСЃ</span>
+                  <span>Статус</span>
                   <strong className={companyDetail.verified ? 'is-verified' : ''}>
-                    {companyDetail.verified ? 'Р’РµСЂРёС„РёС†РёСЂРѕРІР°РЅР°' : 'РќР° РІРµСЂРёС„РёРєР°С†РёРё'}
+                    {companyDetail.verified ? 'Верифицирована' : 'На верификации'}
                   </strong>
                 </div>
               </div>
 
-              <h3>Рћ РєРѕРјРїР°РЅРёРё</h3>
-              <p>{companyDetail.description || 'РћРїРёСЃР°РЅРёРµ РїРѕРєР° РЅРµ Р·Р°РїРѕР»РЅРµРЅРѕ.'}</p>
+              <h3>О компании</h3>
+              <p>{companyDetail.description || 'Описание пока не заполнено.'}</p>
             </article>
 
             <aside className="company-profile-card">
-              <h2>РљРѕРЅС‚Р°РєС‚С‹</h2>
+              <h2>Контакты</h2>
               {hasPrimaryContacts ? (
                 <div className="company-profile-contacts">
-                  <p><Mail size={16} />{companyDetail.publicEmail || 'РџРѕС‡С‚Р° РЅРµ СѓРєР°Р·Р°РЅР°'}</p>
-                  <p><Phone size={16} />{companyDetail.publicPhone || 'РўРµР»РµС„РѕРЅ РЅРµ СѓРєР°Р·Р°РЅ'}</p>
+                  <p><Mail size={16} />{companyDetail.publicEmail || 'Почта не указана'}</p>
+                  <p><Phone size={16} />{companyDetail.publicPhone || 'Телефон не указан'}</p>
                   <p>
                     <Globe size={16} />
                     {companyDetail.websiteUrl ? (
@@ -313,15 +313,15 @@ export function CompanyPage() {
                         {companyDetail.websiteUrl}
                       </a>
                     ) : (
-                      <span>РЎР°Р№С‚ РЅРµ СѓРєР°Р·Р°РЅ</span>
+                      <span>Сайт не указан</span>
                     )}
                   </p>
                 </div>
               ) : (
-                <p>РљРѕРЅС‚Р°РєС‚С‹ РЅРµ СѓРєР°Р·Р°РЅС‹.</p>
+                <p>Контакты не указаны.</p>
               )}
 
-              <h3>РЎСЃС‹Р»РєРё</h3>
+              <h3>Ссылки</h3>
               <div className="company-profile-links">
                 {companyDetail.links.length ? (
                   companyDetail.links
@@ -333,7 +333,7 @@ export function CompanyPage() {
                       </a>
                     ))
                 ) : (
-                  <p>РЎСЃС‹Р»РєРё РЅРµ РґРѕР±Р°РІР»РµРЅС‹.</p>
+                  <p>Ссылки не добавлены.</p>
                 )}
               </div>
             </aside>
@@ -341,7 +341,7 @@ export function CompanyPage() {
         ) : (
           <section className="company-profile-card company-profile-card--opportunities">
             <div className="company-profile-opportunity-head">
-              <h2>РђРєС‚РёРІРЅС‹Рµ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё</h2>
+              <h2>Активные возможности</h2>
               <span>{companyDetail.activeOpportunities.length}</span>
             </div>
             {companyDetail.activeOpportunities.length ? (
@@ -351,7 +351,7 @@ export function CompanyPage() {
                 ))}
               </div>
             ) : (
-              <p>РџРѕРєР° РЅРµС‚ Р°РєС‚РёРІРЅС‹С… РІРѕР·РјРѕР¶РЅРѕСЃС‚РµР№.</p>
+              <p>Пока нет активных возможностей.</p>
             )}
           </section>
         )}
@@ -359,15 +359,15 @@ export function CompanyPage() {
         <section className="company-profile-meta">
           <div>
             <ShieldCheck size={16} />
-            <span>{companyDetail.verified ? 'РљРѕРјРїР°РЅРёСЏ РїСЂРѕС€Р»Р° РІРµСЂРёС„РёРєР°С†РёСЋ' : 'РљРѕРјРїР°РЅРёСЏ РѕР¶РёРґР°РµС‚ РІРµСЂРёС„РёРєР°С†РёСЋ'}</span>
+            <span>{companyDetail.verified ? 'Компания прошла верификацию' : 'Компания ожидает верификацию'}</span>
           </div>
           <div>
             <MapPin size={16} />
-            <span>{companyDetail.cityName || 'Р“РѕСЂРѕРґ РЅРµ СѓРєР°Р·Р°РЅ'}</span>
+            <span>{companyDetail.cityName || 'Город не указан'}</span>
           </div>
           <div>
             <BriefcaseBusiness size={16} />
-            <span>{companyDetail.activeOpportunities.length} Р°РєС‚РёРІРЅС‹С… РІРѕР·РјРѕР¶РЅРѕСЃС‚РµР№</span>
+            <span>{companyDetail.activeOpportunities.length} активных возможностей</span>
           </div>
           <div>
             <Building2 size={16} />
@@ -380,4 +380,3 @@ export function CompanyPage() {
     </section>
   )
 }
-
