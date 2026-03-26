@@ -566,7 +566,9 @@ export function CuratorDashboardPage() {
               </div>
             </div>
 
-            <form className="form-grid form-grid--two admin-form-card" onSubmit={onSubmitUser}>
+            <details className="admin-inline-form">
+              <summary>{editingUserId ? `Edit user #${editingUserId}` : 'Inline user form'}</summary>
+              <form className="form-grid form-grid--two admin-form-card" onSubmit={onSubmitUser}>
               <h3>{editingUserId ? `Редактирование пользователя #${editingUserId}` : 'Создание пользователя'}</h3>
               <label>Email<input type="email" name="email" value={userForm.email} onChange={onUserInputChange} required /></label>
               <label>Имя<input type="text" name="firstName" value={userForm.firstName} onChange={onUserInputChange} required /></label>
@@ -590,7 +592,8 @@ export function CuratorDashboardPage() {
                 </button>
                 {editingUserId ? <button type="button" className="btn btn--ghost" onClick={resetUserForm}>Отменить редактирование</button> : null}
               </div>
-            </form>
+              </form>
+            </details>
 
             <div className="admin-list-grid">
               {users.map((item) => (
