@@ -277,11 +277,21 @@
 
 .opportunity-card--compact {
   .action-row,
-  .company-status {
+  .opportunity-card__meta-line,
+  .opportunity-card__company {
     display: none;
   }
 
-  h3 {
+  .opportunity-card__title {
+    font-size: 1rem;
+  }
+
+  .opportunity-card__head {
+    align-items: flex-start;
+  }
+
+  .opportunity-card__compensation {
+    text-align: left;
     font-size: 1rem;
   }
 }

@@ -330,7 +330,7 @@ export function HomePage() {
                 <div className="result-list">
                   {listItems.map((item) => (
                     <OpportunityCard
-                      key={item.id}
+                      key={`${item.entityType ?? item.type}-${item.id}`}
                       opportunity={item}
                       isApplying={Boolean(applyingIds[item.id])}
                       isApplied={hasApplied(item.id)}

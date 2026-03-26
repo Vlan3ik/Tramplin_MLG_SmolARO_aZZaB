@@ -16,6 +16,8 @@ export type Opportunity = {
   description: string
   tags: string[]
   verified: boolean
+  companyId: number | null
+  companyLogoUrl: string | null
   favoriteCompany?: boolean
   latitude?: number | null
   longitude?: number | null
@@ -27,7 +29,6 @@ export type OpportunityDetail = Opportunity & {
   publishAt: string | null
   applicationDeadline: string | null
   isParticipating?: boolean
-  companyId: number | null
   companyWebsiteUrl: string | null
   companyPublicEmail: string | null
   address: string
