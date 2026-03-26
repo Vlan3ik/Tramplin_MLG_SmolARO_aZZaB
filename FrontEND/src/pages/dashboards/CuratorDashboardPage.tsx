@@ -1,5 +1,4 @@
-import { Building2, CheckCircle2, FileWarning, ShieldCheck, Users } from 'lucide-react'
-import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
+import { type CSSProperties, type ChangeEvent, type FormEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   createAdminCompany,
   createAdminUser,
@@ -24,20 +23,9 @@ import {
   type AdminVacancy,
 } from '../../api/admin'
 import { fetchCities } from '../../api/catalog'
-import { Footer } from '../../components/layout/Footer'
-import { MainHeader } from '../../components/layout/MainHeader'
-import { TopServiceBar } from '../../components/layout/TopServiceBar'
 import type { City } from '../../types/catalog'
 
 type AdminTabId = 'overview' | 'users' | 'companies' | 'vacancies' | 'opportunities'
-
-const adminTabs: Array<{ id: AdminTabId; label: string }> = [
-  { id: 'overview', label: 'Обзор' },
-  { id: 'users', label: 'Пользователи' },
-  { id: 'companies', label: 'Компании' },
-  { id: 'vacancies', label: 'Вакансии' },
-  { id: 'opportunities', label: 'Мероприятия' },
-]
 
 const accountStatusLabel: Record<number, string> = {
   1: 'Активен',
@@ -63,24 +51,6 @@ const moderationStatusLabel: Record<number, string> = {
   7: 'Архив',
 }
 
-const workFormatLabel: Record<number, string> = {
-  1: 'Офис',
-  2: 'Гибрид',
-  3: 'Удаленно',
-}
-
-const opportunityKindLabel: Record<number, string> = {
-  1: 'Хакатон',
-  2: 'День открытых дверей',
-  3: 'Лекция',
-  4: 'Другое',
-}
-
-const vacancyKindLabel: Record<number, string> = {
-  1: 'Стажировка',
-  2: 'Работа',
-}
-
 function parseNamesFromUsername(username: string) {
   const chunks = username.trim().split(/\s+/).filter(Boolean)
   return {
@@ -90,7 +60,16 @@ function parseNamesFromUsername(username: string) {
 }
 
 export function CuratorDashboardPage() {
+  const MIN_SIDEBAR_WIDTH = 320
+  const MAX_SIDEBAR_WIDTH = 760
+
   const [tab, setTab] = useState<AdminTabId>('overview')
+  const [sidebarWidth, setSidebarWidth] = useState(500)
+  const [expandedGroups, setExpandedGroups] = useState({
+    management: true,
+    moderation: true,
+    verification: true,
+  })
   const [cities, setCities] = useState<City[]>([])
 
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -103,10 +82,10 @@ export function CuratorDashboardPage() {
   const [vacanciesTotal, setVacanciesTotal] = useState(0)
   const [opportunitiesTotal, setOpportunitiesTotal] = useState(0)
 
-  const [usersSearch, setUsersSearch] = useState('')
-  const [companiesSearch, setCompaniesSearch] = useState('')
-  const [vacanciesSearch, setVacanciesSearch] = useState('')
-  const [opportunitiesSearch, setOpportunitiesSearch] = useState('')
+  const [usersSearch] = useState('')
+  const [companiesSearch] = useState('')
+  const [vacanciesSearch] = useState('')
+  const [opportunitiesSearch] = useState('')
 
   const [loading, setLoading] = useState(true)
   const [savingUser, setSavingUser] = useState(false)
@@ -145,6 +124,10 @@ export function CuratorDashboardPage() {
     publicPhone: '',
     status: 2,
   })
+
+  const isResizingSidebarRef = useRef(false)
+  const resizeStartXRef = useRef(0)
+  const resizeStartWidthRef = useRef(500)
 
   async function loadUsers() {
     const response = await fetchAdminUsers({ page: 1, pageSize: 30, search: usersSearch })
@@ -206,6 +189,58 @@ export function CuratorDashboardPage() {
     }),
     [companies, companiesTotal, opportunitiesTotal, usersTotal, vacanciesTotal],
   )
+
+  const pageTitleByTab: Record<AdminTabId, string> = {
+    overview: 'Главная',
+    users: 'Управление соискателями',
+    companies: 'Управление работодателями',
+    vacancies: 'Карточки возможностей',
+    opportunities: 'Модерация карточек',
+  }
+
+  function toggleGroup(group: keyof typeof expandedGroups) {
+    setExpandedGroups((state) => ({
+      ...state,
+      [group]: !state[group],
+    }))
+  }
+
+  useEffect(() => {
+    function onPointerMove(event: globalThis.PointerEvent) {
+      if (!isResizingSidebarRef.current) return
+      const delta = event.clientX - resizeStartXRef.current
+      const nextWidth = resizeStartWidthRef.current + delta
+      setSidebarWidth(Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, nextWidth)))
+    }
+
+    function onPointerUp() {
+      isResizingSidebarRef.current = false
+      if (typeof document !== 'undefined') {
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+    }
+
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+    }
+  }, [])
+
+  function onResizePointerDown(event: PointerEvent<HTMLButtonElement>) {
+    if (event.button !== 0) return
+    isResizingSidebarRef.current = true
+    resizeStartXRef.current = event.clientX
+    resizeStartWidthRef.current = sidebarWidth
+    event.currentTarget.setPointerCapture(event.pointerId)
+    if (typeof document !== 'undefined') {
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+  }
 
   function clearMessages() {
     setError('')
@@ -498,269 +533,268 @@ export function CuratorDashboardPage() {
   }
 
   return (
-    <div>
-      <TopServiceBar />
-      <MainHeader />
-      <main className="container seeker-profile-page">
-        <section className="dashboard-section card seeker-profile-hero admin-profile-hero">
-          <div className="seeker-profile-hero__avatar admin-profile-hero__avatar">
-            <span>ADM</span>
-          </div>
-          <div className="seeker-profile-hero__content">
-            <h1>Кабинет администратора</h1>
-            <p>Управление пользователями, компаниями и модерацией вакансий/мероприятий.</p>
-            <div className="seeker-profile-hero__meta">
-              <span><Users size={14} />{usersTotal} пользователей</span>
-              <span><Building2 size={14} />{companiesTotal} компаний</span>
-              <span><FileWarning size={14} />{vacanciesTotal + opportunitiesTotal} карточек</span>
-            </div>
-          </div>
-          {/* <div className="seeker-profile-hero__actions">
-            <button type="button" className="btn btn--ghost" onClick={() => void loadUsers()}>Обновить пользователей</button>
-            <button type="button" className="btn btn--ghost" onClick={() => void loadCompanies()}>Обновить компании</button>
-          </div> */}
-        </section>
+    <main className="curator-dashboard" style={{ '--curator-sidebar-width': `${sidebarWidth}px` } as CSSProperties}>
+      <aside className="curator-dashboard__sidebar">
+        <h1>Кабинет куратора</h1>
+        <button type="button" className={`curator-dashboard__menu-item ${tab === 'overview' ? 'is-active' : ''}`} onClick={() => setTab('overview')}>
+          Главная
+        </button>
 
-        {loading ? <section className="dashboard-section card seeker-profile-panel"><p>Загружаем данные кабинета...</p></section> : null}
-        {error ? <div className="auth-feedback auth-feedback--error">{error}</div> : null}
-        {success ? <div className="auth-feedback">{success}</div> : null}
-
-        <nav className="card seeker-profile-tabs">
-          {adminTabs.map((item) => (
-            <button key={item.id} type="button" className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)}>
-              {item.label}
+        <button
+          type="button"
+          className={`curator-dashboard__menu-group-toggle ${expandedGroups.management ? 'is-expanded' : ''}`}
+          onClick={() => toggleGroup('management')}
+        >
+          <span>Управление</span>
+          <span className="curator-dashboard__menu-group-arrow" aria-hidden="true">▸</span>
+        </button>
+        <div className={`curator-dashboard__menu-sublist-wrap ${expandedGroups.management ? 'is-expanded' : ''}`}>
+          <div className="curator-dashboard__menu-sublist">
+            <button type="button" className={`curator-dashboard__menu-item ${tab === 'users' ? 'is-active' : ''}`} onClick={() => setTab('users')}>
+              Соискатели
             </button>
-          ))}
-        </nav>
+            <button type="button" className={`curator-dashboard__menu-item ${tab === 'companies' ? 'is-active' : ''}`} onClick={() => setTab('companies')}>
+              Работодатели
+            </button>
+            <button type="button" className={`curator-dashboard__menu-item ${tab === 'vacancies' ? 'is-active' : ''}`} onClick={() => setTab('vacancies')}>
+              Карточки возможностей
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className={`curator-dashboard__menu-group-toggle ${expandedGroups.moderation ? 'is-expanded' : ''}`}
+          onClick={() => toggleGroup('moderation')}
+        >
+          <span>Модерация</span>
+          <span className="curator-dashboard__menu-group-arrow" aria-hidden="true">▸</span>
+        </button>
+        <div className={`curator-dashboard__menu-sublist-wrap ${expandedGroups.moderation ? 'is-expanded' : ''}`}>
+          <div className="curator-dashboard__menu-sublist">
+            <button type="button" className={`curator-dashboard__menu-item ${tab === 'opportunities' ? 'is-active' : ''}`} onClick={() => setTab('opportunities')}>
+              Карточки возможностей
+            </button>
+            <button type="button" className={`curator-dashboard__menu-item ${tab === 'users' ? 'is-active' : ''}`} onClick={() => setTab('users')}>
+              Соискатели
+            </button>
+            <button type="button" className={`curator-dashboard__menu-item ${tab === 'companies' ? 'is-active' : ''}`} onClick={() => setTab('companies')}>
+              Работодатели
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className={`curator-dashboard__menu-group-toggle ${expandedGroups.verification ? 'is-expanded' : ''}`}
+          onClick={() => toggleGroup('verification')}
+        >
+          <span>Верификация</span>
+          <span className="curator-dashboard__menu-group-arrow" aria-hidden="true">▸</span>
+        </button>
+        <div className={`curator-dashboard__menu-sublist-wrap ${expandedGroups.verification ? 'is-expanded' : ''}`}>
+          <div className="curator-dashboard__menu-sublist">
+            <button type="button" className={`curator-dashboard__menu-item ${tab === 'companies' ? 'is-active' : ''}`} onClick={() => setTab('companies')}>
+              Заявки на верификацию
+            </button>
+            <button type="button" className={`curator-dashboard__menu-item ${tab === 'companies' ? 'is-active' : ''}`} onClick={() => setTab('companies')}>
+              Документы компаний
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <button
+        type="button"
+        className="curator-dashboard__resize-handle"
+        aria-label="Изменить ширину боковой панели"
+        onPointerDown={onResizePointerDown}
+      />
+
+      <section className="curator-dashboard__content">
+        <header className="curator-dashboard__header">
+          <h2>{pageTitleByTab[tab]}</h2>
+          {loading ? <p>Загрузка данных...</p> : null}
+          {error ? <p className="curator-dashboard__status curator-dashboard__status--error">{error}</p> : null}
+          {success ? <p className="curator-dashboard__status">{success}</p> : null}
+        </header>
 
         {tab === 'overview' ? (
-          <section className="dashboard-section card seeker-profile-panel">
-            <h2>Обзор</h2>
-            <div className="employer-analytics">
-              <article><strong>{overviewStats.users}</strong><span>Всего пользователей</span></article>
-              <article><strong>{overviewStats.companies}</strong><span>Всего компаний</span></article>
-              <article><strong>{overviewStats.pendingVerification}</strong><span>Ждут верификации</span></article>
-              <article><strong>{overviewStats.moderation}</strong><span>Карточек в системе</span></article>
-            </div>
-          </section>
+          <div className="curator-dashboard__overview-grid">
+            <article><span>Пользователи</span><strong>{overviewStats.users}</strong></article>
+            <article><span>Компании</span><strong>{overviewStats.companies}</strong></article>
+            <article><span>Ждут верификации</span><strong>{overviewStats.pendingVerification}</strong></article>
+            <article><span>Карточки</span><strong>{overviewStats.moderation}</strong></article>
+          </div>
         ) : null}
 
         {tab === 'users' ? (
-          <section className="dashboard-section card seeker-profile-panel">
-            <div className="seeker-profile-panel__head">
-              <h2>Пользователи</h2>
-              <div className="admin-toolbar">
-                <input value={usersSearch} onChange={(event) => setUsersSearch(event.target.value)} placeholder="Поиск по email/username" />
-                <button type="button" className="btn btn--ghost" onClick={() => void loadUsers()}>Найти</button>
-              </div>
-            </div>
-
-            <form className="form-grid form-grid--two admin-form-card" onSubmit={onSubmitUser}>
-              <h3>{editingUserId ? `Редактирование пользователя #${editingUserId}` : 'Создание пользователя'}</h3>
-              <label>Email<input type="email" name="email" value={userForm.email} onChange={onUserInputChange} required /></label>
-              <label>Имя<input type="text" name="firstName" value={userForm.firstName} onChange={onUserInputChange} required /></label>
-              <label>Фамилия<input type="text" name="lastName" value={userForm.lastName} onChange={onUserInputChange} required /></label>
-              <label>
-                Статус
-                <select name="status" value={userForm.status} onChange={onUserInputChange}>
-                  <option value={1}>Активен</option>
-                  <option value={2}>Заблокирован</option>
-                  <option value={3}>Удален</option>
-                </select>
-              </label>
-              <div className="admin-checkbox-row">
-                <label className="employer-checkbox"><input type="checkbox" name="seeker" checked={userForm.seeker} onChange={onUserInputChange} />Соискатель</label>
-                <label className="employer-checkbox"><input type="checkbox" name="employer" checked={userForm.employer} onChange={onUserInputChange} />Работодатель</label>
-                <label className="employer-checkbox"><input type="checkbox" name="curator" checked={userForm.curator} onChange={onUserInputChange} />Куратор</label>
-              </div>
-              <div className="favorite-card__actions">
-                <button type="submit" className="btn btn--primary" disabled={savingUser}>
-                  {savingUser ? 'Сохраняем...' : editingUserId ? 'Обновить пользователя' : 'Создать пользователя'}
+          <div className="curator-dashboard__cards-grid">
+            {users.map((item) => (
+              <article key={item.id} className="curator-dashboard__person-card">
+                <h3>{item.username || 'Иванов Иван Иванович'}</h3>
+                <a href={`mailto:${item.email}`}>{item.email}</a>
+                <div className="curator-dashboard__card-status">
+                  <span>Cтатус:</span>
+                  <em className={item.status === 1 ? 'is-active' : 'is-inactive'}>{accountStatusLabel[item.status] ?? `Статус ${item.status}`}</em>
+                </div>
+                <button type="button" className="curator-dashboard__btn curator-dashboard__btn--edit" onClick={() => onEditUser(item)}>
+                  Редактировать
                 </button>
-                {editingUserId ? <button type="button" className="btn btn--ghost" onClick={resetUserForm}>Отменить редактирование</button> : null}
-              </div>
-            </form>
-
-            <div className="admin-list-grid">
-              {users.map((item) => (
-                <article key={item.id} className="favorite-card admin-list-card">
-                  <div className="favorite-card__head">
-                    <div><h3>{item.email}</h3><p>{item.username}</p></div>
-                    <span className="status-chip">{accountStatusLabel[item.status] ?? `Статус ${item.status}`}</span>
-                  </div>
-                  <p>Роли: {item.roles.join(', ') || 'не назначены'}</p>
-                  <div className="favorite-card__actions">
-                    <button type="button" className="btn btn--secondary" onClick={() => onEditUser(item)}>Редактировать</button>
-                    <button type="button" className="btn btn--danger" onClick={() => void onDeleteUser(item)}>Удалить</button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
+                <button type="button" className="curator-dashboard__btn curator-dashboard__btn--delete" onClick={() => void onDeleteUser(item)}>
+                  Удалить
+                </button>
+              </article>
+            ))}
+          </div>
         ) : null}
 
         {tab === 'companies' ? (
-          <section className="dashboard-section card seeker-profile-panel">
-            <div className="seeker-profile-panel__head">
-              <h2>Компании</h2>
-              <div className="admin-toolbar">
-                <input value={companiesSearch} onChange={(event) => setCompaniesSearch(event.target.value)} placeholder="Поиск по названию/индустрии" />
-                <button type="button" className="btn btn--ghost" onClick={() => void loadCompanies()}>Найти</button>
-              </div>
-            </div>
-
-            <form className="form-grid form-grid--two admin-form-card" onSubmit={onSubmitCompany}>
-              <h3>{editingCompanyId ? `Редактирование компании #${editingCompanyId}` : 'Создание компании'}</h3>
-              <label>Юридическое название<input name="legalName" value={companyForm.legalName} onChange={onCompanyInputChange} required /></label>
-              <label>Бренд<input name="brandName" value={companyForm.brandName} onChange={onCompanyInputChange} /></label>
-              <label>
-                Тип
-                <select name="legalType" value={companyForm.legalType} onChange={onCompanyInputChange}>
-                  <option value={1}>Юридическое лицо</option>
-                  <option value={2}>ИП</option>
-                </select>
-              </label>
-              <label>ИНН<input name="taxId" value={companyForm.taxId} onChange={onCompanyInputChange} required /></label>
-              <label>Регистрационный номер<input name="registrationNumber" value={companyForm.registrationNumber} onChange={onCompanyInputChange} required /></label>
-              <label>Индустрия<input name="industry" value={companyForm.industry} onChange={onCompanyInputChange} required /></label>
-              <label>
-                Базовый город
-                <select name="baseCityId" value={companyForm.baseCityId} onChange={onCompanyInputChange} required>
-                  <option value="">Выберите город</option>
-                  {cities.map((city) => (
-                    <option key={city.id} value={city.id}>{city.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Статус
-                <select name="status" value={companyForm.status} onChange={onCompanyInputChange}>
-                  <option value={1}>Черновик</option>
-                  <option value={2}>На верификации</option>
-                  <option value={3}>Подтверждена</option>
-                  <option value={4}>Отклонена</option>
-                  <option value={5}>Заблокирована</option>
-                </select>
-              </label>
-              <label>Сайт<input name="websiteUrl" value={companyForm.websiteUrl} onChange={onCompanyInputChange} /></label>
-              <label>Публичный email<input name="publicEmail" value={companyForm.publicEmail} onChange={onCompanyInputChange} /></label>
-              <label>Публичный телефон<input name="publicPhone" value={companyForm.publicPhone} onChange={onCompanyInputChange} /></label>
-              <label className="full-width">Описание<textarea rows={3} name="description" value={companyForm.description} onChange={onCompanyInputChange} required /></label>
-              <div className="favorite-card__actions full-width">
-                <button type="submit" className="btn btn--primary" disabled={savingCompany}>
-                  {savingCompany ? 'Сохраняем...' : editingCompanyId ? 'Обновить компанию' : 'Создать компанию'}
+          <div className="curator-dashboard__cards-grid">
+            {companies.map((item) => (
+              <article key={item.id} className="curator-dashboard__person-card">
+                <h3>{item.brandName || item.legalName}</h3>
+                <a href="mailto:info@company.ru">info@company.ru</a>
+                <div className="curator-dashboard__card-status">
+                  <span>Cтатус:</span>
+                  <em className={item.status === 3 ? 'is-active' : 'is-inactive'}>{companyStatusLabel[item.status] ?? `Статус ${item.status}`}</em>
+                </div>
+                <button type="button" className="curator-dashboard__btn curator-dashboard__btn--edit" onClick={() => onEditCompany(item)}>
+                  Редактировать
                 </button>
-                {editingCompanyId ? <button type="button" className="btn btn--ghost" onClick={resetCompanyForm}>Отменить редактирование</button> : null}
-              </div>
-            </form>
-
-            <div className="admin-list-grid">
-              {companies.map((item) => (
-                <article key={item.id} className="favorite-card admin-list-card">
-                  <div className="favorite-card__head">
-                    <div><h3>{item.brandName || item.legalName}</h3><p>{item.legalName}</p></div>
-                    <span className="status-chip">{companyStatusLabel[item.status] ?? `Статус ${item.status}`}</span>
+                <button
+                  type="button"
+                  className="curator-dashboard__btn curator-dashboard__btn--delete"
+                  onClick={() => void onDeleteCompany(item)}
+                  disabled={processingCompanyId === item.id}
+                >
+                  Удалить
+                </button>
+                {item.status === 2 ? (
+                  <div className="curator-dashboard__verify-actions">
+                    <button type="button" onClick={() => void onVerifyCompany(item)} disabled={processingCompanyId === item.id}>Подтвердить</button>
+                    <button type="button" onClick={() => void onRejectCompany(item)} disabled={processingCompanyId === item.id}>Отклонить</button>
                   </div>
-                  <p>Индустрия: {item.industry || 'не указана'}</p>
-                  <div className="favorite-card__actions">
-                    <button type="button" className="btn btn--secondary" onClick={() => onEditCompany(item)}>Редактировать</button>
-                    <button type="button" className="btn btn--ghost" disabled={processingCompanyId === item.id} onClick={() => void onVerifyCompany(item)}>
-                      <CheckCircle2 size={14} /> Подтвердить
-                    </button>
-                    <button type="button" className="btn btn--ghost" disabled={processingCompanyId === item.id} onClick={() => void onRejectCompany(item)}>
-                      <ShieldCheck size={14} /> Отклонить
-                    </button>
-                    <button type="button" className="btn btn--danger" onClick={() => void onDeleteCompany(item)}>Удалить</button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
+                ) : null}
+              </article>
+            ))}
+          </div>
         ) : null}
 
         {tab === 'vacancies' ? (
-          <section className="dashboard-section card seeker-profile-panel">
-            <div className="seeker-profile-panel__head">
-              <h2>Вакансии</h2>
-              <div className="admin-toolbar">
-                <input value={vacanciesSearch} onChange={(event) => setVacanciesSearch(event.target.value)} placeholder="Поиск по заголовку" />
-                <button type="button" className="btn btn--ghost" onClick={() => void loadVacancies()}>Найти</button>
-              </div>
-            </div>
-            <div className="admin-list-grid">
-              {vacancies.map((item) => (
-                <article key={item.id} className="favorite-card admin-list-card">
-                  <div className="favorite-card__head">
-                    <div><h3>{item.title}</h3><p>Компания ID: {item.companyId}</p></div>
-                    <span className="status-chip">{moderationStatusLabel[item.status] ?? `Статус ${item.status}`}</span>
-                  </div>
-                  <div className="favorite-card__meta">
-                    <span>{vacancyKindLabel[item.kind] ?? `Вид ${item.kind}`}</span>
-                    <span>{workFormatLabel[item.format] ?? `Формат ${item.format}`}</span>
-                    <span>{new Date(item.publishAt).toLocaleDateString('ru-RU')}</span>
-                  </div>
-                  <div className="favorite-card__actions">
-                    <select
-                      value={item.status}
-                      onChange={(event) => void onChangeVacancyStatus(item, Number(event.target.value))}
-                      disabled={processingVacancyId === item.id}
-                    >
-                      {Object.entries(moderationStatusLabel).map(([value, label]) => (
-                        <option key={value} value={Number(value)}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                    <button type="button" className="btn btn--danger" onClick={() => void onDeleteVacancy(item)}>Удалить</button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
+          <div className="curator-dashboard__cards-grid">
+            {vacancies.map((item) => (
+              <article key={item.id} className="curator-dashboard__person-card">
+                <h3>{item.title}</h3>
+                <a href={`#vacancy-${item.id}`}>Компания #{item.companyId}</a>
+                <div className="curator-dashboard__card-status">
+                  <span>Cтатус:</span>
+                  <em className={item.status === 3 ? 'is-active' : 'is-inactive'}>{moderationStatusLabel[item.status] ?? `Статус ${item.status}`}</em>
+                </div>
+                <select
+                  value={item.status}
+                  onChange={(event) => void onChangeVacancyStatus(item, Number(event.target.value))}
+                  disabled={processingVacancyId === item.id}
+                >
+                  {Object.entries(moderationStatusLabel).map(([value, label]) => (
+                    <option key={value} value={Number(value)}>{label}</option>
+                  ))}
+                </select>
+                <button type="button" className="curator-dashboard__btn curator-dashboard__btn--delete" onClick={() => void onDeleteVacancy(item)}>
+                  Удалить
+                </button>
+              </article>
+            ))}
+          </div>
         ) : null}
 
         {tab === 'opportunities' ? (
-          <section className="dashboard-section card seeker-profile-panel">
-            <div className="seeker-profile-panel__head">
-              <h2>Мероприятия</h2>
-              <div className="admin-toolbar">
-                <input value={opportunitiesSearch} onChange={(event) => setOpportunitiesSearch(event.target.value)} placeholder="Поиск по заголовку" />
-                <button type="button" className="btn btn--ghost" onClick={() => void loadOpportunities()}>Найти</button>
-              </div>
-            </div>
-            <div className="admin-list-grid">
-              {opportunities.map((item) => (
-                <article key={item.id} className="favorite-card admin-list-card">
-                  <div className="favorite-card__head">
-                    <div><h3>{item.title}</h3><p>Компания ID: {item.companyId}</p></div>
-                    <span className="status-chip">{moderationStatusLabel[item.status] ?? `Статус ${item.status}`}</span>
-                  </div>
-                  <div className="favorite-card__meta">
-                    <span>{opportunityKindLabel[item.kind] ?? `Вид ${item.kind}`}</span>
-                    <span>{workFormatLabel[item.format] ?? `Формат ${item.format}`}</span>
-                    <span>{new Date(item.publishAt).toLocaleDateString('ru-RU')}</span>
-                  </div>
-                  <div className="favorite-card__actions">
-                    <select
-                      value={item.status}
-                      onChange={(event) => void onChangeOpportunityStatus(item, Number(event.target.value))}
-                      disabled={processingOpportunityId === item.id}
-                    >
-                      {Object.entries(moderationStatusLabel).map(([value, label]) => (
-                        <option key={value} value={Number(value)}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                    <button type="button" className="btn btn--danger" onClick={() => void onDeleteOpportunity(item)}>Удалить</button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
+          <div className="curator-dashboard__cards-grid">
+            {opportunities.map((item) => (
+              <article key={item.id} className="curator-dashboard__person-card">
+                <h3>{item.title}</h3>
+                <a href={`#opportunity-${item.id}`}>Компания #{item.companyId}</a>
+                <div className="curator-dashboard__card-status">
+                  <span>Cтатус:</span>
+                  <em className={item.status === 3 ? 'is-active' : 'is-inactive'}>{moderationStatusLabel[item.status] ?? `Статус ${item.status}`}</em>
+                </div>
+                <select
+                  value={item.status}
+                  onChange={(event) => void onChangeOpportunityStatus(item, Number(event.target.value))}
+                  disabled={processingOpportunityId === item.id}
+                >
+                  {Object.entries(moderationStatusLabel).map(([value, label]) => (
+                    <option key={value} value={Number(value)}>{label}</option>
+                  ))}
+                </select>
+                <button type="button" className="curator-dashboard__btn curator-dashboard__btn--delete" onClick={() => void onDeleteOpportunity(item)}>
+                  Удалить
+                </button>
+              </article>
+            ))}
+          </div>
         ) : null}
-      </main>
-      <Footer />
-    </div>
+
+        {(tab === 'users' && editingUserId) || (tab === 'users' && !users.length) ? (
+          <form className="curator-dashboard__edit-form" onSubmit={onSubmitUser}>
+            <h3>{editingUserId ? `Редактирование пользователя #${editingUserId}` : 'Создание пользователя'}</h3>
+            <label>Email<input type="email" name="email" value={userForm.email} onChange={onUserInputChange} required /></label>
+            <label>Имя<input type="text" name="firstName" value={userForm.firstName} onChange={onUserInputChange} required /></label>
+            <label>Фамилия<input type="text" name="lastName" value={userForm.lastName} onChange={onUserInputChange} required /></label>
+            <label>
+              Статус
+              <select name="status" value={userForm.status} onChange={onUserInputChange}>
+                <option value={1}>Активен</option>
+                <option value={2}>Заблокирован</option>
+                <option value={3}>Удален</option>
+              </select>
+            </label>
+            <div className="curator-dashboard__edit-form-row">
+              <label><input type="checkbox" name="seeker" checked={userForm.seeker} onChange={onUserInputChange} />Соискатель</label>
+              <label><input type="checkbox" name="employer" checked={userForm.employer} onChange={onUserInputChange} />Работодатель</label>
+              <label><input type="checkbox" name="curator" checked={userForm.curator} onChange={onUserInputChange} />Куратор</label>
+            </div>
+            <div className="curator-dashboard__edit-form-actions">
+              <button type="submit" disabled={savingUser}>{savingUser ? 'Сохраняем...' : editingUserId ? 'Обновить' : 'Создать'}</button>
+              {editingUserId ? <button type="button" onClick={resetUserForm}>Отменить</button> : null}
+            </div>
+          </form>
+        ) : null}
+
+        {tab === 'companies' && editingCompanyId ? (
+          <form className="curator-dashboard__edit-form" onSubmit={onSubmitCompany}>
+            <h3>Редактирование компании #{editingCompanyId}</h3>
+            <label>Юридическое название<input name="legalName" value={companyForm.legalName} onChange={onCompanyInputChange} required /></label>
+            <label>Бренд<input name="brandName" value={companyForm.brandName} onChange={onCompanyInputChange} /></label>
+            <label>Индустрия<input name="industry" value={companyForm.industry} onChange={onCompanyInputChange} required /></label>
+            <label>
+              Базовый город
+              <select name="baseCityId" value={companyForm.baseCityId} onChange={onCompanyInputChange} required>
+                <option value="">Выберите город</option>
+                {cities.map((city) => (
+                  <option key={city.id} value={city.id}>{city.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Статус
+              <select name="status" value={companyForm.status} onChange={onCompanyInputChange}>
+                <option value={1}>Черновик</option>
+                <option value={2}>На верификации</option>
+                <option value={3}>Подтверждена</option>
+                <option value={4}>Отклонена</option>
+                <option value={5}>Заблокирована</option>
+              </select>
+            </label>
+            <label>Публичный email<input name="publicEmail" value={companyForm.publicEmail} onChange={onCompanyInputChange} /></label>
+            <label>Публичный телефон<input name="publicPhone" value={companyForm.publicPhone} onChange={onCompanyInputChange} /></label>
+            <div className="curator-dashboard__edit-form-actions">
+              <button type="submit" disabled={savingCompany}>{savingCompany ? 'Сохраняем...' : 'Обновить'}</button>
+              <button type="button" onClick={resetCompanyForm}>Отменить</button>
+            </div>
+          </form>
+        ) : null}
+      </section>
+    </main>
   )
 }
