@@ -292,7 +292,6 @@ export function CuratorDashboardPage() {
                 <Link className="btn btn--primary" to="/dashboard/curator/companies/create">Создать компанию</Link>
               </div>
             </div>
-            <p>Управление пользователями, компаниями и модерацией вакансий/мероприятий.</p>
             <div className="seeker-profile-hero__meta">
               <span><Users size={14} />{usersTotal} пользователей</span>
               <span><Building2 size={14} />{companiesTotal} компаний</span>
