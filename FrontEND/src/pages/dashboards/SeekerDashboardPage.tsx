@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { createApplication } from '../../api/applications'
 import { fetchCities, fetchTags } from '../../api/catalog'
 import { createDirectChat } from '../../api/chats'
@@ -65,6 +65,7 @@ import type { PublicProfile } from '../../types/public-profile'
 import type { SeekerResume } from '../../types/resume'
 import { getFavoriteOpportunityIds, subscribeToFavoriteOpportunities } from '../../utils/favorites'
 import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
+import { getSubscriptionActionLabel } from '../../utils/subscription-labels'
 import { getTagToneClass } from '../../utils/tag-tones'
 import { formatSkillLevelDisplay, SKILL_LEVEL_OPTIONS } from '../../utils/skill-levels'
 
@@ -996,6 +997,7 @@ function loadResumeLocal(userId: number) {
 
 export function SeekerDashboardPage() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { username: routeUsername } = useParams<{ username?: string }>()
   const publicUsername = routeUsername?.trim() ?? ''
   const isPublicReadOnlyMode = Boolean(publicUsername)
@@ -1663,6 +1665,7 @@ export function SeekerDashboardPage() {
   const profileRoleTitle = useMemo(() => `${profileSpecialization} ${profileCityName}`.trim(), [profileSpecialization, profileCityName])
   const avatarFallback = useMemo(() => (profile?.firstName?.charAt(0) || profile?.lastName?.charAt(0) || 'P').toUpperCase(), [profile])
   const followingUserIds = useMemo(() => new Set(followingUsers.map((item) => item.userId)), [followingUsers])
+  const followerUserIds = useMemo(() => new Set(followerUsers.map((item) => item.userId)), [followerUsers])
   const subscriptionsCount = followingUsers.length
   const subscribersCount = followerUsers.length
   const isForeignProfile = useMemo(() => {
@@ -1679,6 +1682,10 @@ export function SeekerDashboardPage() {
   const isFollowingForeignProfile = useMemo(
     () => (foreignProfileUserId ? followingUserIds.has(foreignProfileUserId) : false),
     [foreignProfileUserId, followingUserIds],
+  )
+  const isForeignProfileFollowingMe = useMemo(
+    () => (foreignProfileUserId ? followerUserIds.has(foreignProfileUserId) : false),
+    [foreignProfileUserId, followerUserIds],
   )
   const isEmployerViewer = session?.platformRole === PlatformRole.Employer
   const isForeignSubscriptionLoading = foreignProfileUserId ? Boolean(subscriptionActionLoading[foreignProfileUserId]) : false
@@ -1790,6 +1797,7 @@ export function SeekerDashboardPage() {
     return source.map((user) => ({
       id: `${followMode}-seeker-${user.userId}`,
       userId: user.userId,
+      profileUsername: user.username?.trim() || null,
       title: user.displayName?.trim() || user.username?.trim() || `Пользователь #${user.userId}`,
       subtitle: 'Соискатель',
       description: followMode === 'subscriptions' ? 'Вы подписаны на этого пользователя.' : 'Подписан на вас.',
@@ -1803,6 +1811,7 @@ export function SeekerDashboardPage() {
     return source.map((user) => ({
       id: `${followMode}-employer-${user.userId}`,
       userId: user.userId,
+      profileUsername: user.username?.trim() || null,
       title: user.organizationName?.trim() || user.displayName?.trim() || user.username?.trim() || `Компания #${user.userId}`,
       subtitle: 'Работодатель',
       description: followMode === 'subscriptions' ? 'Вы подписаны на эту организацию.' : 'Организация подписана на вас.',
@@ -2905,7 +2914,7 @@ export function SeekerDashboardPage() {
                         disabled={isForeignSubscriptionLoading || !foreignProfileUserId}
                         onClick={() => void onToggleSubscription(foreignProfileUserId)}
                       >
-                        {isForeignSubscriptionLoading ? 'Обновляем...' : isFollowingForeignProfile ? 'Вы подписаны' : 'Подписаться'}
+                        {isForeignSubscriptionLoading ? 'Обновляем...' : getSubscriptionActionLabel(isFollowingForeignProfile, isForeignProfileFollowingMe)}
                       </button>
                       <button
                         type="button"
@@ -2936,7 +2945,7 @@ export function SeekerDashboardPage() {
                     disabled={isForeignSubscriptionLoading || !foreignProfileUserId}
                     onClick={() => void onToggleSubscription(foreignProfileUserId)}
                   >
-                    {isForeignSubscriptionLoading ? 'Обновляем...' : isFollowingForeignProfile ? 'Вы подписаны' : 'Подписаться'}
+                    {isForeignSubscriptionLoading ? 'Обновляем...' : getSubscriptionActionLabel(isFollowingForeignProfile, isForeignProfileFollowingMe)}
                   </button>
                   <button
                     type="button"
@@ -3056,19 +3065,44 @@ export function SeekerDashboardPage() {
                 <div className="subscriptions-list">
                   {(subscriptionsTab === 'seekers' ? seekerSubscriptions : employerSubscriptions).map((item) => (
                     <article key={item.id} className="subscriptions-row">
-                      <div className="subscriptions-row__profile">
+                      {(() => {
+                        const canOpenProfile = subscriptionsTab === 'seekers' && Boolean(item.profileUsername)
+
+                        return (
+                          <div
+                            className={clsx('subscriptions-row__profile', canOpenProfile && 'subscriptions-row__profile--clickable')}
+                            role={canOpenProfile ? 'button' : undefined}
+                            tabIndex={canOpenProfile ? 0 : undefined}
+                            onClick={
+                              canOpenProfile
+                                ? () => navigate(`/dashboard/seeker/${encodeURIComponent(item.profileUsername ?? '')}`)
+                                : undefined
+                            }
+                            onKeyDown={
+                              canOpenProfile
+                                ? (event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault()
+                                      navigate(`/dashboard/seeker/${encodeURIComponent(item.profileUsername ?? '')}`)
+                                    }
+                                  }
+                                : undefined
+                            }
+                          >
                         <div className="subscriptions-row__avatar">
                           {item.avatarUrl ? <img src={item.avatarUrl} alt={item.title} /> : <span>{item.title.charAt(0).toUpperCase()}</span>}
-                      </div>
-                      <div className="subscriptions-row__content">
-                        <h3>{item.title}</h3>
-                        <p className="subscriptions-row__subtitle">
-                          {subscriptionsTab === 'seekers' ? <Users size={14} /> : <Building2 size={14} />}
-                          {item.subtitle}
-                        </p>
-                        <p>{item.description}</p>
-                      </div>
-                      </div>
+                          </div>
+                          <div className="subscriptions-row__content">
+                            <h3>{item.title}</h3>
+                            <p className="subscriptions-row__subtitle">
+                              {subscriptionsTab === 'seekers' ? <Users size={14} /> : <Building2 size={14} />}
+                              {item.subtitle}
+                            </p>
+                            <p>{item.description}</p>
+                          </div>
+                        </div>
+                        )
+                      })()}
                       <div className="subscriptions-row__previews">
                         {item.previews.length ? (
                           item.previews.map((preview) => (
@@ -3096,14 +3130,13 @@ export function SeekerDashboardPage() {
                         {(() => {
                           const userId = item.userId
                           const isFollowing = typeof userId === 'number' ? followingUserIds.has(userId) : false
+                          const isFollower = typeof userId === 'number' ? followerUserIds.has(userId) : false
                           const isLoading = typeof userId === 'number' ? Boolean(subscriptionActionLoading[userId]) : false
                           const isDisabled = userId == null || isLoading
 
                           const label = isLoading
                             ? 'Обновляем...'
-                            : isFollowing
-                              ? 'Вы подписаны'
-                              : 'Подписаться'
+                            : getSubscriptionActionLabel(isFollowing, isFollower)
 
                           return (
                             <button type="button" className="subscription-follow-btn" disabled={isDisabled} onClick={() => void onToggleSubscription(userId)}>

@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchTags } from '../api/catalog'
 import { fetchResumeDiscovery } from '../api/resumes'
-import { followUser, unfollowUser } from '../api/subscriptions'
+import { fetchMyFollowerSubscriptions, followUser, unfollowUser } from '../api/subscriptions'
 import { TagPicker } from '../components/forms/TagPicker'
 import { useAuth } from '../hooks/useAuth'
 import type { TagListItem } from '../types/catalog'
 import type { ResumeDiscoveryItem } from '../types/resumes'
+import { getSubscriptionActionLabel } from '../utils/subscription-labels'
 
 type OpenToWorkFilter = 'all' | 'open' | 'closed'
 
@@ -62,6 +63,7 @@ export function ResumesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [syncingIds, setSyncingIds] = useState<Record<number, boolean>>({})
+  const [followerUserIds, setFollowerUserIds] = useState<Set<number>>(new Set())
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(totalCount / PAGE_SIZE)), [totalCount])
 
@@ -80,6 +82,31 @@ export function ResumesPage() {
     void loadTags()
     return () => controller.abort()
   }, [])
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setFollowerUserIds(new Set())
+      return
+    }
+
+    const controller = new AbortController()
+
+    async function loadFollowers() {
+      try {
+        const followers = await fetchMyFollowerSubscriptions(controller.signal)
+        if (!controller.signal.aborted) {
+          setFollowerUserIds(new Set(followers.map((item) => item.userId)))
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setFollowerUserIds(new Set())
+        }
+      }
+    }
+
+    void loadFollowers()
+    return () => controller.abort()
+  }, [isAuthenticated])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -355,7 +382,7 @@ export function ResumesPage() {
                   void toggleFollow(item)
                 }}
               >
-                {item.isFollowedByMe ? 'Отписаться' : 'Подписаться'}
+                {getSubscriptionActionLabel(item.isFollowedByMe, followerUserIds.has(item.userId))}
               </button>
               )}
             </article>
