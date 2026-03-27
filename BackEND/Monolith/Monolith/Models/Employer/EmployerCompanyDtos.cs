@@ -1,3 +1,4 @@
+using Monolith.Models.Media;
 using Monolith.Entities;
 
 namespace Monolith.Models.Employer;
@@ -43,6 +44,7 @@ public record EmployerCompanyResponse(
     string? WebsiteUrl,
     string? PublicEmail,
     string? PublicPhone,
+    IReadOnlyCollection<CompanyMediaItemDto> Media,
     long BaseCityId,
     CompanyStatus Status,
     CompanyMemberRole MembershipRole,

@@ -55,7 +55,90 @@ public class NominatimReverseGeocodingService(
         return result;
     }
 
+    public async Task<IReadOnlyCollection<ReverseGeocodingAddress>> SearchAsync(string query, int limit, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Array.Empty<ReverseGeocodingAddress>();
+        }
+
+        var normalizedQuery = query.Trim();
+        var normalizedLimit = Math.Clamp(limit, 1, 15);
+        var cacheKey = $"nominatim:search:{normalizedQuery.ToLowerInvariant()}:{normalizedLimit}";
+        if (memoryCache.TryGetValue<IReadOnlyCollection<ReverseGeocodingAddress>>(cacheKey, out var cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        IReadOnlyCollection<ReverseGeocodingAddress> result;
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"/search?format=jsonv2&addressdetails=1&q={Uri.EscapeDataString(normalizedQuery)}&limit={normalizedLimit}");
+            request.Headers.TryAddWithoutValidation("User-Agent", options.UserAgent);
+
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                result = Array.Empty<ReverseGeocodingAddress>();
+            }
+            else
+            {
+                var dto = await response.Content.ReadFromJsonAsync<List<NominatimSearchResponse>>(cancellationToken: cancellationToken);
+                result = (dto ?? [])
+                    .Select(static x => Map(x))
+                    .Where(x => x is not null)
+                    .Select(x => x!)
+                    .ToArray();
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            result = Array.Empty<ReverseGeocodingAddress>();
+        }
+        catch (HttpRequestException)
+        {
+            result = Array.Empty<ReverseGeocodingAddress>();
+        }
+
+        memoryCache.Set(cacheKey, result, TimeSpan.FromSeconds(Math.Max(options.CacheSeconds, 15)));
+        return result;
+    }
+
     private static ReverseGeocodingAddress? Map(NominatimReverseResponse? response)
+    {
+        if (response?.Address is null)
+        {
+            return null;
+        }
+
+        var cityName = FirstNonEmpty(
+            response.Address.City,
+            response.Address.Town,
+            response.Address.Village,
+            response.Address.Hamlet,
+            response.Address.Municipality,
+            response.Address.County);
+
+        var street = FirstNonEmpty(response.Address.Road, response.Address.Pedestrian, response.Address.Footway);
+        var house = FirstNonEmpty(response.Address.HouseNumber);
+        var region = FirstNonEmpty(response.Address.State, response.Address.Region);
+        var countryCode = string.IsNullOrWhiteSpace(response.Address.CountryCode)
+            ? null
+            : response.Address.CountryCode.Trim().ToUpperInvariant();
+
+        return new ReverseGeocodingAddress(
+            countryCode,
+            region,
+            cityName,
+            street,
+            house,
+            TryParseDecimal(response.Lat),
+            TryParseDecimal(response.Lon));
+    }
+
+    private static ReverseGeocodingAddress? Map(NominatimSearchResponse? response)
     {
         if (response?.Address is null)
         {
@@ -147,5 +230,17 @@ public class NominatimReverseGeocodingService(
 
         [JsonPropertyName("house_number")]
         public string? HouseNumber { get; set; }
+    }
+
+    private sealed class NominatimSearchResponse
+    {
+        [JsonPropertyName("lat")]
+        public string? Lat { get; set; }
+
+        [JsonPropertyName("lon")]
+        public string? Lon { get; set; }
+
+        [JsonPropertyName("address")]
+        public NominatimAddress? Address { get; set; }
     }
 }

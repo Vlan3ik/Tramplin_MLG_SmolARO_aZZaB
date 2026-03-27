@@ -20,6 +20,7 @@ public class Company
     public DateTimeOffset UpdatedAt { get; set; }
     public City BaseCity { get; set; } = null!;
     public List<CompanyLink> Links { get; set; } = new();
+    public List<CompanyMedia> Media { get; set; } = new();
     public List<Vacancy> Vacancies { get; set; } = new();
     public List<Opportunity> Opportunities { get; set; } = new();
     public List<CompanyMember> Members { get; set; } = new();

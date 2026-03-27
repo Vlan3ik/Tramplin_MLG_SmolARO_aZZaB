@@ -233,10 +233,10 @@ public class EmployerVacanciesController(
             return this.ToBadRequestError("employer.vacancies.invalid", validationError);
         }
 
-        var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+        var resolvedLocation = await ResolveLocationAsync(request, cancellationToken);
         if (resolvedLocation is null)
         {
-            return this.ToBadRequestError("employer.vacancies.location_unresolved", "Unable to resolve location from mapPoint.");
+            return this.ToBadRequestError("employer.vacancies.location_unresolved", "Unable to resolve location from mapPoint/address.");
         }
 
         var resolvedStatus = await ResolvePublicationStatusAsync(membership.CompanyId, request.Status, cancellationToken);
@@ -297,10 +297,10 @@ public class EmployerVacanciesController(
             return this.ToNotFoundError("employer.vacancies.not_found", "Vacancy not found.");
         }
 
-        var resolvedLocation = await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+        var resolvedLocation = await ResolveLocationAsync(request, cancellationToken);
         if (resolvedLocation is null)
         {
-            return this.ToBadRequestError("employer.vacancies.location_unresolved", "Unable to resolve location from mapPoint.");
+            return this.ToBadRequestError("employer.vacancies.location_unresolved", "Unable to resolve location from mapPoint/address.");
         }
 
         var resolvedStatus = await ResolvePublicationStatusAsync(membership.CompanyId, request.Status, cancellationToken);
@@ -570,14 +570,9 @@ public class EmployerVacanciesController(
             return "salaryTo must be >= salaryFrom.";
         }
 
-        if (request.MapPoint is null)
+        if (request.MapPoint is null && request.CityId is null && request.LocationId is null)
         {
-            return "mapPoint is required. cityId/locationId are resolved automatically.";
-        }
-
-        if (request.CityId is not null || request.LocationId is not null)
-        {
-            return "cityId and locationId cannot be set manually. Use mapPoint.";
+            return "Either mapPoint or cityId/locationId must be provided.";
         }
 
         if (request.MapPoint is not null)
@@ -604,6 +599,39 @@ public class EmployerVacanciesController(
         }
 
         return await employerLocationService.ResolveOrCreateAsync(mapPoint.Latitude, mapPoint.Longitude, cancellationToken);
+    }
+
+    private async Task<ResolvedLocationResult?> ResolveLocationAsync(EmployerVacancyUpsertRequest request, CancellationToken cancellationToken)
+    {
+        if (request.MapPoint is not null)
+        {
+            return await ResolveMapPointAsync(request.MapPoint, cancellationToken);
+        }
+
+        if (request.LocationId is > 0)
+        {
+            var location = await dbContext.Locations
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.Id == request.LocationId.Value &&
+                         (!request.CityId.HasValue || x.CityId == request.CityId.Value),
+                    cancellationToken);
+            if (location is not null)
+            {
+                return new ResolvedLocationResult(location.CityId, location.Id);
+            }
+        }
+
+        if (request.CityId is > 0)
+        {
+            return await employerLocationService.ResolveOrCreateByAddressAsync(
+                request.CityId.Value,
+                request.StreetName,
+                request.HouseNumber,
+                cancellationToken);
+        }
+
+        return null;
     }
 
     private string BuildVacancyUrl(long vacancyId)

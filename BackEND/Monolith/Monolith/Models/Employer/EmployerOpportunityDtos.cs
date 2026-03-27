@@ -71,6 +71,8 @@ public record EmployerOpportunityUpsertRequest(
     OpportunityStatus Status,
     long? CityId,
     long? LocationId,
+    string? StreetName,
+    string? HouseNumber,
     PriceType PriceType,
     decimal? PriceAmount,
     string? PriceCurrencyCode,

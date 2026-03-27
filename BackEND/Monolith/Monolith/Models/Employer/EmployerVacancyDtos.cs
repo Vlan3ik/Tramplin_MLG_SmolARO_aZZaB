@@ -80,6 +80,8 @@ public record EmployerVacancyUpsertRequest(
     OpportunityStatus Status,
     long? CityId,
     long? LocationId,
+    string? StreetName,
+    string? HouseNumber,
     decimal? SalaryFrom,
     decimal? SalaryTo,
     string? CurrencyCode,

@@ -5,6 +5,7 @@ using Monolith.Contexts;
 using Monolith.Entities;
 using Monolith.Models.Common;
 using Monolith.Models.Employer;
+using Monolith.Models.Media;
 using Monolith.Services.Common;
 
 namespace Monolith.Controllers;
@@ -314,6 +315,8 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
             .AsNoTracking()
             .Include(x => x.Company)
                 .ThenInclude(x => x.ChatSettings)
+            .Include(x => x.Company)
+                .ThenInclude(x => x.Media)
             .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
 
     private static EmployerCompanyResponse ToEmployerCompanyResponse(CompanyMember membership)
@@ -333,6 +336,16 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
             c.WebsiteUrl,
             c.PublicEmail,
             c.PublicPhone,
+            c.Media
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.Id)
+                .Select(x => new CompanyMediaItemDto(
+                    x.Id,
+                    x.MediaType == CompanyMediaType.Video ? "video" : "image",
+                    x.Url,
+                    x.MimeType,
+                    x.SortOrder))
+                .ToArray(),
             c.BaseCityId,
             c.Status,
             membership.Role,
