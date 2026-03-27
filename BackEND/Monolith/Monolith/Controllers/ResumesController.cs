@@ -286,6 +286,11 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
             .OrderBy(x => x.Id)
             .Select(x => new ResumeLinkDto(x.Id, x.Kind, x.Url, x.Label))
             .ToListAsync(cancellationToken);
+        var includeLinks = viewerId == id || privacy.ShowContactsInResume;
+        if (!includeLinks)
+        {
+            links = [];
+        }
 
         var dto = new ResumeDetailDto(
             profile.UserId,

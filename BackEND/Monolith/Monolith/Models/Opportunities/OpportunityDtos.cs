@@ -25,6 +25,7 @@ public record OpportunityListItemDto(
     public int TagMatchCount { get; init; }
     public bool IsFavoriteByMe { get; init; }
     public int FriendFavoritesCount { get; init; }
+    public int FriendApplicationsCount { get; init; }
 }
 
 public record OpportunityDetailDto(
@@ -50,6 +51,7 @@ public record OpportunityDetailDto(
     public int TagMatchCount { get; init; }
     public bool IsFavoriteByMe { get; init; }
     public int FriendFavoritesCount { get; init; }
+    public int FriendApplicationsCount { get; init; }
 }
 
 public record CompanyShortDto(long Id, string Name, bool Verified, string? WebsiteUrl, string? PublicEmail);

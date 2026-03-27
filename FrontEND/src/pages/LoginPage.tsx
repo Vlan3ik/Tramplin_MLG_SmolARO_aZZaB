@@ -2,8 +2,10 @@ import { Eye, EyeOff } from 'lucide-react'
 import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { getVkLoginUrl, loginUser, loginViaVk } from '../api/auth'
+import { syncFavorites } from '../api/favorites'
 import { useAuth } from '../hooks/useAuth'
 import { createAuthSession, getSafeRedirectPath } from '../utils/auth'
+import { clearGuestFavoriteSnapshot, getGuestFavoriteSnapshot, hasGuestFavorites } from '../utils/favorites'
 
 type LoginFormState = {
   email: string
@@ -44,6 +46,23 @@ export function LoginPage() {
 
   const redirectPath = readRedirectPath(location.state)
 
+  async function syncGuestFavoritesAfterAuth() {
+    if (!hasGuestFavorites()) {
+      return
+    }
+
+    try {
+      const snapshot = getGuestFavoriteSnapshot()
+      await syncFavorites({
+        vacancyIds: snapshot.vacancyIds,
+        opportunityIds: snapshot.opportunityIds,
+      })
+      clearGuestFavoriteSnapshot()
+    } catch {
+      // Сессию не блокируем: оставляем локальные избранные для следующей попытки синхронизации.
+    }
+  }
+
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const vkCode = params.get('code')
@@ -72,6 +91,7 @@ export function LoginPage() {
         const response = await loginViaVk(vkCode)
         const session = createAuthSession(response)
         signIn(session)
+        await syncGuestFavoritesAfterAuth()
         navigate(getSafeRedirectPath(redirectPath, session.platformRole ?? null), { replace: true })
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : 'Не удалось войти через VK.')
@@ -114,6 +134,7 @@ export function LoginPage() {
 
       const session = createAuthSession(response)
       signIn(session)
+      await syncGuestFavoritesAfterAuth()
 
       navigate(getSafeRedirectPath(redirectPath, session.platformRole ?? null), { replace: true })
     } catch (error) {

@@ -110,6 +110,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.ResumeVisibility).HasColumnName("resume_visibility");
             entity.Property(x => x.OpenToWork).HasColumnName("open_to_work");
             entity.Property(x => x.ShowContactsInResume).HasColumnName("show_contacts_in_resume");
+            entity.Property(x => x.ShowInFriendsFavorites).HasColumnName("show_in_friends_favorites").HasDefaultValue(true);
+            entity.Property(x => x.ShowInFriendsApplications).HasColumnName("show_in_friends_applications").HasDefaultValue(true);
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasOne(x => x.CandidateProfile).WithOne(x => x.PrivacySettings).HasForeignKey<CandidatePrivacySettings>(x => x.UserId);
         });

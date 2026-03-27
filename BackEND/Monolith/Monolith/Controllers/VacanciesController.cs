@@ -67,6 +67,7 @@ public class VacanciesController(AppDbContext dbContext) : ControllerBase
         var vacancyIds = rows.Select(x => x.Id).ToArray();
         var favoriteByMeIds = new HashSet<long>();
         var friendFavoriteCounts = new Dictionary<long, int>();
+        var friendApplicationCounts = new Dictionary<long, int>();
         if (currentUserId is not null && vacancyIds.Length > 0)
         {
             var favoriteList = await dbContext.UserOpportunityFavorites
@@ -79,11 +80,25 @@ public class VacanciesController(AppDbContext dbContext) : ControllerBase
             var mutualFriendIds = await GetMutualFriendIds(currentUserId.Value, cancellationToken);
             if (mutualFriendIds.Length > 0)
             {
+                var visibleFavoritesFriendIds = await FilterVisibleFriendIdsForFavorites(mutualFriendIds, cancellationToken);
                 friendFavoriteCounts = await dbContext.UserOpportunityFavorites
                     .AsNoTracking()
-                    .Where(x => x.VacancyId != null && vacancyIds.Contains(x.VacancyId.Value) && mutualFriendIds.Contains(x.UserId))
+                    .Where(x =>
+                        x.VacancyId != null &&
+                        vacancyIds.Contains(x.VacancyId.Value) &&
+                        visibleFavoritesFriendIds.Contains(x.UserId))
                     .GroupBy(x => x.VacancyId!.Value)
                     .Select(x => new { VacancyId = x.Key, Count = x.Count() })
+                    .ToDictionaryAsync(x => x.VacancyId, x => x.Count, cancellationToken);
+
+                var visibleApplicationsFriendIds = await FilterVisibleFriendIdsForApplications(mutualFriendIds, cancellationToken);
+                friendApplicationCounts = await dbContext.Applications
+                    .AsNoTracking()
+                    .Where(x =>
+                        vacancyIds.Contains(x.VacancyId) &&
+                        visibleApplicationsFriendIds.Contains(x.CandidateUserId))
+                    .GroupBy(x => x.VacancyId)
+                    .Select(x => new { VacancyId = x.Key, Count = x.Select(y => y.CandidateUserId).Distinct().Count() })
                     .ToDictionaryAsync(x => x.VacancyId, x => x.Count, cancellationToken);
             }
         }
@@ -107,7 +122,8 @@ public class VacanciesController(AppDbContext dbContext) : ControllerBase
             CompanyLogoUrl = x.CompanyLogoUrl,
             TagMatchCount = x.TagMatchCount,
             IsFavoriteByMe = favoriteByMeIds.Contains(x.Id),
-            FriendFavoritesCount = friendFavoriteCounts.GetValueOrDefault(x.Id)
+            FriendFavoritesCount = friendFavoriteCounts.GetValueOrDefault(x.Id),
+            FriendApplicationsCount = friendApplicationCounts.GetValueOrDefault(x.Id)
         }).ToList();
 
         return Ok(new PagedResponse<VacancyListItemDto>(items, totalCount, page, pageSize));
@@ -185,6 +201,8 @@ public class VacanciesController(AppDbContext dbContext) : ControllerBase
                 .ToArrayAsync(cancellationToken);
             var tagSet = viewerTagIds.ToHashSet();
             var mutualFriendIds = await GetMutualFriendIds(currentUserId.Value, cancellationToken);
+            var visibleFavoritesFriendIds = await FilterVisibleFriendIdsForFavorites(mutualFriendIds, cancellationToken);
+            var visibleApplicationsFriendIds = await FilterVisibleFriendIdsForApplications(mutualFriendIds, cancellationToken);
 
             dto = dto with
             {
@@ -192,11 +210,19 @@ public class VacanciesController(AppDbContext dbContext) : ControllerBase
                 IsFavoriteByMe = await dbContext.UserOpportunityFavorites
                     .AsNoTracking()
                     .AnyAsync(x => x.UserId == currentUserId.Value && x.VacancyId == id, cancellationToken),
-                FriendFavoritesCount = mutualFriendIds.Length == 0
+                FriendFavoritesCount = visibleFavoritesFriendIds.Length == 0
                     ? 0
                     : await dbContext.UserOpportunityFavorites
                         .AsNoTracking()
-                        .CountAsync(x => x.VacancyId == id && mutualFriendIds.Contains(x.UserId), cancellationToken)
+                        .CountAsync(x => x.VacancyId == id && visibleFavoritesFriendIds.Contains(x.UserId), cancellationToken),
+                FriendApplicationsCount = visibleApplicationsFriendIds.Length == 0
+                    ? 0
+                    : await dbContext.Applications
+                        .AsNoTracking()
+                        .Where(x => x.VacancyId == id && visibleApplicationsFriendIds.Contains(x.CandidateUserId))
+                        .Select(x => x.CandidateUserId)
+                        .Distinct()
+                        .CountAsync(cancellationToken)
             };
         }
 
@@ -305,5 +331,37 @@ public class VacanciesController(AppDbContext dbContext) : ControllerBase
             .Union(contactIds)
             .Distinct()
             .ToArrayAsync(cancellationToken);
+    }
+
+    private async Task<long[]> FilterVisibleFriendIdsForFavorites(long[] candidateUserIds, CancellationToken cancellationToken)
+    {
+        if (candidateUserIds.Length == 0)
+        {
+            return [];
+        }
+
+        var hiddenUserIds = await dbContext.CandidatePrivacySettings
+            .AsNoTracking()
+            .Where(x => candidateUserIds.Contains(x.UserId) && !x.ShowInFriendsFavorites)
+            .Select(x => x.UserId)
+            .ToArrayAsync(cancellationToken);
+
+        return candidateUserIds.Except(hiddenUserIds).ToArray();
+    }
+
+    private async Task<long[]> FilterVisibleFriendIdsForApplications(long[] candidateUserIds, CancellationToken cancellationToken)
+    {
+        if (candidateUserIds.Length == 0)
+        {
+            return [];
+        }
+
+        var hiddenUserIds = await dbContext.CandidatePrivacySettings
+            .AsNoTracking()
+            .Where(x => candidateUserIds.Contains(x.UserId) && !x.ShowInFriendsApplications)
+            .Select(x => x.UserId)
+            .ToArrayAsync(cancellationToken);
+
+        return candidateUserIds.Except(hiddenUserIds).ToArray();
     }
 }

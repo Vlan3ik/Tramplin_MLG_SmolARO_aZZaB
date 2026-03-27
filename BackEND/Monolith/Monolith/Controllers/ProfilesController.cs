@@ -57,7 +57,8 @@ public class ProfilesController(AppDbContext dbContext) : ControllerBase
         var canViewResume = HasAccess(settings.ResumeVisibility, isOwner, isContact, isAuthorizedViewer);
 
         var stats = await BuildStats(profile.UserId, cancellationToken);
-        var resume = canViewResume ? await BuildResumeDetails(profile.UserId, cancellationToken) : null;
+        var canViewResumeLinks = isOwner || settings.ShowContactsInResume;
+        var resume = canViewResume ? await BuildResumeDetails(profile.UserId, canViewResumeLinks, cancellationToken) : null;
 
         return Ok(new PublicProfileResponse(
             profile.UserId,
@@ -131,7 +132,7 @@ public class ProfilesController(AppDbContext dbContext) : ControllerBase
             participationsCount);
     }
 
-    private async Task<ResumeDetailsResponse> BuildResumeDetails(long userId, CancellationToken cancellationToken)
+    private async Task<ResumeDetailsResponse> BuildResumeDetails(long userId, bool includeLinks, CancellationToken cancellationToken)
     {
         var resume = await dbContext.CandidateResumeProfiles.AsNoTracking().FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken)
             ?? new CandidateResumeProfile { UserId = userId };
@@ -185,12 +186,14 @@ public class ProfilesController(AppDbContext dbContext) : ControllerBase
             .OrderByDescending(x => x.GraduationYear)
             .Select(x => new ResumeEducationItemDto(x.Id, x.University, x.Faculty, x.Specialty, x.Course, x.GraduationYear))
             .ToListAsync(cancellationToken);
-        var links = await dbContext.CandidateResumeLinks
-            .AsNoTracking()
-            .Where(x => x.UserId == userId)
-            .OrderBy(x => x.Id)
-            .Select(x => new ResumeLinkItemDto(x.Id, x.Kind, x.Url, x.Label))
-            .ToListAsync(cancellationToken);
+        var links = includeLinks
+            ? await dbContext.CandidateResumeLinks
+                .AsNoTracking()
+                .Where(x => x.UserId == userId)
+                .OrderBy(x => x.Id)
+                .Select(x => new ResumeLinkItemDto(x.Id, x.Kind, x.Url, x.Label))
+                .ToListAsync(cancellationToken)
+            : [];
 
         return new ResumeDetailsResponse(
             userId,

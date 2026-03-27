@@ -224,7 +224,9 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             settings.ProfileVisibility,
             settings.ResumeVisibility,
             settings.OpenToWork,
-            settings.ShowContactsInResume));
+            settings.ShowContactsInResume,
+            settings.ShowInFriendsFavorites,
+            settings.ShowInFriendsApplications));
     }
 
     /// <summary>
@@ -250,6 +252,8 @@ public class MeController(AppDbContext dbContext) : ControllerBase
         settings.ResumeVisibility = request.ResumeVisibility;
         settings.OpenToWork = request.OpenToWork;
         settings.ShowContactsInResume = request.ShowContactsInResume;
+        settings.ShowInFriendsFavorites = request.ShowInFriendsFavorites;
+        settings.ShowInFriendsApplications = request.ShowInFriendsApplications;
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -258,7 +262,9 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             settings.ProfileVisibility,
             settings.ResumeVisibility,
             settings.OpenToWork,
-            settings.ShowContactsInResume));
+            settings.ShowContactsInResume,
+            settings.ShowInFriendsFavorites,
+            settings.ShowInFriendsApplications));
     }
 
     /// <summary>

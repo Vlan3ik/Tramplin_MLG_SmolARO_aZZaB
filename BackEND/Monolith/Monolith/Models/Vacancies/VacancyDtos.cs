@@ -23,6 +23,7 @@ public record VacancyListItemDto(
     public int TagMatchCount { get; init; }
     public bool IsFavoriteByMe { get; init; }
     public int FriendFavoritesCount { get; init; }
+    public int FriendApplicationsCount { get; init; }
 }
 
 public record VacancyDetailDto(
@@ -46,4 +47,5 @@ public record VacancyDetailDto(
     public int TagMatchCount { get; init; }
     public bool IsFavoriteByMe { get; init; }
     public int FriendFavoritesCount { get; init; }
+    public int FriendApplicationsCount { get; init; }
 }
