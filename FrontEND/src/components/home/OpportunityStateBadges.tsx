@@ -14,15 +14,7 @@ type OpportunityStateBadgesProps = {
 export function OpportunityStateBadges({ opportunity, isFavorite, compact = false, className }: OpportunityStateBadgesProps) {
   const socialState = useOpportunitySocialState(opportunity)
   const privacySettings = useSeekerPrivacySettings()
-  const badges = getOpportunityStateBadges(
-    {
-      ...opportunity,
-      isFavoriteByMe: socialState.isFavoriteByMe,
-      friendFavoritesCount: socialState.friendFavoritesCount,
-      friendsAppliedCount: socialState.friendsAppliedCount,
-    },
-    isFavorite,
-  ).filter((badge) => {
+  const badges = getOpportunityStateBadges(opportunity, isFavorite ?? socialState.isFavoriteByMe).filter((badge) => {
     if (privacySettings.showSocialProofs) {
       return true
     }

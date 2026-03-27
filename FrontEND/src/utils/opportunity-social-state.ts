@@ -13,10 +13,14 @@ type OpportunitySocialStateRecord = OpportunitySocialStateSnapshot & {
   entityType: OpportunitySocialEntityType
 }
 
-type OpportunityLike = Pick<
+export type OpportunitySocialStateSource = Pick<
   Opportunity,
   'id' | 'entityType' | 'type' | 'isFavoriteByMe' | 'friendFavoritesCount' | 'friendsAppliedCount'
->
+> & {
+  friendApplicationsCount?: number | null
+  friendsResponsesCount?: number | null
+  friendsRespondedCount?: number | null
+}
 
 const stateByKey = new Map<string, OpportunitySocialStateRecord>()
 const listeners = new Set<() => void>()
@@ -33,6 +37,21 @@ function normalizeCount(value: number | null | undefined) {
   return Math.floor(value)
 }
 
+function normalizeFriendsAppliedCount(
+  source: Pick<OpportunitySocialStateSource, 'friendsAppliedCount' | 'friendApplicationsCount' | 'friendsResponsesCount' | 'friendsRespondedCount'>,
+) {
+  const values = [source.friendsAppliedCount, source.friendApplicationsCount, source.friendsResponsesCount, source.friendsRespondedCount]
+
+  for (const value of values) {
+    const normalized = normalizeCount(value)
+    if (normalized > 0) {
+      return normalized
+    }
+  }
+
+  return 0
+}
+
 export function resolveOpportunitySocialEntityType(opportunity: Pick<Opportunity, 'entityType' | 'type'>): OpportunitySocialEntityType {
   if (opportunity.entityType === 'vacancy' || opportunity.entityType === 'opportunity') {
     return opportunity.entityType
@@ -41,15 +60,15 @@ export function resolveOpportunitySocialEntityType(opportunity: Pick<Opportunity
   return opportunity.type === 'vacancy' || opportunity.type === 'internship' ? 'vacancy' : 'opportunity'
 }
 
-function toSnapshot(opportunity: OpportunityLike): OpportunitySocialStateSnapshot {
+function toSnapshot(opportunity: OpportunitySocialStateSource): OpportunitySocialStateSnapshot {
   return {
     isFavoriteByMe: Boolean(opportunity.isFavoriteByMe),
     friendFavoritesCount: normalizeCount(opportunity.friendFavoritesCount),
-    friendsAppliedCount: normalizeCount(opportunity.friendsAppliedCount),
+    friendsAppliedCount: normalizeFriendsAppliedCount(opportunity),
   }
 }
 
-export function readOpportunitySocialState(opportunity: OpportunityLike): OpportunitySocialStateSnapshot {
+export function readOpportunitySocialState(opportunity: OpportunitySocialStateSource): OpportunitySocialStateSnapshot {
   const entityType = resolveOpportunitySocialEntityType(opportunity)
   const key = buildKey(entityType, opportunity.id)
   const existing = stateByKey.get(key)
@@ -71,7 +90,7 @@ function emitOpportunitySocialStateChange() {
   })
 }
 
-export function upsertOpportunitySocialState(opportunity: OpportunityLike) {
+export function upsertOpportunitySocialState(opportunity: OpportunitySocialStateSource) {
   const entityType = resolveOpportunitySocialEntityType(opportunity)
   const key = buildKey(entityType, opportunity.id)
   const nextSnapshot = toSnapshot(opportunity)
@@ -94,7 +113,7 @@ export function upsertOpportunitySocialState(opportunity: OpportunityLike) {
   emitOpportunitySocialStateChange()
 }
 
-export function upsertOpportunitySocialStates(opportunities: OpportunityLike[]) {
+export function upsertOpportunitySocialStates(opportunities: OpportunitySocialStateSource[]) {
   let hasChanges = false
 
   for (const opportunity of opportunities) {

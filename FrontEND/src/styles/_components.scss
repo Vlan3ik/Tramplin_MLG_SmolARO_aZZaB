@@ -1230,11 +1230,16 @@
 }
 
 .map-marker--favorite .map-marker__circle {
-  background: #facc15;
-  border-color: #fff6cc;
+  background: linear-gradient(180deg, #fef08a 0%, #facc15 56%, #eab308 100%);
+  border-color: #fff2a8;
   box-shadow:
-    0 0 0 2px rgba(124, 89, 0, 0.2),
-    0 8px 14px rgba(124, 89, 0, 0.22);
+    0 0 0 3px rgba(245, 158, 11, 0.18),
+    0 0 0 7px rgba(250, 204, 21, 0.18),
+    0 10px 18px rgba(161, 98, 7, 0.26);
+}
+
+.map-marker--favorite:not(.map-marker--friends-favorite) .map-marker__circle {
+  filter: saturate(1.08) brightness(1.03);
 }
 
 .map-marker--friends-favorite .map-marker__circle {
@@ -1250,12 +1255,20 @@
 }
 
 .map-marker--friends-favorite.map-marker--favorite .map-marker__circle {
-  background: linear-gradient(140deg, #facc15 0 52%, #60a5fa 52% 100%);
-  border-color: #fff7d8;
+  background: linear-gradient(140deg, #fef08a 0 58%, #60a5fa 58% 100%);
+  border-color: #fff2a8;
+  box-shadow:
+    0 0 0 3px rgba(245, 158, 11, 0.2),
+    0 0 0 7px rgba(250, 204, 21, 0.14),
+    0 10px 18px rgba(161, 98, 7, 0.22);
 }
 
 .map-marker--viewed .map-marker__circle {
   filter: saturate(0.35) brightness(0.9);
+}
+
+.map-marker--favorite.map-marker--viewed .map-marker__circle {
+  filter: none;
 }
 
 .map-marker__favorite {
@@ -1328,18 +1341,19 @@
 
 .map-marker--cluster.map-marker--favorite {
   .map-marker__circle {
-    background: #facc15;
-    border-color: #fff6cc;
+    background: linear-gradient(180deg, #fef08a 0%, #facc15 56%, #eab308 100%);
+    border-color: #fff2a8;
     box-shadow:
-      0 0 0 2px rgba(124, 89, 0, 0.2),
-      0 8px 14px rgba(124, 89, 0, 0.22);
+      0 0 0 3px rgba(245, 158, 11, 0.18),
+      0 0 0 7px rgba(250, 204, 21, 0.18),
+      0 10px 18px rgba(161, 98, 7, 0.26);
   }
 }
 
 .map-marker--cluster.map-marker--favorite.map-marker--friends-favorite {
   .map-marker__circle {
-    background: linear-gradient(140deg, #facc15 0 52%, #60a5fa 52% 100%);
-    border-color: #fff7d8;
+    background: linear-gradient(140deg, #fef08a 0 58%, #60a5fa 58% 100%);
+    border-color: #fff2a8;
   }
 }
 
