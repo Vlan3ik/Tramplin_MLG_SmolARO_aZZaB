@@ -73,7 +73,43 @@ public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBa
         dbContext.Opportunities.Add(opportunity);
         await dbContext.SaveChangesAsync(cancellationToken);
         var dto = new AdminOpportunityListItemDto(opportunity.Id, opportunity.CompanyId, opportunity.Title, opportunity.Status, opportunity.Kind, opportunity.Format, opportunity.PublishAt);
-        return CreatedAtAction(nameof(GetList), new { id = opportunity.Id }, dto);
+        return CreatedAtAction(nameof(GetById), new { id = opportunity.Id }, dto);
+    }
+
+    [HttpGet("{id:long}")]
+    [ProducesResponseType(typeof(AdminOpportunityDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AdminOpportunityDetailDto>> GetById(long id, CancellationToken cancellationToken)
+    {
+        var opportunity = await dbContext.Opportunities
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new AdminOpportunityDetailDto(
+                x.Id,
+                x.CompanyId,
+                x.CreatedByUserId,
+                x.Title,
+                x.ShortDescription,
+                x.FullDescription,
+                x.Kind,
+                x.Format,
+                x.Status,
+                x.CityId,
+                x.LocationId,
+                x.PriceType,
+                x.PriceAmount,
+                x.PriceCurrencyCode,
+                x.ParticipantsCanWrite,
+                x.PublishAt,
+                x.EventDate))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (opportunity is null)
+        {
+            return this.ToNotFoundError("admin.opportunities.not_found", "Opportunity not found.");
+        }
+
+        return Ok(opportunity);
     }
 
     /// <summary>

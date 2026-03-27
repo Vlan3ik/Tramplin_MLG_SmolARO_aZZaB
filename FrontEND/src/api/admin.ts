@@ -43,6 +43,26 @@ type AdminVacancyApi = {
   publishAt: string
 }
 
+type AdminVacancyDetailApi = {
+  id: number
+  companyId: number
+  createdByUserId: number
+  title: string
+  shortDescription: string
+  fullDescription: string
+  kind: number | string
+  format: number | string
+  status: number | string
+  cityId: number | null
+  locationId: number | null
+  salaryFrom: number | null
+  salaryTo: number | null
+  currencyCode: string | null
+  salaryTaxMode: number | string
+  publishAt: string
+  applicationDeadline: string | null
+}
+
 type AdminOpportunityApi = {
   id: number
   companyId: number
@@ -51,6 +71,26 @@ type AdminOpportunityApi = {
   kind: number | string
   format: number | string
   publishAt: string
+}
+
+type AdminOpportunityDetailApi = {
+  id: number
+  companyId: number
+  createdByUserId: number
+  title: string
+  shortDescription: string
+  fullDescription: string
+  kind: number | string
+  format: number | string
+  status: number | string
+  cityId: number | null
+  locationId: number | null
+  priceType: number | string
+  priceAmount: number | null
+  priceCurrencyCode: string | null
+  participantsCanWrite: boolean
+  publishAt: string
+  eventDate: string | null
 }
 
 type AdminResumeApi = {
@@ -492,6 +532,28 @@ export function updateAdminVacancy(id: number, payload: AdminVacancyUpsertReques
   return putJson<AdminVacancyApi, AdminVacancyUpsertApiRequest>(`/admin/vacancies/${id}`, mapVacancyUpsertRequest(payload))
 }
 
+export function fetchAdminVacancyById(id: number, signal?: AbortSignal) {
+  return getJson<AdminVacancyDetailApi>(`/admin/vacancies/${id}`, { signal }).then((item) => ({
+    id: item.id,
+    companyId: item.companyId,
+    createdByUserId: item.createdByUserId,
+    title: item.title ?? '',
+    shortDescription: item.shortDescription ?? '',
+    fullDescription: item.fullDescription ?? '',
+    kind: parseEnum(item.kind),
+    format: parseEnum(item.format),
+    status: parseEnum(item.status),
+    cityId: item.cityId ?? null,
+    locationId: item.locationId ?? null,
+    salaryFrom: item.salaryFrom ?? null,
+    salaryTo: item.salaryTo ?? null,
+    currencyCode: item.currencyCode ?? null,
+    salaryTaxMode: parseEnum(item.salaryTaxMode),
+    publishAt: item.publishAt,
+    applicationDeadline: item.applicationDeadline ?? null,
+  }))
+}
+
 export function updateAdminVacancyStatus(id: number, status: number) {
   return patchJson<unknown, { status: number }>(`/admin/vacancies/${id}/status`, { status })
 }
@@ -514,6 +576,28 @@ export function createAdminOpportunity(payload: AdminOpportunityUpsertRequest) {
 
 export function updateAdminOpportunity(id: number, payload: AdminOpportunityUpsertRequest) {
   return putJson<AdminOpportunityApi, AdminOpportunityUpsertApiRequest>(`/admin/opportunities/${id}`, mapOpportunityUpsertRequest(payload))
+}
+
+export function fetchAdminOpportunityById(id: number, signal?: AbortSignal) {
+  return getJson<AdminOpportunityDetailApi>(`/admin/opportunities/${id}`, { signal }).then((item) => ({
+    id: item.id,
+    companyId: item.companyId,
+    createdByUserId: item.createdByUserId,
+    title: item.title ?? '',
+    shortDescription: item.shortDescription ?? '',
+    fullDescription: item.fullDescription ?? '',
+    kind: parseEnum(item.kind),
+    format: parseEnum(item.format),
+    status: parseEnum(item.status),
+    cityId: item.cityId ?? null,
+    locationId: item.locationId ?? null,
+    priceType: parseEnum(item.priceType),
+    priceAmount: item.priceAmount ?? null,
+    priceCurrencyCode: item.priceCurrencyCode ?? null,
+    participantsCanWrite: item.participantsCanWrite,
+    publishAt: item.publishAt,
+    eventDate: item.eventDate ?? null,
+  }))
 }
 
 export function updateAdminOpportunityStatus(id: number, status: number) {

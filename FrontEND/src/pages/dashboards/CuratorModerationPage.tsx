@@ -229,8 +229,8 @@ export function CuratorModerationPage() {
                   </div>
                   <p>Обновлено: {new Date(item.updatedAt).toLocaleString()}</p>
                   <div className="favorite-card__actions">
-                    <Link className="btn btn--secondary" to={`/dashboard/seeker/${encodeURIComponent(item.username)}`}>Открыть карточку</Link>
-                    <Link className="btn btn--secondary" to={`/dashboard/seeker/${encodeURIComponent(item.username)}?mode=resume`}>Редактировать</Link>
+                    <Link className="btn btn--secondary" to={item.username ? `/dashboard/seeker/${encodeURIComponent(item.username)}` : '/resumes'}>Открыть карточку</Link>
+                    <Link className="btn btn--secondary" to={`/dashboard/curator/users/create?userId=${item.userId}`}>Редактировать</Link>
                     <button type="button" className="btn btn--ghost" onClick={() => void handleAction(() => updateAdminResumeArchive(item.userId, !item.isArchived), item.isArchived ? 'Резюме восстановлено.' : 'Резюме отправлено в архив.', loadResumes)}>
                       {item.isArchived ? 'Восстановить' : 'Архивировать'}
                     </button>
@@ -290,7 +290,9 @@ export function CuratorModerationPage() {
                   </div>
                   <div className="favorite-card__actions">
                     <Link className="btn btn--secondary" to={`/opportunity/${item.id}`}>Открыть карточку</Link>
-                    <button type="button" className="btn btn--secondary" onClick={() => void handleAction(() => updateAdminOpportunityStatus(item.id, item.status === 2 ? 3 : 2), 'Статус модерации мероприятия обновлен.', loadOpportunities)}>Редактировать</button>
+                    <Link className="btn btn--secondary" to={`/dashboard/curator/opportunities/create?opportunityId=${item.id}`} state={{ opportunity: item }}>
+                      Редактировать
+                    </Link>
                     <button type="button" className="btn btn--ghost" onClick={() => void handleAction(() => updateAdminOpportunityStatus(item.id, 7), 'Мероприятие отправлено в архив.', loadOpportunities)}>Архивировать</button>
                     <button type="button" className="btn btn--ghost" onClick={() => void handleAction(() => updateAdminOpportunityStatus(item.id, 6), 'Мероприятие заблокировано/отклонено.', loadOpportunities)}>Заблокировать</button>
                     <button type="button" className="btn btn--danger" onClick={() => void handleAction(() => deleteAdminOpportunity(item.id), 'Мероприятие удалено.', loadOpportunities)}>Удалить</button>

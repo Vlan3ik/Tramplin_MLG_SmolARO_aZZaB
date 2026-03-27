@@ -72,7 +72,43 @@ public class AdminVacanciesController(AppDbContext dbContext) : ControllerBase
         dbContext.Vacancies.Add(vacancy);
         await dbContext.SaveChangesAsync(cancellationToken);
         var dto = new AdminVacancyListItemDto(vacancy.Id, vacancy.CompanyId, vacancy.Title, vacancy.Status, vacancy.Kind, vacancy.Format, vacancy.PublishAt);
-        return CreatedAtAction(nameof(GetList), new { id = vacancy.Id }, dto);
+        return CreatedAtAction(nameof(GetById), new { id = vacancy.Id }, dto);
+    }
+
+    [HttpGet("{id:long}")]
+    [ProducesResponseType(typeof(AdminVacancyDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AdminVacancyDetailDto>> GetById(long id, CancellationToken cancellationToken)
+    {
+        var vacancy = await dbContext.Vacancies
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new AdminVacancyDetailDto(
+                x.Id,
+                x.CompanyId,
+                x.CreatedByUserId,
+                x.Title,
+                x.ShortDescription,
+                x.FullDescription,
+                x.Kind,
+                x.Format,
+                x.Status,
+                x.CityId,
+                x.LocationId,
+                x.SalaryFrom,
+                x.SalaryTo,
+                x.CurrencyCode,
+                x.SalaryTaxMode,
+                x.PublishAt,
+                x.ApplicationDeadline))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (vacancy is null)
+        {
+            return this.ToNotFoundError("admin.vacancies.not_found", "Vacancy not found.");
+        }
+
+        return Ok(vacancy);
     }
 
     /// <summary>
@@ -163,5 +199,6 @@ public class AdminVacanciesController(AppDbContext dbContext) : ControllerBase
         vacancy.PublishAt = request.PublishAt;
         vacancy.ApplicationDeadline = request.ApplicationDeadline;
     }
+
 }
 

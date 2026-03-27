@@ -26,23 +26,11 @@ public class AdminResumesController(AppDbContext dbContext) : ControllerBase
         var safePage = page <= 0 ? 1 : page;
         var safePageSize = pageSize <= 0 ? 20 : Math.Min(pageSize, 100);
 
-        var query = dbContext.CandidateResumeProfiles
-            .AsNoTracking()
-            .Join(
-                dbContext.CandidateProfiles.AsNoTracking(),
-                resume => resume.UserId,
-                profile => profile.UserId,
-                (resume, profile) => new { resume, profile })
-            .Join(
-                dbContext.Users.AsNoTracking(),
-                item => item.resume.UserId,
-                user => user.Id,
-                (item, user) => new { item.resume, item.profile, user })
-            .GroupJoin(
-                dbContext.CandidatePrivacySettings.AsNoTracking(),
-                item => item.resume.UserId,
-                privacy => privacy.UserId,
-                (item, privacy) => new { item.resume, item.profile, item.user, privacy = privacy.FirstOrDefault() });
+        var query =
+            from resume in dbContext.CandidateResumeProfiles.AsNoTracking()
+            join profile in dbContext.CandidateProfiles.AsNoTracking() on resume.UserId equals profile.UserId
+            join user in dbContext.Users.AsNoTracking() on resume.UserId equals user.Id
+            select new { resume, profile, user };
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -68,7 +56,11 @@ public class AdminResumesController(AppDbContext dbContext) : ControllerBase
                 x.resume.Headline,
                 x.resume.DesiredPosition,
                 x.resume.UpdatedAt,
-                x.privacy != null && x.privacy.ResumeVisibility == PrivacyScope.Private,
+                dbContext.CandidatePrivacySettings
+                    .AsNoTracking()
+                    .Where(p => p.UserId == x.resume.UserId)
+                    .Select(p => p.ResumeVisibility == PrivacyScope.Private)
+                    .FirstOrDefault(),
                 x.user.Status))
             .ToListAsync(cancellationToken);
 
@@ -93,11 +85,6 @@ public class AdminResumesController(AppDbContext dbContext) : ControllerBase
                 item => item.resume.UserId,
                 user => user.Id,
                 (item, user) => new { item.resume, item.profile, user })
-            .GroupJoin(
-                dbContext.CandidatePrivacySettings.AsNoTracking(),
-                item => item.resume.UserId,
-                privacy => privacy.UserId,
-                (item, privacy) => new { item.resume, item.profile, item.user, privacy = privacy.FirstOrDefault() })
             .Select(x => new AdminResumeDetailDto(
                 x.resume.UserId,
                 x.user.Username,
@@ -106,7 +93,11 @@ public class AdminResumesController(AppDbContext dbContext) : ControllerBase
                 x.resume.DesiredPosition,
                 x.resume.Summary,
                 x.resume.UpdatedAt,
-                x.privacy != null && x.privacy.ResumeVisibility == PrivacyScope.Private,
+                dbContext.CandidatePrivacySettings
+                    .AsNoTracking()
+                    .Where(p => p.UserId == x.resume.UserId)
+                    .Select(p => p.ResumeVisibility == PrivacyScope.Private)
+                    .FirstOrDefault(),
                 x.user.Status))
             .FirstOrDefaultAsync(cancellationToken);
 

@@ -21,6 +21,7 @@ import { ResumesPage } from './pages/ResumesPage'
 import { VacancyFlowPage } from './pages/VacancyFlowPage'
 import { CuratorDashboardPage } from './pages/dashboards/CuratorDashboardPage'
 import { CuratorCreateCompanyPage } from './pages/dashboards/CuratorCreateCompanyPage'
+import { CuratorCreateOpportunityPage } from './pages/dashboards/CuratorCreateOpportunityPage'
 import { CuratorCreateUserPage } from './pages/dashboards/CuratorCreateUserPage'
 import { CuratorCreateVacancyPage } from './pages/dashboards/CuratorCreateVacancyPage'
 import { EmployerDashboardPage } from './pages/dashboards/EmployerDashboardPage'
@@ -105,6 +106,7 @@ function App() {
           <Route path="dashboard/curator/moderation" element={<CuratorModerationPage />} />
           <Route path="dashboard/curator/users/create" element={<CuratorCreateUserPage />} />
           <Route path="dashboard/curator/companies/create" element={<CuratorCreateCompanyPage />} />
+          <Route path="dashboard/curator/opportunities/create" element={<CuratorCreateOpportunityPage />} />
           <Route path="dashboard/curator/vacancies/create" element={<CuratorCreateVacancyPage />} />
         </Route>
 
