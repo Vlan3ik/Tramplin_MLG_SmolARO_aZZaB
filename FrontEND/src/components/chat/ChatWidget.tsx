@@ -9,8 +9,10 @@ import { useNavigate } from 'react-router-dom'
 import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
 
 const CHAT_POLL_OPEN_INTERVAL_MS = 20000
+const CHAT_POLL_CLOSED_INTERVAL_MS = 20000
 const MESSAGE_POLL_INTERVAL_MS = 8000
 const CHAT_PANEL_ANIMATION_MS = 240
+const CHAT_NOTIFICATION_SOUND_FILE = 'icq-notification-sound-message-received-on-icq.mp3'
 
 type MediaViewerItem = {
   id: number
@@ -200,6 +202,32 @@ function getMediaIndex(items: MediaViewerItem[], attachmentId: number) {
   )
 }
 
+function shouldNotifyForMessage(message: ChatMessage, currentUserId: number | undefined) {
+  if (message.senderUserId === currentUserId) {
+    return false
+  }
+
+  if (message.isSystem) {
+    return false
+  }
+
+  return true
+}
+
+function formatUnreadCount(value: number) {
+  if (value > 99) {
+    return '99+'
+  }
+
+  return String(value)
+}
+
+function getChatNotificationSoundUrl() {
+  const rawBase = (import.meta.env.BASE_URL || '/').trim()
+  const normalizedBase = rawBase.endsWith('/') ? rawBase : `${rawBase}/`
+  return `${normalizedBase}${CHAT_NOTIFICATION_SOUND_FILE}`
+}
+
 export function ChatWidget() {
   const { session, isAuthenticated } = useAuth()
   const currentUserId = session?.user?.id
@@ -211,6 +239,7 @@ export function ChatWidget() {
   const [chats, setChats] = useState<ChatListItem[]>([])
   const [activeChatId, setActiveChatId] = useState<number | null>(null)
   const [messagesByChat, setMessagesByChat] = useState<Record<number, ChatMessage[]>>({})
+  const [unreadByChat, setUnreadByChat] = useState<Record<number, number>>({})
   const [messageInput, setMessageInput] = useState('')
   const [queuedFiles, setQueuedFiles] = useState<File[]>([])
   const [isLoadingChats, setIsLoadingChats] = useState(false)
@@ -224,12 +253,19 @@ export function ChatWidget() {
   const [activeMediaIndex, setActiveMediaIndex] = useState(0)
 
   const chatsInFlightRef = useRef(false)
+  const hasLoadedChatsSnapshotRef = useRef(false)
   const historyInFlightByChatRef = useRef<Record<number, boolean>>({})
   const newMessagesInFlightByChatRef = useRef<Record<number, boolean>>({})
   const latestMessageIdByChatRef = useRef<Record<number, number>>({})
   const lastReadMessageIdByChatRef = useRef<Record<number, number>>({})
+  const latestListMessageIdByChatRef = useRef<Record<number, number>>({})
+  const unreadByChatRef = useRef<Record<number, number>>({})
+  const notificationAudioRef = useRef<HTMLAudioElement | null>(null)
+  const hasUserInteractedRef = useRef(false)
+  const hasPendingSoundRef = useRef(false)
 
   const activeChatIdRef = useRef<number | null>(activeChatId)
+  const isOpenRef = useRef(isOpen)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const panelUnmountTimeoutRef = useRef<number | null>(null)
@@ -237,6 +273,14 @@ export function ChatWidget() {
   useEffect(() => {
     activeChatIdRef.current = activeChatId
   }, [activeChatId])
+
+  useEffect(() => {
+    isOpenRef.current = isOpen
+  }, [isOpen])
+
+  useEffect(() => {
+    unreadByChatRef.current = unreadByChat
+  }, [unreadByChat])
 
   useEffect(() => {
     if (isOpen) {
@@ -283,6 +327,7 @@ export function ChatWidget() {
 
   const activeChat = useMemo(() => chats.find((chat) => chat.id === activeChatId) ?? null, [activeChatId, chats])
   const activeMessages = useMemo(() => (activeChatId ? messagesByChat[activeChatId] ?? [] : []), [activeChatId, messagesByChat])
+  const activeUnreadCount = useMemo(() => (activeChatId ? unreadByChat[activeChatId] ?? 0 : 0), [activeChatId, unreadByChat])
   const activeVacancyLink = useMemo(() => {
     if (!activeChat || activeChat.type !== 2) {
       return null
@@ -353,7 +398,8 @@ export function ChatWidget() {
 
     return null
   }, [activeChat, activeMessages, currentUserId])
-  const hasUnreadChats = useMemo(() => chats.some((chat) => chat.lastMessage && chat.lastMessage.senderUserId !== currentUserId), [chats, currentUserId])
+  const unreadChatsCount = useMemo(() => Object.values(unreadByChat).reduce((acc, value) => acc + value, 0), [unreadByChat])
+  const hasUnreadChats = unreadChatsCount > 0
   const hasComposerContent = messageInput.trim().length > 0 || queuedFiles.length > 0
   const isMediaViewerOpen = mediaViewerItems.length > 0
   const activeViewerItem = mediaViewerItems[activeMediaIndex]
@@ -379,8 +425,53 @@ export function ChatWidget() {
     [currentUserId],
   )
 
+  const clearUnreadForChat = useCallback((chatId: number) => {
+    setUnreadByChat((currentState) => {
+      if (!currentState[chatId]) {
+        return currentState
+      }
+
+      const nextState = { ...currentState }
+      delete nextState[chatId]
+      return nextState
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!isOpen || !activeChatId) {
+      return
+    }
+
+    clearUnreadForChat(activeChatId)
+  }, [activeChatId, clearUnreadForChat, isOpen])
+
+  const playNotificationSoundNow = useCallback(() => {
+    const audio = notificationAudioRef.current
+    if (!audio) {
+      return
+    }
+
+    audio.currentTime = 0
+    void audio.play().catch(() => {
+      hasPendingSoundRef.current = true
+    })
+  }, [])
+
+  const tryPlayNotificationSound = useCallback(() => {
+    if (!hasUserInteractedRef.current) {
+      hasPendingSoundRef.current = true
+      return
+    }
+
+    playNotificationSoundNow()
+  }, [playNotificationSoundNow])
+
   const tryMarkRead = useCallback(
     async (chatId: number, candidateMessage: ChatMessage | undefined) => {
+      if (!isOpenRef.current) {
+        return
+      }
+
       if (!candidateMessage || candidateMessage.senderUserId === currentUserId) {
         return
       }
@@ -394,11 +485,12 @@ export function ChatWidget() {
       try {
         await markChatRead(chatId, candidateMessage.id)
         lastReadMessageIdByChatRef.current[chatId] = candidateMessage.id
+        clearUnreadForChat(chatId)
       } catch {
         // read-state failure is non-blocking
       }
     },
-    [currentUserId],
+    [clearUnreadForChat, currentUserId],
   )
 
   const loadChats = useCallback(
@@ -431,6 +523,61 @@ export function ChatWidget() {
           return bTime - aTime
         })
 
+        const knownChatIds = new Set(sorted.map((chat) => chat.id))
+        let nextUnread = unreadByChatRef.current
+        let unreadChanged = false
+        let shouldPlayNotification = false
+
+        for (const chat of sorted) {
+          const lastMessage = chat.lastMessage
+          const lastMessageId = lastMessage?.id ?? 0
+          const previousMessageId = latestListMessageIdByChatRef.current[chat.id]
+          const isKnownChat = typeof previousMessageId === 'number'
+          latestListMessageIdByChatRef.current[chat.id] = lastMessageId
+
+          if (!hasLoadedChatsSnapshotRef.current) {
+            continue
+          }
+
+          if (!lastMessage) {
+            continue
+          }
+
+          if (isKnownChat && lastMessageId <= previousMessageId) {
+            continue
+          }
+
+          const isActiveVisible = isOpen && activeChatIdRef.current === chat.id && isPageVisible()
+          if (!shouldNotifyForMessage(lastMessage, currentUserId) || isActiveVisible) {
+            continue
+          }
+
+          if (!unreadChanged) {
+            nextUnread = { ...nextUnread }
+            unreadChanged = true
+          }
+
+          nextUnread[chat.id] = (nextUnread[chat.id] ?? 0) + 1
+          shouldPlayNotification = true
+        }
+
+        const staleUnreadChatIds = Object.keys(nextUnread).map(Number).filter((chatId) => !knownChatIds.has(chatId))
+        if (staleUnreadChatIds.length) {
+          if (!unreadChanged) {
+            nextUnread = { ...nextUnread }
+            unreadChanged = true
+          }
+
+          for (const chatId of staleUnreadChatIds) {
+            delete nextUnread[chatId]
+            delete latestListMessageIdByChatRef.current[chatId]
+          }
+        }
+
+        if (unreadChanged) {
+          setUnreadByChat(nextUnread)
+        }
+
         setChats(sorted)
         setActiveChatId((currentId) => {
           if (!currentId) {
@@ -439,6 +586,11 @@ export function ChatWidget() {
 
           return sorted.some((chat) => chat.id === currentId) ? currentId : (sorted[0]?.id ?? null)
         })
+        hasLoadedChatsSnapshotRef.current = true
+
+        if (shouldPlayNotification) {
+          tryPlayNotificationSound()
+        }
       } catch (error) {
         if (!options?.signal?.aborted && !isAbortError(error)) {
           setErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить список чатов.')
@@ -450,7 +602,7 @@ export function ChatWidget() {
         }
       }
     },
-    [isAuthenticated, isEmployerSession, isOpen],
+    [currentUserId, isAuthenticated, isEmployerSession, isOpen, tryPlayNotificationSound],
   )
 
   const loadChatHistory = useCallback(
@@ -480,6 +632,7 @@ export function ChatWidget() {
           ...current,
           [chatId]: detail.linkedCard ?? null,
         }))
+        clearUnreadForChat(chatId)
 
         await tryMarkRead(chatId, latest)
       } catch (error) {
@@ -493,7 +646,7 @@ export function ChatWidget() {
         }
       }
     },
-    [isEmployerSession, tryMarkRead],
+    [clearUnreadForChat, isEmployerSession, tryMarkRead],
   )
 
   const loadNewMessages = useCallback(
@@ -521,6 +674,10 @@ export function ChatWidget() {
         const latestIncoming = incoming[incoming.length - 1]
         latestMessageIdByChatRef.current[chatId] = latestIncoming.id
 
+        const incomingExternalCount = incoming.reduce((acc, message) => (
+          shouldNotifyForMessage(message, currentUserId) ? acc + 1 : acc
+        ), 0)
+
         setMessagesByChat((currentState) => {
           const existing = currentState[chatId] ?? []
           return {
@@ -528,6 +685,19 @@ export function ChatWidget() {
             [chatId]: mergeMessages(existing, incoming),
           }
         })
+
+        const isActiveVisible = isOpen && activeChatIdRef.current === chatId && isPageVisible()
+        if (incomingExternalCount > 0) {
+          if (isActiveVisible) {
+            clearUnreadForChat(chatId)
+          } else {
+            setUnreadByChat((currentState) => ({
+              ...currentState,
+              [chatId]: (currentState[chatId] ?? 0) + incomingExternalCount,
+            }))
+          }
+          tryPlayNotificationSound()
+        }
 
         await tryMarkRead(chatId, latestIncoming)
       } catch (error) {
@@ -538,8 +708,37 @@ export function ChatWidget() {
         newMessagesInFlightByChatRef.current[chatId] = false
       }
     },
-    [isEmployerSession, tryMarkRead],
+    [clearUnreadForChat, currentUserId, isEmployerSession, isOpen, tryMarkRead, tryPlayNotificationSound],
   )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return () => undefined
+    }
+
+    const audio = new Audio(getChatNotificationSoundUrl())
+    audio.preload = 'auto'
+    notificationAudioRef.current = audio
+
+    const unlockSound = () => {
+      hasUserInteractedRef.current = true
+      if (hasPendingSoundRef.current) {
+        hasPendingSoundRef.current = false
+        playNotificationSoundNow()
+      }
+    }
+
+    window.addEventListener('pointerdown', unlockSound, { passive: true })
+    window.addEventListener('keydown', unlockSound)
+    window.addEventListener('touchstart', unlockSound, { passive: true })
+
+    return () => {
+      notificationAudioRef.current = null
+      window.removeEventListener('pointerdown', unlockSound)
+      window.removeEventListener('keydown', unlockSound)
+      window.removeEventListener('touchstart', unlockSound)
+    }
+  }, [playNotificationSoundNow])
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -615,6 +814,24 @@ export function ChatWidget() {
     const intervalId = window.setInterval(() => {
       void loadChats()
     }, CHAT_POLL_OPEN_INTERVAL_MS)
+
+    return () => {
+      controller.abort()
+      window.clearInterval(intervalId)
+    }
+  }, [isAuthenticated, isOpen, loadChats])
+
+  useEffect(() => {
+    if (!isAuthenticated || isOpen) {
+      return () => undefined
+    }
+
+    const controller = new AbortController()
+    void loadChats({ signal: controller.signal, force: true })
+
+    const intervalId = window.setInterval(() => {
+      void loadChats({ force: true })
+    }, CHAT_POLL_CLOSED_INTERVAL_MS)
 
     return () => {
       controller.abort()
@@ -880,10 +1097,16 @@ export function ChatWidget() {
                     key={chat.id}
                     type="button"
                     className={`chat-widget__list-item ${chat.id === activeChatId ? 'is-active' : ''}`}
-                    onClick={() => setActiveChatId(chat.id)}
+                    onClick={() => {
+                      setActiveChatId(chat.id)
+                      clearUnreadForChat(chat.id)
+                    }}
                   >
                     <strong>{getChatTitle(chat)}</strong>
-                    <span>{getMessagePreview(chat.lastMessage)}</span>
+                    <div className="chat-widget__list-item-meta">
+                      <span>{getMessagePreview(chat.lastMessage)}</span>
+                      {(unreadByChat[chat.id] ?? 0) > 0 ? <em className="chat-widget__unread-badge">{formatUnreadCount(unreadByChat[chat.id] ?? 0)}</em> : null}
+                    </div>
                   </button>
                 ))}
               </aside>
@@ -893,7 +1116,10 @@ export function ChatWidget() {
                   <>
                     <div className="chat-widget__thread-head">
                       <div className="chat-widget__thread-head-title">
-                        <strong>{activeChatHeaderTitle}</strong>
+                        <strong>
+                          {activeChatHeaderTitle}
+                          {activeUnreadCount > 0 ? <em className="chat-widget__unread-badge chat-widget__unread-badge--inline">{formatUnreadCount(activeUnreadCount)}</em> : null}
+                        </strong>
                         {activeDirectUsername ? (
                           <button type="button" className="chat-widget__thread-link" onClick={() => navigate(`/dashboard/seeker/${encodeURIComponent(activeDirectUsername)}`)}>
                             Профиль пользователя
@@ -1076,6 +1302,7 @@ export function ChatWidget() {
         aria-label="Открыть чаты"
       >
         <MessageCircle size={20} />
+        {hasUnreadChats ? <span className="chat-widget__fab-count">{formatUnreadCount(unreadChatsCount)}</span> : null}
       </button>
 
       {isMediaViewerOpen && activeViewerItem ? (
