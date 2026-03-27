@@ -23,7 +23,6 @@ type UserEditorForm = {
   seeker: boolean
   employer: boolean
   adminAccess: boolean
-  curatorAccess: boolean
 }
 
 function normalizeRole(value: string) {
@@ -39,7 +38,6 @@ function getInitialForm(): UserEditorForm {
     seeker: false,
     employer: true,
     adminAccess: false,
-    curatorAccess: false,
   }
 }
 
@@ -53,7 +51,6 @@ function mapUserToForm(user: AdminUser): UserEditorForm {
     seeker: roles.includes('seeker'),
     employer: roles.includes('employer'),
     adminAccess: roles.includes('admin'),
-    curatorAccess: roles.includes('curator'),
   }
 }
 
@@ -129,7 +126,6 @@ export function CuratorCreateUserPage() {
     setForm((state) => ({
       ...state,
       adminAccess: false,
-      curatorAccess: false,
     }))
   }, [isSuperCurator])
 
@@ -159,7 +155,6 @@ export function CuratorCreateUserPage() {
     if (form.seeker) roles.push(1)
     if (form.employer) roles.push(2)
     if (isSuperCurator && form.adminAccess) roles.push(4)
-    if (isSuperCurator && form.curatorAccess) roles.push(3)
     return Array.from(new Set(roles))
   }
 
@@ -348,9 +343,6 @@ export function CuratorCreateUserPage() {
                       <label className="employer-checkbox">
                         <input type="checkbox" name="adminAccess" checked={form.adminAccess} onChange={onInputChange} /> Куратор (Admin)
                       </label>
-                      <label className="employer-checkbox">
-                        <input type="checkbox" name="curatorAccess" checked={form.curatorAccess} onChange={onInputChange} /> Super Curator
-                      </label>
                     </div>
                   ) : null}
                 </div>
@@ -394,7 +386,7 @@ export function CuratorCreateUserPage() {
                 <div className="status-table">
                   <div><span>Email</span><strong>{form.email || '-'}</strong></div>
                   <div><span>Статус</span><strong>{form.status === 1 ? 'Активен' : form.status === 2 ? 'Заблокирован' : 'Удален'}</strong></div>
-                  <div><span>Роли</span><strong>{[form.seeker ? 'seeker' : '', form.employer ? 'employer' : '', isSuperCurator && form.adminAccess ? 'admin' : '', isSuperCurator && form.curatorAccess ? 'curator' : ''].filter(Boolean).join(', ') || 'не выбраны'}</strong></div>
+                  <div><span>Роли</span><strong>{[form.seeker ? 'seeker' : '', form.employer ? 'employer' : '', isSuperCurator && form.adminAccess ? 'admin' : ''].filter(Boolean).join(', ') || 'не выбраны'}</strong></div>
                 </div>
               </aside>
             </div>

@@ -46,6 +46,7 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         }
 
         await EnsureRoleAsync(curator.Id, PlatformRole.Curator, now);
+        await EnsureSingleSuperCuratorAsync(curator.Id);
         foreach (var employer in employers)
         {
             await EnsureRoleAsync(employer.Id, PlatformRole.Employer, now);
@@ -989,6 +990,21 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
             AssignedAt = assignedAt
         });
 
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task EnsureSingleSuperCuratorAsync(long superCuratorUserId)
+    {
+        var extraCuratorRoles = await dbContext.UserRoles
+            .Where(x => x.Role == PlatformRole.Curator && x.UserId != superCuratorUserId)
+            .ToListAsync();
+
+        if (extraCuratorRoles.Count == 0)
+        {
+            return;
+        }
+
+        dbContext.UserRoles.RemoveRange(extraCuratorRoles);
         await dbContext.SaveChangesAsync();
     }
 
