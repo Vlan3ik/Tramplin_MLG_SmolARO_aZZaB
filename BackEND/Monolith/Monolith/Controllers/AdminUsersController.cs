@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Monolith.Contexts;
@@ -21,6 +21,7 @@ public class AdminUsersController(
     IPasswordHasher passwordHasher,
     IObjectStorageService storageService) : ControllerBase
 {
+    private const string SuperCuratorEmail = "admin@tramplin.local";
     private const long MaxImageSizeBytes = 10 * 1024 * 1024;
     private static readonly HashSet<string> AllowedImageTypes =
     [
@@ -155,6 +156,12 @@ public class AdminUsersController(
         if (privilegedError is not null)
         {
             return privilegedError;
+        }
+
+        var isSuperCurator = string.Equals(user.Email, SuperCuratorEmail, StringComparison.OrdinalIgnoreCase);
+        if (isSuperCurator && !roles.Contains(PlatformRole.Curator))
+        {
+            return this.ToBadRequestError("admin.users.roles.super_curator_required", "У super-curator нельзя снять роль curator.");
         }
 
         user.Email = request.Email.Trim().ToLowerInvariant();
@@ -319,8 +326,16 @@ public class AdminUsersController(
 
     private ActionResult? ValidateRoleAssignment(IEnumerable<PlatformRole> roles)
     {
-        var wantsPrivileged = roles.Any(x => x is PlatformRole.Curator or PlatformRole.Admin);
-        if (!wantsPrivileged)
+        var requestedRoles = roles.Distinct().ToArray();
+
+        if (requestedRoles.Contains(PlatformRole.Curator))
+        {
+            return this.ToBadRequestError(
+                "admin.users.roles.curator_singleton",
+                "Роль curator выдавать нельзя. Super-curator только один: admin@tramplin.local.");
+        }
+
+        if (!requestedRoles.Contains(PlatformRole.Admin))
         {
             return null;
         }
@@ -332,7 +347,7 @@ public class AdminUsersController(
 
         return StatusCode(
             StatusCodes.Status403Forbidden,
-            new ErrorResponse("admin.users.roles.forbidden", "Назначение ролей admin/curator доступно только curator."));
+            new ErrorResponse("admin.users.roles.forbidden", "Назначение роли admin доступно только curator."));
     }
 
     private async Task EnsureCandidateProfile(long userId, string fio, CancellationToken cancellationToken)

@@ -114,10 +114,35 @@ function getFallbackDirectChatTitle(chat: ChatListItem, currentUserId: number | 
   return companionId ? `Пользователь #${companionId}` : `Личный чат #${chat.id}`
 }
 
+function formatShortFio(value: string | null | undefined) {
+  const normalized = value?.trim()
+  if (!normalized) {
+    return ''
+  }
+
+  const parts = normalized
+    .split(/\s+/)
+    .map((part) => part.replace(/\./g, '').trim())
+    .filter(Boolean)
+  if (parts.length <= 1) {
+    return parts[0] ?? ''
+  }
+
+  const firstWord = parts[0]
+  const initials = parts
+    .slice(1, 3)
+    .map((part) => part[0]?.toUpperCase())
+    .filter(Boolean)
+    .map((letter) => `${letter}.`)
+    .join(' ')
+
+  return initials ? `${firstWord} ${initials}` : firstWord
+}
+
 function getChatSubjectTitle(chat: ChatListItem, currentUserId: number | undefined) {
   const titleFromApi = chat.title?.trim()
   if (titleFromApi) {
-    return titleFromApi
+    return chat.type === 1 ? formatShortFio(titleFromApi) : titleFromApi
   }
 
   if (chat.type === 2 || chat.type === 3) {
@@ -420,7 +445,11 @@ export function ChatWidget() {
   const getChatTitle = useCallback(
     (chat: ChatListItem) => {
       const titleFromApi = chat.title?.trim()
-      return titleFromApi || getFallbackDirectChatTitle(chat, currentUserId)
+      if (titleFromApi) {
+        return chat.type === 1 ? formatShortFio(titleFromApi) : titleFromApi
+      }
+
+      return getFallbackDirectChatTitle(chat, currentUserId)
     },
     [currentUserId],
   )
@@ -1154,7 +1183,8 @@ export function ChatWidget() {
                       {!isLoadingMessages && !activeMessages.length ? <p>Сообщений пока нет.</p> : null}
                       {activeMessages.map((message) => {
                         const isMine = message.senderUserId === currentUserId
-                        const displayName = (isMine ? currentUserDisplayName : message.senderDisplayName)?.trim() || 'Пользователь'
+                        const rawDisplayName = (isMine ? currentUserDisplayName : message.senderDisplayName)?.trim() || 'Пользователь'
+                        const displayName = formatShortFio(rawDisplayName)
                         const username = isMine ? currentUserUsername : message.senderUsername
                         const usernameLabel = getUsernameLabel(username)
                         const avatarUrl = isMine ? currentUserAvatarUrl : message.senderAvatarUrl
