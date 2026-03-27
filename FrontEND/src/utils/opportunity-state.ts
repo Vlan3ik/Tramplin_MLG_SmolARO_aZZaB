@@ -1,4 +1,5 @@
 import type { Opportunity } from '../types/opportunity'
+import { getSeekerPrivacySettingsSnapshot } from './seeker-privacy-settings'
 
 export type OpportunityStateBadgeTone = 'favorite' | 'friends' | 'responses'
 
@@ -11,6 +12,7 @@ export type OpportunityStateBadge = {
 export function getOpportunityStateBadges(opportunity: Opportunity, isFavoriteOverride?: boolean): OpportunityStateBadge[] {
   const isFavorite = typeof isFavoriteOverride === 'boolean' ? isFavoriteOverride : opportunity.isFavoriteByMe
   const badges: OpportunityStateBadge[] = []
+  const privacySettings = getSeekerPrivacySettingsSnapshot()
 
   if (isFavorite) {
     badges.push({ id: 'favorite', label: '\u0412 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u043c', tone: 'favorite' })
@@ -26,6 +28,10 @@ export function getOpportunityStateBadges(opportunity: Opportunity, isFavoriteOv
       label: `\u041e\u0442\u043a\u043b\u0438\u043a\u043d\u0443\u043b\u0438\u0441\u044c ${opportunity.friendsAppliedCount} \u0434\u0440\u0443\u0437\u0435\u0439`,
       tone: 'responses',
     })
+  }
+
+  if (!privacySettings.showSocialProofs) {
+    return badges.filter((badge) => badge.id !== 'friends-favorite' && badge.id !== 'friends-applied')
   }
 
   return badges

@@ -46,6 +46,8 @@ export type SeekerSettings = {
   resumeVisibility: PrivacyScope
   openToWork: boolean
   showContactsInResume: boolean
+  showLinksInResume: boolean
+  showSocialProofs: boolean
 }
 
 export type UpdateSeekerSettingsRequest = {
@@ -53,4 +55,6 @@ export type UpdateSeekerSettingsRequest = {
   resumeVisibility: PrivacyScope
   openToWork: boolean
   showContactsInResume: boolean
+  showLinksInResume: boolean
+  showSocialProofs: boolean
 }

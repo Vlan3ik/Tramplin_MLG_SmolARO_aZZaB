@@ -1,5 +1,6 @@
 import clsx from 'clsx'
 import { useOpportunitySocialState } from '../../hooks/useOpportunitySocialState'
+import { useSeekerPrivacySettings } from '../../hooks/useSeekerPrivacySettings'
 import type { Opportunity } from '../../types/opportunity'
 import { getOpportunityStateBadges } from '../../utils/opportunity-state'
 
@@ -12,6 +13,7 @@ type OpportunityStateBadgesProps = {
 
 export function OpportunityStateBadges({ opportunity, isFavorite, compact = false, className }: OpportunityStateBadgesProps) {
   const socialState = useOpportunitySocialState(opportunity)
+  const privacySettings = useSeekerPrivacySettings()
   const badges = getOpportunityStateBadges(
     {
       ...opportunity,
@@ -20,7 +22,13 @@ export function OpportunityStateBadges({ opportunity, isFavorite, compact = fals
       friendsAppliedCount: socialState.friendsAppliedCount,
     },
     isFavorite,
-  )
+  ).filter((badge) => {
+    if (privacySettings.showSocialProofs) {
+      return true
+    }
+
+    return badge.id !== 'friends-favorite' && badge.id !== 'friends-applied'
+  })
   if (!badges.length) {
     return null
   }
