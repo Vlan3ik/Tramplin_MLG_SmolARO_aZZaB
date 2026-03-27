@@ -28,6 +28,10 @@ type VacancyListItemApi = {
   tagMatchCount?: number | null
   isFavoriteByMe?: boolean | null
   friendFavoritesCount?: number | null
+  friendsAppliedCount?: number | null
+  friendApplicationsCount?: number | null
+  friendsResponsesCount?: number | null
+  friendsRespondedCount?: number | null
 }
 
 type OpportunityListItemApi = {
@@ -52,6 +56,10 @@ type OpportunityListItemApi = {
   tagMatchCount?: number | null
   isFavoriteByMe?: boolean | null
   friendFavoritesCount?: number | null
+  friendsAppliedCount?: number | null
+  friendApplicationsCount?: number | null
+  friendsResponsesCount?: number | null
+  friendsRespondedCount?: number | null
 }
 
 type VacancyDetailApi = {
@@ -87,6 +95,10 @@ type VacancyDetailApi = {
   tagMatchCount?: number | null
   isFavoriteByMe?: boolean | null
   friendFavoritesCount?: number | null
+  friendsAppliedCount?: number | null
+  friendApplicationsCount?: number | null
+  friendsResponsesCount?: number | null
+  friendsRespondedCount?: number | null
 }
 
 type OpportunityDetailApi = {
@@ -123,6 +135,10 @@ type OpportunityDetailApi = {
   tagMatchCount?: number | null
   isFavoriteByMe?: boolean | null
   friendFavoritesCount?: number | null
+  friendsAppliedCount?: number | null
+  friendApplicationsCount?: number | null
+  friendsResponsesCount?: number | null
+  friendsRespondedCount?: number | null
 }
 
 type MapOpportunityFeatureApi = {
@@ -148,6 +164,12 @@ type MapOpportunityFeatureApi = {
     companyName?: string | null
     locationName?: string | null
     tags?: string[] | null
+    isFavoriteByMe?: boolean | null
+    friendFavoritesCount?: number | null
+    friendsAppliedCount?: number | null
+    friendApplicationsCount?: number | null
+    friendsResponsesCount?: number | null
+    friendsRespondedCount?: number | null
     company?: {
       id?: number
       name?: string | null
@@ -306,6 +328,29 @@ function formatRelativeDate(publishAt: string | undefined) {
 
   return publishDate.toLocaleDateString('ru-RU')
 }
+
+function toFriendsAppliedCount(source: {
+  friendsAppliedCount?: number | null
+  friendApplicationsCount?: number | null
+  friendsResponsesCount?: number | null
+  friendsRespondedCount?: number | null
+}) {
+  const values = [
+    source.friendsAppliedCount,
+    source.friendApplicationsCount,
+    source.friendsResponsesCount,
+    source.friendsRespondedCount,
+  ]
+
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return value
+    }
+  }
+
+  return 0
+}
+
 function toOpportunityFromVacancy(apiItem: VacancyListItemApi, coordinates: { latitude: number | null; longitude: number | null }): Opportunity {
   const kind = apiItem.kind ?? apiItem.type
   const type = parseOpportunityType(kind, 'vacancy')
@@ -333,6 +378,7 @@ function toOpportunityFromVacancy(apiItem: VacancyListItemApi, coordinates: { la
     tagMatchCount: apiItem.tagMatchCount ?? 0,
     isFavoriteByMe: Boolean(apiItem.isFavoriteByMe),
     friendFavoritesCount: apiItem.friendFavoritesCount ?? 0,
+    friendsAppliedCount: toFriendsAppliedCount(apiItem),
   }
 }
 
@@ -368,6 +414,7 @@ function toOpportunityFromOpportunity(
     tagMatchCount: apiItem.tagMatchCount ?? 0,
     isFavoriteByMe: Boolean(apiItem.isFavoriteByMe),
     friendFavoritesCount: apiItem.friendFavoritesCount ?? 0,
+    friendsAppliedCount: toFriendsAppliedCount(apiItem),
   }
 }
 function parseMapEntityType(value: string | number | null | undefined) {
@@ -753,8 +800,9 @@ function mapOpportunityFromFeature(feature: MapOpportunityFeatureApi): Opportuni
     entityType: entityType ?? undefined,
     publishAt: props?.publishAt ?? null,
     tagMatchCount: 0,
-    isFavoriteByMe: false,
-    friendFavoritesCount: 0,
+    isFavoriteByMe: Boolean(props?.isFavoriteByMe),
+    friendFavoritesCount: props?.friendFavoritesCount ?? 0,
+    friendsAppliedCount: toFriendsAppliedCount(props ?? {}),
   }
 }
 export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: AbortSignal) {
@@ -770,7 +818,7 @@ export async function fetchHomeOpportunities(query: HomeSearchQuery, signal?: Ab
     needOpportunities
       ? getJson<PagedResponse<OpportunityListItemApi>>(`/opportunities?${opportunitiesQueryString}`, { signal })
       : Promise.resolve(createEmptyPagedResponse<OpportunityListItemApi>(query.page ?? 1, query.pageSize ?? 24)),
-    getJson<MapOpportunityResponseApi>(`/map/opportunities?${mapQueryString}`, { signal, withAuth: false }),
+    getJson<MapOpportunityResponseApi>(`/map/opportunities?${mapQueryString}`, { signal }),
   ])
 
   const coordinatesByEntityKey = new Map<string, { latitude: number | null; longitude: number | null }>()
@@ -900,7 +948,7 @@ export async function fetchEventsListOpportunities(query: HomeSearchQuery, signa
 
 export async function fetchMapOpportunities(query: MapSearchQuery, signal?: AbortSignal) {
   const mapQueryString = buildMapSearchQueryString(query)
-  const mapResponse = await getJson<MapOpportunityResponseApi>(`/map/opportunities?${mapQueryString}`, { signal, withAuth: false })
+  const mapResponse = await getJson<MapOpportunityResponseApi>(`/map/opportunities?${mapQueryString}`, { signal })
 
   const items = applyClientFilters(
     (mapResponse.features ?? [])
@@ -949,6 +997,7 @@ function mapFromVacancyDetail(response: VacancyDetailApi): OpportunityDetail {
     tagMatchCount: response.tagMatchCount ?? 0,
     isFavoriteByMe: Boolean(response.isFavoriteByMe),
     friendFavoritesCount: response.friendFavoritesCount ?? 0,
+    friendsAppliedCount: toFriendsAppliedCount(response),
   }
 }
 function mapFromOpportunityDetail(response: OpportunityDetailApi): OpportunityDetail {
@@ -985,6 +1034,7 @@ function mapFromOpportunityDetail(response: OpportunityDetailApi): OpportunityDe
     tagMatchCount: response.tagMatchCount ?? 0,
     isFavoriteByMe: Boolean(response.isFavoriteByMe),
     friendFavoritesCount: response.friendFavoritesCount ?? 0,
+    friendsAppliedCount: toFriendsAppliedCount(response),
   }
 }
 function isProbablyNotFoundError(error: unknown) {
@@ -1021,6 +1071,7 @@ export async function fetchOpportunityById(id: number, signal?: AbortSignal): Pr
     tagMatchCount: detail.tagMatchCount,
     isFavoriteByMe: detail.isFavoriteByMe,
     friendFavoritesCount: detail.friendFavoritesCount,
+    friendsAppliedCount: detail.friendsAppliedCount,
   }
 }
 

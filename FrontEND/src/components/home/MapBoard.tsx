@@ -3,8 +3,10 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useNavigate } from 'react-router-dom'
 import type { Opportunity } from '../../types/opportunity'
+import { getOpportunityStateBadges } from '../../utils/opportunity-state'
 import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
 import { isFavoriteOpportunity, subscribeToFavoriteOpportunities } from '../../utils/favorites'
+import { OpportunityStateBadges } from './OpportunityStateBadges'
 import {
   isMapItemViewed,
   markMapItemViewed,
@@ -23,6 +25,7 @@ type OpportunityMarker = {
   tone: MarkerTone
   isViewed: boolean
   isFavorite: boolean
+  hasFriendsFavorite: boolean
   entityType: ViewedMapEntityType | null
   opportunityId: number | null
   count: number
@@ -47,6 +50,84 @@ function resolveEntityType(item: Opportunity): ViewedMapEntityType {
   return item.type === 'vacancy' || item.type === 'internship' ? 'vacancy' : 'opportunity'
 }
 
+function resolveIsFavorite(item: Opportunity) {
+  return Boolean(item.isFavoriteByMe) || isFavoriteOpportunity(item.id)
+}
+
+function buildHoverCardNode(marker: OpportunityMarker) {
+  const root = document.createElement('div')
+  root.className = 'map-hover-card'
+
+  if (marker.kind === 'cluster') {
+    const title = document.createElement('strong')
+    title.textContent = `В точке: ${marker.count}`
+    root.append(title)
+
+    const list = document.createElement('div')
+    list.className = 'map-hover-card__list'
+
+    marker.opportunities.slice(0, 3).forEach((item) => {
+      const row = document.createElement('div')
+      row.className = 'map-hover-card__item'
+
+      const itemTitle = document.createElement('p')
+      itemTitle.textContent = item.title
+      row.append(itemTitle)
+
+      const badges = getOpportunityStateBadges(item, resolveIsFavorite(item))
+      if (badges.length) {
+        const badgesRow = document.createElement('div')
+        badgesRow.className = 'map-hover-card__badges'
+        badges.forEach((badge) => {
+          const badgeNode = document.createElement('span')
+          badgeNode.className = `map-hover-card__badge map-hover-card__badge--${badge.tone}`
+          badgeNode.textContent = badge.label
+          badgesRow.append(badgeNode)
+        })
+        row.append(badgesRow)
+      }
+
+      list.append(row)
+    })
+
+    root.append(list)
+    return root
+  }
+
+  const [item] = marker.opportunities
+  if (!item) {
+    return root
+  }
+
+  const title = document.createElement('strong')
+  title.textContent = item.title
+  root.append(title)
+
+  const company = document.createElement('p')
+  company.textContent = item.company
+  root.append(company)
+
+  const compensation = document.createElement('p')
+  compensation.className = 'map-hover-card__compensation'
+  compensation.textContent = item.compensation
+  root.append(compensation)
+
+  const badges = getOpportunityStateBadges(item, marker.isFavorite)
+  if (badges.length) {
+    const badgesRow = document.createElement('div')
+    badgesRow.className = 'map-hover-card__badges'
+    badges.forEach((badge) => {
+      const badgeNode = document.createElement('span')
+      badgeNode.className = `map-hover-card__badge map-hover-card__badge--${badge.tone}`
+      badgeNode.textContent = badge.label
+      badgesRow.append(badgeNode)
+    })
+    root.append(badgesRow)
+  }
+
+  return root
+}
+
 export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetry, onBoundsChange, jumpToRequest }: MapBoardProps) {
   const navigate = useNavigate()
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
@@ -56,6 +137,7 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
   const boundsDebounceRef = useRef<number | null>(null)
   const ignoreNextMoveEndRef = useRef(false)
   const lastJumpTokenRef = useRef<number | null>(null)
+  const hoverPopupRef = useRef<maplibregl.Popup | null>(null)
   const [markersVersion, setMarkersVersion] = useState(0)
   const [activePoint, setActivePoint] = useState<OpportunityMarker | null>(null)
 
@@ -90,6 +172,8 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
       const hasOnlyEvents = group.opportunities.every((item) => item.type === 'event')
       const tone: MarkerTone = hasOnlyEvents ? 'event' : 'vacancy-like'
       const isGroupViewed = group.opportunities.some((item) => isMapItemViewed(resolveEntityType(item), item.id))
+      const isGroupFavorite = group.opportunities.some((item) => resolveIsFavorite(item))
+      const hasGroupFriendsFavorite = group.opportunities.some((item) => item.friendFavoritesCount > 0)
 
       if (group.opportunities.length > 1) {
         return {
@@ -98,7 +182,8 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
           kind: 'cluster' as const,
           tone,
           isViewed: isGroupViewed,
-          isFavorite: false,
+          isFavorite: isGroupFavorite,
+          hasFriendsFavorite: hasGroupFriendsFavorite,
           entityType: null,
           opportunityId: null,
           count: group.opportunities.length,
@@ -115,7 +200,8 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
         kind: 'single' as const,
         tone,
         isViewed: isMapItemViewed(entityType, singleItem.id),
-        isFavorite: isFavoriteOpportunity(singleItem.id),
+        isFavorite: resolveIsFavorite(singleItem),
+        hasFriendsFavorite: singleItem.friendFavoritesCount > 0,
         entityType,
         opportunityId: singleItem.id,
         count: 1,
@@ -157,6 +243,14 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     map.addControl(new maplibregl.AttributionControl({ compact: true }))
+    hoverPopupRef.current = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      closeOnMove: true,
+      className: 'map-hover-popup',
+      offset: 14,
+      maxWidth: '320px',
+    })
 
     const emitBounds = () => {
       const bounds = map.getBounds()
@@ -195,10 +289,12 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
       if (boundsDebounceRef.current != null) {
         window.clearTimeout(boundsDebounceRef.current)
       }
+      hoverPopupRef.current?.remove()
       mapMarkersRef.current.forEach((marker) => marker.remove())
       mapMarkersRef.current = []
       map.remove()
       mapRef.current = null
+      hoverPopupRef.current = null
     }
   }, [onBoundsChange])
 
@@ -220,7 +316,7 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
       .map((marker) => {
         const markerElement = document.createElement('button')
         markerElement.type = 'button'
-        markerElement.className = `map-marker map-marker--${marker.kind} map-marker--tone-${marker.tone} ${marker.isViewed ? 'map-marker--viewed' : ''}`
+        markerElement.className = `map-marker map-marker--${marker.kind} map-marker--tone-${marker.tone} ${marker.isViewed ? 'map-marker--viewed' : ''} ${marker.isFavorite ? 'map-marker--favorite' : ''} ${marker.hasFriendsFavorite ? 'map-marker--friends-favorite' : ''}`
         markerElement.dataset.kind = marker.kind
         markerElement.ariaLabel = 'Метка возможности на карте'
 
@@ -233,6 +329,13 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
           favoriteBadge.className = 'map-marker__favorite'
           favoriteBadge.textContent = '★'
           markerElement.append(favoriteBadge)
+        }
+
+        if (marker.hasFriendsFavorite) {
+          const friendsBadge = document.createElement('span')
+          friendsBadge.className = 'map-marker__friends-favorite'
+          friendsBadge.textContent = 'FR'
+          markerElement.append(friendsBadge)
         }
 
         if (marker.kind === 'cluster') {
@@ -258,6 +361,22 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
             curve: 1.35,
             essential: true,
           })
+        })
+
+        markerElement.addEventListener('mouseenter', () => {
+          const popup = hoverPopupRef.current
+          if (!popup) {
+            return
+          }
+
+          popup
+            .setLngLat(marker.lngLat)
+            .setDOMContent(buildHoverCardNode(marker))
+            .addTo(map)
+        })
+
+        markerElement.addEventListener('mouseleave', () => {
+          hoverPopupRef.current?.remove()
         })
 
         return new maplibregl.Marker({
@@ -354,6 +473,7 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
                   <span className="map-mini-card__company">{item.company}</span>
                 </div>
                 <div className="map-mini-card__salary">{item.compensation}</div>
+                <OpportunityStateBadges opportunity={item} isFavorite={resolveIsFavorite(item)} compact />
                 <div className="tag-row">
                   {item.tags.slice(0, 3).map((tag) => (
                     <span key={tag} className="tag">

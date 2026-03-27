@@ -1113,6 +1113,52 @@
   color: #16944f;
 }
 
+.opportunity-state-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.opportunity-state-badges--compact {
+  gap: 0.3rem;
+}
+
+.opportunity-state-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(127, 154, 198, 0.3);
+  padding: 0.08rem 0.52rem;
+  font-size: 0.73rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.opportunity-state-badges--compact .opportunity-state-badge {
+  min-height: 20px;
+  font-size: 0.69rem;
+  padding: 0.06rem 0.46rem;
+}
+
+.opportunity-state-badge--favorite {
+  background: rgba(250, 204, 21, 0.18);
+  border-color: rgba(161, 98, 7, 0.3);
+  color: #854d0e;
+}
+
+.opportunity-state-badge--friends {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(37, 99, 235, 0.25);
+  color: #1d4ed8;
+}
+
+.opportunity-state-badge--responses {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.28);
+  color: #166534;
+}
+
 .map-canvas {
   min-height: 630px;
   position: relative;
@@ -1183,6 +1229,31 @@
   background: #16a34a;
 }
 
+.map-marker--favorite .map-marker__circle {
+  background: #facc15;
+  border-color: #fff6cc;
+  box-shadow:
+    0 0 0 2px rgba(124, 89, 0, 0.2),
+    0 8px 14px rgba(124, 89, 0, 0.22);
+}
+
+.map-marker--friends-favorite .map-marker__circle {
+  box-shadow:
+    0 0 0 2px rgba(15, 23, 42, 0.16),
+    0 0 0 5px rgba(59, 130, 246, 0.38),
+    0 10px 16px rgba(30, 64, 175, 0.28);
+}
+
+.map-marker--friends-favorite:not(.map-marker--favorite) .map-marker__circle {
+  background: #60a5fa;
+  border-color: #dbeafe;
+}
+
+.map-marker--friends-favorite.map-marker--favorite .map-marker__circle {
+  background: linear-gradient(140deg, #facc15 0 52%, #60a5fa 52% 100%);
+  border-color: #fff7d8;
+}
+
 .map-marker--viewed .map-marker__circle {
   filter: saturate(0.35) brightness(0.9);
 }
@@ -1203,6 +1274,27 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 10px rgba(124, 89, 0, 0.2);
+}
+
+.map-marker__friends-favorite {
+  position: absolute;
+  left: -7px;
+  top: -8px;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #dbeafe, #93c5fd);
+  color: #1e3a8a;
+  border: 1px solid rgba(30, 64, 175, 0.5);
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 12px rgba(30, 64, 175, 0.3);
+  z-index: 3;
 }
 
 .map-marker--cluster {
@@ -1393,6 +1485,96 @@
     background: rgba(238, 245, 255, 0.98);
     transform: translateY(-1px);
   }
+}
+
+.map-hover-popup .maplibregl-popup-content {
+  border-radius: 12px;
+  border: 1px solid rgba(127, 154, 198, 0.28);
+  box-shadow: 0 12px 28px rgba(15, 42, 90, 0.16);
+  background: rgba(255, 255, 255, 0.98);
+  padding: 0.6rem 0.65rem;
+}
+
+.map-hover-popup .maplibregl-popup-tip {
+  border-top-color: rgba(255, 255, 255, 0.98);
+  border-bottom-color: rgba(255, 255, 255, 0.98);
+}
+
+.map-hover-card {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 200px;
+
+  strong {
+    color: #10294d;
+    font-size: 0.86rem;
+    line-height: 1.25;
+  }
+
+  p {
+    margin: 0;
+    color: #4d648a;
+    font-size: 0.78rem;
+    line-height: 1.25;
+  }
+}
+
+.map-hover-card__compensation {
+  color: #166534 !important;
+  font-weight: 700;
+}
+
+.map-hover-card__list {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.map-hover-card__item {
+  display: grid;
+  gap: 0.24rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid rgba(203, 213, 225, 0.7);
+
+  &:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+}
+
+.map-hover-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.map-hover-card__badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(127, 154, 198, 0.28);
+  padding: 0 0.44rem;
+  font-size: 0.64rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.map-hover-card__badge--favorite {
+  background: rgba(250, 204, 21, 0.18);
+  border-color: rgba(161, 98, 7, 0.3);
+  color: #854d0e;
+}
+
+.map-hover-card__badge--friends {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(37, 99, 235, 0.25);
+  color: #1d4ed8;
+}
+
+.map-hover-card__badge--responses {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.28);
+  color: #166534;
 }
 
 .map-canvas {

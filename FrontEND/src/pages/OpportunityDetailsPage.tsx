@@ -9,6 +9,7 @@ import { fetchHomeOpportunities, fetchOpportunityDetailById, participateInOpport
 import { fetchMyFollowerSubscriptions, fetchMyFollowingSubscriptions } from '../api/subscriptions'
 import { OpportunityLocationMap } from '../components/home/OpportunityLocationMap'
 import { OpportunityCard } from '../components/home/OpportunityCard'
+import { OpportunityStateBadges } from '../components/home/OpportunityStateBadges'
 import { useApplications } from '../hooks/useApplications'
 import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityDetail } from '../types/opportunity'
@@ -40,18 +41,6 @@ function buildMapLink(opportunity: OpportunityDetail) {
   }
 
   return `https://yandex.ru/maps/?text=${encodeURIComponent(opportunity.address || opportunity.location)}`
-}
-
-function getFriendFavoritesLabel(count: number) {
-  if (count <= 0) {
-    return ''
-  }
-
-  if (count === 1) {
-    return 'В избранном у 1 друга'
-  }
-
-  return `В избранном у ${count} друзей`
 }
 
 export function OpportunityDetailsPage() {
@@ -352,7 +341,7 @@ export function OpportunityDetailsPage() {
           <button className={`btn ${isFavorite ? 'btn--primary' : 'btn--ghost'}`} type="button" onClick={() => void handleToggleFavorite()}>
             {isFavorite ? 'В избранном' : 'В избранное'}
           </button>
-          {opportunity.friendFavoritesCount > 0 ? <div className="status-line">{getFriendFavoritesLabel(opportunity.friendFavoritesCount)}</div> : null}
+          <OpportunityStateBadges opportunity={opportunity} isFavorite={isFavorite} />
           <a className="btn btn--ghost" href={buildMapLink(opportunity)} target="_blank" rel="noreferrer">
             Открыть карту
           </a>

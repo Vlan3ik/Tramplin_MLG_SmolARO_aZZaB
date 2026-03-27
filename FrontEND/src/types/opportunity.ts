@@ -25,6 +25,7 @@ export type Opportunity = {
   tagMatchCount: number
   isFavoriteByMe: boolean
   friendFavoritesCount: number
+  friendsAppliedCount: number
 }
 
 export type OpportunityDetail = Opportunity & {

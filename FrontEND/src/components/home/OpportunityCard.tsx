@@ -8,6 +8,7 @@ import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
 import { getTagDisplayLabel } from '../../utils/tag-labels'
 import { getTagToneClass } from '../../utils/tag-tones'
 import { isFavoriteOpportunity, toggleFavoriteOpportunity } from '../../utils/favorites'
+import { OpportunityStateBadges } from './OpportunityStateBadges'
 
 type OpportunityCardProps = {
   opportunity: Opportunity
@@ -35,18 +36,6 @@ function getInitials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
-}
-
-function getFriendFavoritesLabel(count: number) {
-  if (count <= 0) {
-    return ''
-  }
-
-  if (count === 1) {
-    return 'В избранном у 1 друга'
-  }
-
-  return `В избранном у ${count} друзей`
 }
 
 export function OpportunityCard({ opportunity, compact = false, isApplying = false, isApplied = false, onApply, onToggleFavorite }: OpportunityCardProps) {
@@ -98,7 +87,7 @@ export function OpportunityCard({ opportunity, compact = false, isApplying = fal
       <button className={clsx('btn btn--icon opportunity-card__favorite', isFavorite && 'btn--icon-active')} type="button" aria-label={favoriteLabel} onClick={handleFavoriteToggle}>
         <Bookmark size={16} fill={isFavorite ? 'currentColor' : 'none'} />
       </button>
-      {opportunity.friendFavoritesCount > 0 ? <span className="opportunity-card__friend-favorite">{getFriendFavoritesLabel(opportunity.friendFavoritesCount)}</span> : null}
+      <OpportunityStateBadges opportunity={opportunity} isFavorite={isFavorite} />
 
       <div className="opportunity-card__head">
         <div className="opportunity-card__content">

@@ -1464,6 +1464,7 @@ export function SeekerDashboardPage() {
             tagMatchCount: detail.tagMatchCount,
             isFavoriteByMe: detail.isFavoriteByMe,
             friendFavoritesCount: detail.friendFavoritesCount,
+            friendsAppliedCount: detail.friendsAppliedCount,
           }))
           .sort((a, b) => {
             if (b.tagMatchCount !== a.tagMatchCount) {
