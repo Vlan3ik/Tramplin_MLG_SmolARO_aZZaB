@@ -14,7 +14,18 @@ public class MinioObjectStorageService(IOptions<MinioOptions> options) : IObject
         .WithSSL(options.Value.UseSsl)
         .Build();
 
-    public async Task<string> UploadImageAsync(
+    public Task<string> UploadImageAsync(
+        Stream stream,
+        long size,
+        string contentType,
+        string objectPrefix,
+        string fileExtension,
+        CancellationToken cancellationToken)
+    {
+        return UploadObjectAsync(stream, size, contentType, objectPrefix, fileExtension, cancellationToken);
+    }
+
+    public async Task<string> UploadObjectAsync(
         Stream stream,
         long size,
         string contentType,
@@ -66,6 +77,22 @@ public class MinioObjectStorageService(IOptions<MinioOptions> options) : IObject
         {
             return null;
         }
+    }
+
+    public async Task DeleteObjectAsync(string objectKey, CancellationToken cancellationToken)
+    {
+        await EnsureBucketAsync(cancellationToken);
+        var safeKey = objectKey.Trim('/');
+        if (string.IsNullOrWhiteSpace(safeKey))
+        {
+            return;
+        }
+
+        await _client.RemoveObjectAsync(
+            new RemoveObjectArgs()
+                .WithBucket(_options.Bucket)
+                .WithObject(safeKey),
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task EnsureBucketAsync(CancellationToken cancellationToken)

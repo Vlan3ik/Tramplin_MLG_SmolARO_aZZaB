@@ -4,6 +4,7 @@ using Monolith.Contexts;
 using Monolith.Entities;
 using Monolith.Models.Common;
 using Monolith.Models.Companies;
+using Monolith.Models.Media;
 using Monolith.Models.Opportunities;
 using Monolith.Services.Common;
 
@@ -94,6 +95,7 @@ public class CompaniesController(AppDbContext dbContext) : ControllerBase
             .AsNoTracking()
             .Include(x => x.BaseCity)
             .Include(x => x.Links)
+            .Include(x => x.Media)
             .Include(x => x.Vacancies)
             .Include(x => x.Opportunities)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -135,6 +137,16 @@ public class CompaniesController(AppDbContext dbContext) : ControllerBase
             company.WebsiteUrl,
             company.PublicEmail,
             company.PublicPhone,
+            company.Media
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.Id)
+                .Select(x => new CompanyMediaItemDto(
+                    x.Id,
+                    x.MediaType == CompanyMediaType.Video ? "video" : "image",
+                    x.Url,
+                    x.MimeType,
+                    x.SortOrder))
+                .ToArray(),
             company.Links.Select(x => new CompanyLinkDto(x.LinkKind.ToString().ToLowerInvariant(), x.Url, x.Label)).ToArray(),
             activeVacancies
                 .Concat(activeOpportunities)

@@ -70,6 +70,63 @@ public class EmployerLocationService(AppDbContext dbContext, IReverseGeocodingSe
             resolvedLongitude);
     }
 
+    public async Task<ResolvedLocationResult?> ResolveOrCreateByAddressAsync(
+        long cityId,
+        string? streetName,
+        string? houseNumber,
+        CancellationToken cancellationToken)
+    {
+        var city = await dbContext.Cities.FirstOrDefaultAsync(x => x.Id == cityId, cancellationToken);
+        if (city is null)
+        {
+            return null;
+        }
+
+        var normalizedStreet = CleanText(streetName);
+        var normalizedHouse = CleanText(houseNumber);
+        if (normalizedStreet is null && normalizedHouse is null)
+        {
+            return new ResolvedLocationResult(city.Id, await EnsureCityCenterLocationAsync(city, cancellationToken));
+        }
+
+        var existingLocation = await dbContext.Locations.FirstOrDefaultAsync(
+            x => x.CityId == city.Id
+                 && (normalizedStreet == null || x.StreetName == normalizedStreet)
+                 && (normalizedHouse == null || x.HouseNumber == normalizedHouse),
+            cancellationToken);
+        if (existingLocation is not null)
+        {
+            return new ResolvedLocationResult(city.Id, existingLocation.Id);
+        }
+
+        var query = $"{city.CityName}, {normalizedStreet ?? string.Empty} {normalizedHouse ?? string.Empty}".Trim();
+        var searchResults = await reverseGeocodingService.SearchAsync(query, 5, cancellationToken);
+        var best = searchResults.FirstOrDefault(x =>
+            !string.IsNullOrWhiteSpace(x.CityName) &&
+            string.Equals(x.CityName.Trim(), city.CityName, StringComparison.OrdinalIgnoreCase) &&
+            x.Latitude is not null &&
+            x.Longitude is not null);
+
+        var latitude = best?.Latitude ?? city.Latitude;
+        var longitude = best?.Longitude ?? city.Longitude;
+        if (latitude is null || longitude is null)
+        {
+            return null;
+        }
+
+        var location = new LocationEntity
+        {
+            CityId = city.Id,
+            GeoPoint = GeometryFactory.CreatePoint(new Coordinate((double)longitude.Value, (double)latitude.Value)),
+            StreetName = normalizedStreet,
+            HouseNumber = normalizedHouse
+        };
+
+        dbContext.Locations.Add(location);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new ResolvedLocationResult(city.Id, location.Id);
+    }
+
     private async Task<City?> ResolveCityAsync(
         ReverseGeocodingAddress? reverse,
         decimal latitude,
@@ -136,4 +193,29 @@ public class EmployerLocationService(AppDbContext dbContext, IReverseGeocodingSe
 
     private static string? CleanText(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task<long> EnsureCityCenterLocationAsync(City city, CancellationToken cancellationToken)
+    {
+        var existing = await dbContext.Locations.FirstOrDefaultAsync(
+            x => x.CityId == city.Id && x.StreetName == null && x.HouseNumber == null,
+            cancellationToken);
+        if (existing is not null)
+        {
+            return existing.Id;
+        }
+
+        var latitude = city.Latitude ?? 0m;
+        var longitude = city.Longitude ?? 0m;
+        var location = new LocationEntity
+        {
+            CityId = city.Id,
+            GeoPoint = GeometryFactory.CreatePoint(new Coordinate((double)longitude, (double)latitude)),
+            StreetName = null,
+            HouseNumber = null
+        };
+
+        dbContext.Locations.Add(location);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return location.Id;
+    }
 }

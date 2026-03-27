@@ -1,3 +1,5 @@
+using Monolith.Models.Media;
+
 namespace Monolith.Models.Companies;
 
 public record CompanyListItemDto(
@@ -23,6 +25,7 @@ public record CompanyDetailDto(
     string? WebsiteUrl,
     string? PublicEmail,
     string? PublicPhone,
+    IReadOnlyCollection<CompanyMediaItemDto> Media,
     IReadOnlyCollection<CompanyLinkDto> Links,
     IReadOnlyCollection<CompanyOpportunityDto> ActiveOpportunities);
 

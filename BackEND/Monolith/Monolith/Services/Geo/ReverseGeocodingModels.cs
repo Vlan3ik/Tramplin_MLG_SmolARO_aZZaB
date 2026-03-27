@@ -12,6 +12,7 @@ public sealed record ReverseGeocodingAddress(
 public interface IReverseGeocodingService
 {
     Task<ReverseGeocodingAddress?> ReverseAsync(decimal latitude, decimal longitude, CancellationToken cancellationToken);
+    Task<IReadOnlyCollection<ReverseGeocodingAddress>> SearchAsync(string query, int limit, CancellationToken cancellationToken);
 }
 
 public sealed record ResolvedLocationResult(long CityId, long LocationId);
@@ -28,5 +29,6 @@ public sealed record ResolvedAddressResult(
 public interface IEmployerLocationService
 {
     Task<ResolvedLocationResult?> ResolveOrCreateAsync(decimal latitude, decimal longitude, CancellationToken cancellationToken);
+    Task<ResolvedLocationResult?> ResolveOrCreateByAddressAsync(long cityId, string? streetName, string? houseNumber, CancellationToken cancellationToken);
     Task<ResolvedAddressResult?> ResolveAddressAsync(decimal latitude, decimal longitude, CancellationToken cancellationToken);
 }

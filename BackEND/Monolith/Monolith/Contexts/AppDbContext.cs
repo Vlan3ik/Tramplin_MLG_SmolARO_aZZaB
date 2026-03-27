@@ -30,6 +30,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<CompanyLink> CompanyLinks => Set<CompanyLink>();
+    public DbSet<CompanyMedia> CompanyMedia => Set<CompanyMedia>();
     public DbSet<CompanyMember> CompanyMembers => Set<CompanyMember>();
     public DbSet<CompanyInvite> CompanyInvites => Set<CompanyInvite>();
     public DbSet<CompanyChatSettings> CompanyChatSettings => Set<CompanyChatSettings>();
@@ -465,6 +466,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Url).HasColumnName("url").HasMaxLength(500);
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.HasOne(x => x.Company).WithMany(x => x.Links).HasForeignKey(x => x.CompanyId);
+        });
+
+        modelBuilder.Entity<CompanyMedia>(entity =>
+        {
+            entity.ToTable("company_media");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.CompanyId).HasColumnName("company_id");
+            entity.Property(x => x.MediaType).HasColumnName("media_type");
+            entity.Property(x => x.Url).HasColumnName("url").HasMaxLength(500);
+            entity.Property(x => x.MimeType).HasColumnName("mime_type").HasMaxLength(200);
+            entity.Property(x => x.SortOrder).HasColumnName("sort_order");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => new { x.CompanyId, x.SortOrder });
+            entity.HasOne(x => x.Company).WithMany(x => x.Media).HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<CompanyMember>(entity =>
