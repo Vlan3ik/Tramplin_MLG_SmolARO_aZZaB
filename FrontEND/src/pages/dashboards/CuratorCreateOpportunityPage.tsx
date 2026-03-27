@@ -25,7 +25,6 @@ function toLocalDateTimeInputValue(date: Date) {
 function parseOptionalNumber(value: string) {
   const trimmed = value.trim()
   if (!trimmed) return null
-
   const parsed = Number(trimmed)
   return Number.isFinite(parsed) ? parsed : null
 }
@@ -69,8 +68,8 @@ export function CuratorCreateOpportunityPage() {
 
   useEffect(() => {
     let active = true
-
     setLoadingRefs(true)
+
     Promise.all([fetchAdminCompanies({ page: 1, pageSize: 200 }), fetchAdminUsers({ page: 1, pageSize: 200 }), fetchCities()])
       .then(([companiesResponse, usersResponse, citiesResponse]) => {
         if (!active) return
@@ -229,8 +228,11 @@ export function CuratorCreateOpportunityPage() {
               <ArrowLeft size={14} /> Назад в модерацию
             </Link>
           </div>
+
           <p className="status-line">
-            {isEditMode ? 'Редактирование мероприятия из кабинета модерации.' : 'Отдельная страница создания мероприятия со всеми справочниками.'}
+            {isEditMode
+              ? 'Редактирование мероприятия из кабинета модерации.'
+              : 'Отдельная страница создания мероприятия со всеми справочниками.'}
           </p>
 
           {loadingRefs ? <p>Загружаем справочники...</p> : null}
@@ -355,7 +357,8 @@ export function CuratorCreateOpportunityPage() {
 
             <div className="favorite-card__actions full-width">
               <button type="submit" className="btn btn--primary" disabled={isSaving || loadingRefs || loadingOpportunity}>
-                <CalendarDays size={14} /> {isSaving ? (isEditMode ? 'Сохраняем...' : 'Создаем...') : isEditMode ? 'Сохранить мероприятие' : 'Создать мероприятие'}
+                <CalendarDays size={14} />{' '}
+                {isSaving ? (isEditMode ? 'Сохраняем...' : 'Создаем...') : isEditMode ? 'Сохранить мероприятие' : 'Создать мероприятие'}
               </button>
             </div>
           </form>
