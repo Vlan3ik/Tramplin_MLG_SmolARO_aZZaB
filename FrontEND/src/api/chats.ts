@@ -7,6 +7,7 @@ type ChatMessageApi = {
   id: number
   chatId: number
   senderUserId: number
+  senderFio?: string | null
   senderDisplayName?: string | null
   senderUsername?: string | null
   senderAvatarUrl?: string | null
@@ -120,7 +121,7 @@ function mapMessage(item: ChatMessageApi): ChatMessage {
     id: item.id,
     chatId: item.chatId,
     senderUserId: item.senderUserId,
-    senderDisplayName: item.senderDisplayName ?? null,
+    senderDisplayName: item.senderFio ?? item.senderDisplayName ?? null,
     senderUsername: item.senderUsername ?? null,
     senderAvatarUrl: item.senderAvatarUrl ?? null,
     text: item.text ?? '',

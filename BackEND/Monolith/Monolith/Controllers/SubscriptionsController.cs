@@ -18,7 +18,7 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
     private sealed record SubscriptionBaseRow(
         long UserId,
         string Username,
-        string DisplayName,
+        string Fio,
         string? AvatarUrl,
         DateTimeOffset CreatedAt);
 
@@ -34,7 +34,7 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
             .Select(x => new SubscriptionBaseRow(
                 x.FollowingUserId,
                 x.FollowingUser.Username,
-                x.FollowingUser.DisplayName,
+                x.FollowingUser.Fio,
                 x.FollowingUser.AvatarUrl,
                 x.CreatedAt))
             .ToListAsync(cancellationToken);
@@ -55,7 +55,7 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
             .Select(x => new SubscriptionBaseRow(
                 x.FollowerUserId,
                 x.FollowerUser.Username,
-                x.FollowerUser.DisplayName,
+                x.FollowerUser.Fio,
                 x.FollowerUser.AvatarUrl,
                 x.CreatedAt))
             .ToListAsync(cancellationToken);
@@ -190,7 +190,7 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
                 return new SubscriptionUserDto(
                     id,
                     x.Username,
-                    x.DisplayName,
+                    x.Fio,
                     x.AvatarUrl,
                     accountType,
                     companyMap.GetValueOrDefault(id),

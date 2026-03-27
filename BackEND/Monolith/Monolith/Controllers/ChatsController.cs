@@ -76,11 +76,11 @@ public class ChatsController(
                 x.Participants.Count,
                 x.Participants.Select(p => new ChatParticipantProjection(
                     p.UserId,
-                    p.User.DisplayName,
+                    p.User.Fio,
                     p.User.AvatarUrl,
-                    p.User.CandidateProfile != null ? p.User.CandidateProfile.LastName : null,
-                    p.User.CandidateProfile != null ? p.User.CandidateProfile.FirstName : null,
-                    p.User.CandidateProfile != null ? p.User.CandidateProfile.MiddleName : null))
+                    p.User.CandidateProfile != null ? p.User.CandidateProfile.Fio : null,
+                    p.User.CandidateProfile != null ? p.User.CandidateProfile.Fio : null,
+                    p.User.CandidateProfile != null ? p.User.CandidateProfile.Fio : null))
                     .ToArray(),
                 x.Messages
                     .OrderByDescending(m => m.CreatedAt)
@@ -88,7 +88,7 @@ public class ChatsController(
                         m.Id,
                         m.ChatId,
                         m.SenderUserId,
-                        m.SenderUser.DisplayName,
+                        m.SenderUser.Fio,
                         m.SenderUser.Username,
                         m.SenderUser.AvatarUrl,
                         m.Text,
@@ -342,7 +342,7 @@ public class ChatsController(
                 x.Id,
                 x.ChatId,
                 x.SenderUserId,
-                x.SenderUser.DisplayName,
+                x.SenderUser.Fio,
                 x.SenderUser.Username,
                 x.SenderUser.AvatarUrl,
                 x.Text,
@@ -440,14 +440,14 @@ public class ChatsController(
         var sender = await dbContext.Users
             .AsNoTracking()
             .Where(x => x.Id == userId)
-            .Select(x => new { x.DisplayName, x.Username, x.AvatarUrl })
+            .Select(x => new { x.Fio, x.Username, x.AvatarUrl })
             .FirstAsync(cancellationToken);
 
         var dto = new ChatMessageDto(
             message.Id,
             message.ChatId,
             message.SenderUserId,
-            sender.DisplayName,
+            sender.Fio,
             sender.Username,
             sender.AvatarUrl,
             message.Text,
@@ -806,7 +806,7 @@ public class ChatsController(
             x.Id,
             x.ChatId,
             x.SenderUserId,
-            x.SenderUser.DisplayName,
+            x.SenderUser.Fio,
             x.SenderUser.Username,
             x.SenderUser.AvatarUrl,
             x.Text,
@@ -942,7 +942,7 @@ public class ChatsController(
         projection.Id,
         projection.ChatId,
         projection.SenderUserId,
-        projection.SenderDisplayName,
+        projection.SenderFio,
         projection.SenderUsername,
         projection.SenderAvatarUrl,
         projection.Text,
@@ -1035,7 +1035,7 @@ public class ChatsController(
             var resume = application.CandidateUser.CandidateProfile?.ResumeProfile;
             var candidateCard = new CandidateLinkedCardDto(
                 application.CandidateUserId,
-                application.CandidateUser.DisplayName,
+                application.CandidateUser.Fio,
                 application.CandidateUser.AvatarUrl,
                 resume?.Headline,
                 resume?.DesiredPosition,
@@ -1108,11 +1108,11 @@ public class ChatsController(
             {
                 return FormatUserTitle(new ChatParticipantProjection(
                     candidateParticipant.UserId,
-                    candidateParticipant.User.DisplayName,
+                    candidateParticipant.User.Fio,
                     candidateParticipant.User.AvatarUrl,
-                    candidateParticipant.User.CandidateProfile?.LastName,
-                    candidateParticipant.User.CandidateProfile?.FirstName,
-                    candidateParticipant.User.CandidateProfile?.MiddleName));
+                    candidateParticipant.User.CandidateProfile?.Fio,
+                    candidateParticipant.User.CandidateProfile?.Fio,
+                    candidateParticipant.User.CandidateProfile?.Fio));
             }
         }
 
@@ -1124,28 +1124,28 @@ public class ChatsController(
 
         return FormatUserTitle(new ChatParticipantProjection(
             other.UserId,
-            other.User.DisplayName,
+            other.User.Fio,
             other.User.AvatarUrl,
-            other.User.CandidateProfile?.LastName,
-            other.User.CandidateProfile?.FirstName,
-            other.User.CandidateProfile?.MiddleName));
+            other.User.CandidateProfile?.Fio,
+            other.User.CandidateProfile?.Fio,
+            other.User.CandidateProfile?.Fio));
     }
 
     private static string FormatUserTitle(ChatParticipantProjection participant)
     {
-        if (!string.IsNullOrWhiteSpace(participant.LastName) && !string.IsNullOrWhiteSpace(participant.FirstName))
+        if (!string.IsNullOrWhiteSpace(participant.Fio) && !string.IsNullOrWhiteSpace(participant.Fio))
         {
-            var firstInitial = char.ToUpperInvariant(participant.FirstName.Trim()[0]);
-            char? middleInitial = string.IsNullOrWhiteSpace(participant.MiddleName)
+            var firstInitial = char.ToUpperInvariant(participant.Fio.Trim()[0]);
+            char? middleInitial = string.IsNullOrWhiteSpace(participant.Fio)
                 ? null
-                : char.ToUpperInvariant(participant.MiddleName.Trim()[0]);
+                : char.ToUpperInvariant(participant.Fio.Trim()[0]);
 
             return middleInitial is null
-                ? $"{participant.LastName.Trim()} {firstInitial}."
-                : $"{participant.LastName.Trim()} {firstInitial}.{middleInitial}.";
+                ? $"{participant.Fio.Trim()} {firstInitial}."
+                : $"{participant.Fio.Trim()} {firstInitial}.{middleInitial}.";
         }
 
-        return string.IsNullOrWhiteSpace(participant.DisplayName) ? "User" : participant.DisplayName.Trim();
+        return string.IsNullOrWhiteSpace(participant.Fio) ? "User" : participant.Fio.Trim();
     }
 
     private sealed record ChatProjection(
@@ -1161,7 +1161,7 @@ public class ChatsController(
 
     private sealed record ChatParticipantProjection(
         long UserId,
-        string DisplayName,
+        string Fio,
         string? AvatarUrl,
         string? LastName,
         string? FirstName,
@@ -1171,7 +1171,7 @@ public class ChatsController(
         long Id,
         long ChatId,
         long SenderUserId,
-        string SenderDisplayName,
+        string SenderFio,
         string? SenderUsername,
         string? SenderAvatarUrl,
         string Text,

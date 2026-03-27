@@ -216,7 +216,7 @@ public class EmployerCompaniesController(AppDbContext dbContext) : ControllerBas
                 x.UserId,
                 x.User.Email,
                 x.User.Username,
-                x.User.DisplayName,
+                x.User.Fio,
                 x.User.AvatarUrl,
                 x.Role,
                 x.CreatedAt))

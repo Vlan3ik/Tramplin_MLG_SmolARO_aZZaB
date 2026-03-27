@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Monolith.Contexts;
@@ -10,19 +10,19 @@ using Monolith.Services.Common;
 namespace Monolith.Controllers;
 
 [ApiController]
-[Authorize(Roles = "curator")]
+[Authorize(Roles = "curator,admin")]
 [Route("admin/vacancies")]
 [Produces("application/json")]
 public class AdminVacanciesController(AppDbContext dbContext) : ControllerBase
 {
     /// <summary>
-    /// Возвращает список вакансий для модерации с пагинацией и поиском.
+    /// Р’РѕР·РІСЂР°С‰Р°РµС‚ СЃРїРёСЃРѕРє РІР°РєР°РЅСЃРёР№ РґР»СЏ РјРѕРґРµСЂР°С†РёРё СЃ РїР°РіРёРЅР°С†РёРµР№ Рё РїРѕРёСЃРєРѕРј.
     /// </summary>
-    /// <param name="page">Номер страницы (начиная с 1).</param>
-    /// <param name="pageSize">Размер страницы (максимум 100).</param>
-    /// <param name="search">Поисковая строка по заголовку и краткому описанию.</param>
-    /// <param name="cancellationToken">Токен отмены операции чтения.</param>
-    /// <returns>Пагинированный список вакансий.</returns>
+    /// <param name="page">РќРѕРјРµСЂ СЃС‚СЂР°РЅРёС†С‹ (РЅР°С‡РёРЅР°СЏ СЃ 1).</param>
+    /// <param name="pageSize">Р Р°Р·РјРµСЂ СЃС‚СЂР°РЅРёС†С‹ (РјР°РєСЃРёРјСѓРј 100).</param>
+    /// <param name="search">РџРѕРёСЃРєРѕРІР°СЏ СЃС‚СЂРѕРєР° РїРѕ Р·Р°РіРѕР»РѕРІРєСѓ Рё РєСЂР°С‚РєРѕРјСѓ РѕРїРёСЃР°РЅРёСЋ.</param>
+    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё С‡С‚РµРЅРёСЏ.</param>
+    /// <returns>РџР°РіРёРЅРёСЂРѕРІР°РЅРЅС‹Р№ СЃРїРёСЃРѕРє РІР°РєР°РЅСЃРёР№.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<AdminVacancyListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<AdminVacancyListItemDto>>> GetList(
@@ -52,11 +52,11 @@ public class AdminVacanciesController(AppDbContext dbContext) : ControllerBase
     }
 
     /// <summary>
-    /// Создает вакансию от имени администратора.
+    /// РЎРѕР·РґР°РµС‚ РІР°РєР°РЅСЃРёСЋ РѕС‚ РёРјРµРЅРё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°.
     /// </summary>
-    /// <param name="request">Данные вакансии.</param>
-    /// <param name="cancellationToken">Токен отмены операции записи.</param>
-    /// <returns>Созданная вакансия в кратком формате.</returns>
+    /// <param name="request">Р”Р°РЅРЅС‹Рµ РІР°РєР°РЅСЃРёРё.</param>
+    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё Р·Р°РїРёСЃРё.</param>
+    /// <returns>РЎРѕР·РґР°РЅРЅР°СЏ РІР°РєР°РЅСЃРёСЏ РІ РєСЂР°С‚РєРѕРј С„РѕСЂРјР°С‚Рµ.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(AdminVacancyListItemDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -76,12 +76,12 @@ public class AdminVacanciesController(AppDbContext dbContext) : ControllerBase
     }
 
     /// <summary>
-    /// Обновляет существующую вакансию.
+    /// РћР±РЅРѕРІР»СЏРµС‚ СЃСѓС‰РµСЃС‚РІСѓСЋС‰СѓСЋ РІР°РєР°РЅСЃРёСЋ.
     /// </summary>
-    /// <param name="id">Идентификатор вакансии.</param>
-    /// <param name="request">Новые значения полей вакансии.</param>
-    /// <param name="cancellationToken">Токен отмены операции записи.</param>
-    /// <returns>Обновленная вакансия в кратком формате.</returns>
+    /// <param name="id">РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РІР°РєР°РЅСЃРёРё.</param>
+    /// <param name="request">РќРѕРІС‹Рµ Р·РЅР°С‡РµРЅРёСЏ РїРѕР»РµР№ РІР°РєР°РЅСЃРёРё.</param>
+    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё Р·Р°РїРёСЃРё.</param>
+    /// <returns>РћР±РЅРѕРІР»РµРЅРЅР°СЏ РІР°РєР°РЅСЃРёСЏ РІ РєСЂР°С‚РєРѕРј С„РѕСЂРјР°С‚Рµ.</returns>
     [HttpPut("{id:long}")]
     [ProducesResponseType(typeof(AdminVacancyListItemDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -106,12 +106,12 @@ public class AdminVacanciesController(AppDbContext dbContext) : ControllerBase
     }
 
     /// <summary>
-    /// Удаляет вакансию по идентификатору.
+    /// РЈРґР°Р»СЏРµС‚ РІР°РєР°РЅСЃРёСЋ РїРѕ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂСѓ.
     /// </summary>
-    /// <param name="id">Идентификатор вакансии.</param>
-    /// <param name="cancellationToken">Токен отмены операции удаления.</param>
-    /// <returns>Пустой ответ при успешном удалении.</returns>
-    /// <param name="request">Новый статус вакансии.</param>
+    /// <param name="id">РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РІР°РєР°РЅСЃРёРё.</param>
+    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё СѓРґР°Р»РµРЅРёСЏ.</param>
+    /// <returns>РџСѓСЃС‚РѕР№ РѕС‚РІРµС‚ РїСЂРё СѓСЃРїРµС€РЅРѕРј СѓРґР°Р»РµРЅРёРё.</returns>
+    /// <param name="request">РќРѕРІС‹Р№ СЃС‚Р°С‚СѓСЃ РІР°РєР°РЅСЃРёРё.</param>
     [HttpPatch("{id:long}/status")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -164,3 +164,4 @@ public class AdminVacanciesController(AppDbContext dbContext) : ControllerBase
         vacancy.ApplicationDeadline = request.ApplicationDeadline;
     }
 }
+

@@ -2,7 +2,7 @@ using Monolith.Entities;
 
 namespace Monolith.Models.Auth;
 
-public record RegisterRequest(string Email, string Password, string FirstName, string LastName, PlatformRole Role);
+public record RegisterRequest(string Email, string Password, string Fio, PlatformRole Role);
 
 public record LoginRequest(string Email, string Password);
 

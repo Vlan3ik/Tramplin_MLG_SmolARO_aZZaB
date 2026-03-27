@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -63,7 +63,7 @@ namespace Monolith.Migrations
                     email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
                     username = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     password_hash = table.Column<string>(type: "text", nullable: false),
-                    display_name = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
+                    fio = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
                     avatar_url = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     status = table.Column<int>(type: "integer", nullable: false),
                     last_login_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),

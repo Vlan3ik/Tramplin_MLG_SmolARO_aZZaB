@@ -34,7 +34,7 @@ public class ResumeListQuery
 public record ResumeListItemDto(
     long UserId,
     string Username,
-    string DisplayName,
+    string Fio,
     string? AvatarUrl,
     string? Headline,
     string? DesiredPosition,
@@ -57,9 +57,7 @@ public record ResumeSkillShortDto(
 public record ResumeDetailDto(
     long UserId,
     string Username,
-    string FirstName,
-    string LastName,
-    string? MiddleName,
+    string Fio,
     DateOnly? BirthDate,
     CandidateGender Gender,
     string? Phone,

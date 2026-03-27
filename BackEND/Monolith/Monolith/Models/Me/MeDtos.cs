@@ -5,9 +5,7 @@ namespace Monolith.Models.Me;
 public record MeResponse(long Id, string Email, string Username, string? AvatarUrl, string? ProfileBannerUrl, IReadOnlyCollection<string> Roles);
 
 public record UpdateProfileRequest(
-    string FirstName,
-    string LastName,
-    string? MiddleName,
+    string Fio,
     DateOnly? BirthDate,
     CandidateGender? Gender,
     string? Phone,
@@ -19,9 +17,7 @@ public record UpdateProfileRequest(
 public record ProfileResponse(
     long UserId,
     string Username,
-    string FirstName,
-    string LastName,
-    string? MiddleName,
+    string Fio,
     DateOnly? BirthDate,
     CandidateGender Gender,
     string? Phone,
@@ -182,9 +178,7 @@ public record ProfileStatsResponse(
 public record PublicProfileResponse(
     long UserId,
     string Username,
-    string FirstName,
-    string LastName,
-    string? MiddleName,
+    string Fio,
     DateOnly? BirthDate,
     CandidateGender? Gender,
     string? Phone,

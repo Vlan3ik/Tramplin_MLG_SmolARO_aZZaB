@@ -182,7 +182,7 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
             {
                 var participantInfo = userInfos.TryGetValue(x.UserId, out var participantUserInfo)
                     ? participantUserInfo
-                    : new UserInfo(x.UserId, x.User.Username, x.User.DisplayName, null);
+                    : new UserInfo(x.UserId, x.User.Username, x.User.Fio, null);
                 return new PortfolioProjectParticipantDto(
                     x.UserId,
                     participantInfo.Username,
@@ -362,9 +362,8 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
             {
                 x.UserId,
                 x.User.Username,
-                x.User.DisplayName,
-                x.FirstName,
-                x.LastName,
+                x.User.Fio,
+                CandidateFio = x.Fio,
                 x.AvatarUrl
             })
             .ToListAsync(cancellationToken);
@@ -373,7 +372,7 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
             x => x.UserId,
             x =>
             {
-                var fio = BuildFio(x.FirstName, x.LastName, x.DisplayName);
+                var fio = BuildFio(x.CandidateFio, x.Fio);
                 return new UserInfo(x.UserId, x.Username, fio, x.AvatarUrl);
             });
 
@@ -383,12 +382,12 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
             var users = await dbContext.Users
                 .AsNoTracking()
                 .Where(x => missingUserIds.Contains(x.Id))
-                .Select(x => new { x.Id, x.Username, x.DisplayName })
+                .Select(x => new { x.Id, x.Username, x.Fio })
                 .ToListAsync(cancellationToken);
 
             foreach (var user in users)
             {
-                result[user.Id] = new UserInfo(user.Id, user.Username, string.IsNullOrWhiteSpace(user.DisplayName) ? user.Username : user.DisplayName, null);
+                result[user.Id] = new UserInfo(user.Id, user.Username, string.IsNullOrWhiteSpace(user.Fio) ? user.Username : user.Fio, null);
             }
         }
 
@@ -433,17 +432,17 @@ public class PortfolioProjectsController(AppDbContext dbContext) : ControllerBas
             Shorten(project.Description));
     }
 
-    private static string BuildFio(string? firstName, string? lastName, string? fallbackDisplayName)
+    private static string BuildFio(string? candidateFio, string? fallbackFio)
     {
-        var fio = $"{firstName} {lastName}".Trim();
+        var fio = candidateFio?.Trim();
         if (!string.IsNullOrWhiteSpace(fio))
         {
             return fio;
         }
 
-        if (!string.IsNullOrWhiteSpace(fallbackDisplayName))
+        if (!string.IsNullOrWhiteSpace(fallbackFio))
         {
-            return fallbackDisplayName;
+            return fallbackFio;
         }
 
         return "Неизвестный пользователь";

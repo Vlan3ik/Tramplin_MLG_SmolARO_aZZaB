@@ -16,5 +16,9 @@ public enum PlatformRole
     /// <summary>
     /// Куратор/администратор платформы (role_id = 3).
     /// </summary>
-    Curator = 3
+    Curator = 3,
+    /// <summary>
+    /// Р Р°Р±РѕС‡Р°СЏ Р°РґРјРёРЅ-СЂРѕР»СЊ РґР»СЏ РєСѓСЂР°С‚РѕСЂСЃРєРѕРіРѕ РєР°Р±РёРЅРµС‚Р° (role_id = 4).
+    /// </summary>
+    Admin = 4
 }

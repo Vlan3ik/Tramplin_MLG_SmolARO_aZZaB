@@ -81,6 +81,22 @@ export type MeApiResponse = {
   roles: string[] | null
 }
 
+type SeekerProfileApiResponse = Omit<SeekerProfile, 'firstName' | 'lastName' | 'middleName'> & {
+  fio?: string | null
+  firstName?: string | null
+  lastName?: string | null
+  middleName?: string | null
+}
+
+function splitFio(fio: string | null | undefined) {
+  const parts = (fio ?? '').trim().split(/\s+/).filter(Boolean)
+  return {
+    firstName: parts[0] ?? '',
+    lastName: parts[1] ?? '',
+    middleName: parts.slice(2).join(' ') || null,
+  }
+}
+
 type UpdateResumeDetailsRequest = {
   headline: string | null
   desiredPosition: string | null
@@ -127,7 +143,23 @@ type UpdateResumeDetailsRequest = {
 }
 
 export function fetchSeekerProfile(signal?: AbortSignal) {
-  return getJson<SeekerProfile>('/me/profile', { signal })
+  return getJson<SeekerProfileApiResponse>('/me/profile', { signal }).then((response) => {
+    const fromFio = splitFio(response.fio)
+    return {
+      userId: response.userId,
+      username: response.username,
+      firstName: response.firstName ?? fromFio.firstName,
+      lastName: response.lastName ?? fromFio.lastName,
+      middleName: response.middleName ?? fromFio.middleName,
+      birthDate: response.birthDate,
+      gender: response.gender,
+      phone: response.phone,
+      cityId: response.cityId,
+      city: response.city,
+      about: response.about,
+      avatarUrl: response.avatarUrl,
+    } satisfies SeekerProfile
+  })
 }
 
 function normalizeSkillLevel(value: number | null | undefined) {
@@ -151,7 +183,37 @@ export function fetchMe(signal?: AbortSignal) {
 }
 
 export function updateSeekerProfile(payload: UpdateSeekerProfileRequest) {
-  return putJson<SeekerProfile, UpdateSeekerProfileRequest>('/me/profile', payload)
+  const fio = [payload.lastName, payload.firstName, payload.middleName].filter((item) => item && item.trim()).join(' ').trim()
+
+  return putJson<SeekerProfileApiResponse, Omit<UpdateSeekerProfileRequest, 'firstName' | 'lastName' | 'middleName'> & { fio: string }>(
+    '/me/profile',
+    {
+      fio,
+      birthDate: payload.birthDate,
+      gender: payload.gender,
+      phone: payload.phone,
+      cityId: payload.cityId,
+      city: payload.city,
+      about: payload.about,
+      avatarUrl: payload.avatarUrl,
+    },
+  ).then((response) => {
+    const fromFio = splitFio(response.fio)
+    return {
+      userId: response.userId,
+      username: response.username,
+      firstName: response.firstName ?? fromFio.firstName,
+      lastName: response.lastName ?? fromFio.lastName,
+      middleName: response.middleName ?? fromFio.middleName,
+      birthDate: response.birthDate,
+      gender: response.gender,
+      phone: response.phone,
+      cityId: response.cityId,
+      city: response.city,
+      about: response.about,
+      avatarUrl: response.avatarUrl,
+    } satisfies SeekerProfile
+  })
 }
 
 export async function fetchSeekerSettings(signal?: AbortSignal): Promise<SeekerSettings> {

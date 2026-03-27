@@ -63,7 +63,7 @@ public record EmployerCompanyMemberDto(
     long UserId,
     string Email,
     string Username,
-    string DisplayName,
+    string Fio,
     string? AvatarUrl,
     CompanyMemberRole Role,
     DateTimeOffset JoinedAt);

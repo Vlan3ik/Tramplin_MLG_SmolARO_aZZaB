@@ -343,7 +343,7 @@ export function CuratorDashboardPage() {
               {users.map((item) => (
                 <article key={item.id} className="favorite-card admin-list-card">
                   <div className="favorite-card__head">
-                    <div><h3>{item.email}</h3><p>{item.username}</p></div>
+                    <div><h3>{item.fio || item.email}</h3><p>{item.email} · {item.username}</p></div>
                     <span className="status-chip">{accountStatusLabel[item.status] ?? `Статус ${item.status}`}</span>
                   </div>
                   <p>Роли: {item.roles.join(', ') || 'не назначены'}</p>

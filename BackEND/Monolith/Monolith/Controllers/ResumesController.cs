@@ -61,7 +61,7 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
         {
             var term = query.Search.Trim().ToLowerInvariant();
             baseQuery = baseQuery.Where(x =>
-                x.User.DisplayName.ToLower().Contains(term) ||
+                x.User.Fio.ToLower().Contains(term) ||
                 x.User.Username.ToLower().Contains(term) ||
                 (x.ResumeProfile!.Headline != null && x.ResumeProfile.Headline.ToLower().Contains(term)) ||
                 (x.ResumeProfile.DesiredPosition != null && x.ResumeProfile.DesiredPosition.ToLower().Contains(term)) ||
@@ -111,14 +111,14 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
         var totalCount = await baseQuery.CountAsync(cancellationToken);
         var rows = await baseQuery
             .OrderByDescending(x => x.ResumeProfile!.UpdatedAt)
-            .ThenBy(x => x.User.DisplayName)
+            .ThenBy(x => x.User.Fio)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(x => new
             {
                 x.UserId,
                 x.User.Username,
-                x.User.DisplayName,
+                x.User.Fio,
                 x.User.AvatarUrl,
                 x.ResumeProfile!.Headline,
                 x.ResumeProfile.DesiredPosition,
@@ -181,7 +181,7 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
             .Select(x => new ResumeListItemDto(
                 x.UserId,
                 x.Username,
-                x.DisplayName,
+                x.Fio,
                 x.AvatarUrl,
                 x.Headline,
                 x.DesiredPosition,
@@ -290,9 +290,7 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
         var dto = new ResumeDetailDto(
             profile.UserId,
             profile.User.Username,
-            profile.FirstName,
-            profile.LastName,
-            profile.MiddleName,
+            profile.Fio,
             profile.BirthDate,
             profile.Gender,
             privacy.ShowContactsInResume ? profile.Phone : null,

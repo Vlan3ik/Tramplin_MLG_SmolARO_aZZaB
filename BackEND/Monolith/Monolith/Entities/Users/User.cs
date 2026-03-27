@@ -7,7 +7,7 @@ public class User
     public string Email { get; set; } = string.Empty;
     public string Username { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
-    public string DisplayName { get; set; } = string.Empty;
+    public string Fio { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
     public string? ProfileBannerUrl { get; set; }
     public AccountStatus Status { get; set; } = AccountStatus.Active;

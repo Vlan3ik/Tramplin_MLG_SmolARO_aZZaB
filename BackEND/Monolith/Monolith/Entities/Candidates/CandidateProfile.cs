@@ -3,9 +3,7 @@ namespace Monolith.Entities;
 public class CandidateProfile
 {
     public long UserId { get; set; }
-    public string LastName { get; set; } = string.Empty;
-    public string FirstName { get; set; } = string.Empty;
-    public string? MiddleName { get; set; }
+    public string Fio { get; set; } = string.Empty;
     public DateOnly? BirthDate { get; set; }
     public CandidateGender Gender { get; set; } = CandidateGender.Unknown;
     public string? Phone { get; set; }

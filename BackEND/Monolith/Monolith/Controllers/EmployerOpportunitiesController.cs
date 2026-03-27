@@ -166,7 +166,7 @@ public class EmployerOpportunitiesController(
             .Take(10)
             .Select(x => new EmployerOpportunityRecentParticipantDto(
                 x.UserId,
-                x.User.DisplayName,
+                x.User.Fio,
                 x.User.AvatarUrl,
                 x.JoinedAt))
             .ToArray();

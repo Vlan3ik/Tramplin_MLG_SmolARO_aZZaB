@@ -9,6 +9,7 @@ type ResumeSkillShortApi = {
 type ResumeDiscoveryItemApi = {
   userId: number
   username?: string | null
+  fio?: string | null
   displayName?: string | null
   avatarUrl?: string | null
   headline?: string | null
@@ -35,7 +36,7 @@ function mapResumeItem(item: ResumeDiscoveryItemApi): ResumeDiscoveryItem {
   return {
     userId: item.userId,
     username: item.username ?? '',
-    displayName: item.displayName ?? 'Без имени',
+    displayName: item.fio ?? item.displayName ?? 'Без имени',
     avatarUrl: item.avatarUrl ?? null,
     headline: item.headline ?? null,
     desiredPosition: item.desiredPosition ?? null,
@@ -102,3 +103,4 @@ export async function fetchResumeDiscovery(query: ResumeDiscoveryQuery, signal?:
     pageSize: response.pageSize ?? query.pageSize ?? 12,
   }
 }
+

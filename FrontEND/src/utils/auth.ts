@@ -8,7 +8,10 @@ function isBrowser() {
 }
 
 function isKnownRole(value: number): value is PlatformRole {
-  return value === PlatformRole.Seeker || value === PlatformRole.Employer || value === PlatformRole.Curator
+  return value === PlatformRole.Seeker
+    || value === PlatformRole.Employer
+    || value === PlatformRole.Curator
+    || value === PlatformRole.Admin
 }
 
 function notifyAuthSessionChanged() {
@@ -26,15 +29,19 @@ export function resolvePlatformRole(roleNames: string[] | null | undefined) {
 
   const normalizedRoles = roleNames.map((role) => role.toLowerCase())
 
-  if (normalizedRoles.some((role) => role.includes('curator') || role.includes('куратор'))) {
+  if (normalizedRoles.some((role) => role.includes('curator'))) {
     return PlatformRole.Curator
   }
 
-  if (normalizedRoles.some((role) => role.includes('employer') || role.includes('работодатель'))) {
+  if (normalizedRoles.some((role) => role.includes('admin'))) {
+    return PlatformRole.Admin
+  }
+
+  if (normalizedRoles.some((role) => role.includes('employer'))) {
     return PlatformRole.Employer
   }
 
-  if (normalizedRoles.some((role) => role.includes('seeker') || role.includes('соискатель'))) {
+  if (normalizedRoles.some((role) => role.includes('seeker'))) {
     return PlatformRole.Seeker
   }
 
@@ -108,7 +115,7 @@ export function getDefaultRouteForRole(role: PlatformRole | null) {
     return '/dashboard/employer'
   }
 
-  if (role === PlatformRole.Curator) {
+  if (role === PlatformRole.Curator || role === PlatformRole.Admin) {
     return '/dashboard/curator'
   }
 
@@ -128,7 +135,7 @@ export function getDashboardLabelForRole(role: PlatformRole | null) {
     return 'Кабинет работодателя'
   }
 
-  if (role === PlatformRole.Curator) {
+  if (role === PlatformRole.Curator || role === PlatformRole.Admin) {
     return 'Кураторская панель'
   }
 

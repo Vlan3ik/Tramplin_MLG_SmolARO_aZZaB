@@ -52,10 +52,7 @@
     build:
       context: ../BackEND/Monolith/Monolith
       dockerfile: Dockerfile
-      target: build
     container_name: tramplin_api
-    working_dir: /src
-    command: dotnet watch --project Monolith.csproj run --urls http://0.0.0.0:8080
     depends_on:
       db:
         condition: service_healthy
@@ -63,12 +60,9 @@
         condition: service_completed_successfully
       redis:
         condition: service_started
-    volumes:
-      - ../BackEND/Monolith/Monolith:/src
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      DOTNET_USE_POLLING_FILE_WATCHER: "1"
       ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=tramplin_db;Username=tramplin;Password=tramplin
       Jwt__Issuer: Tramplin.Api
       Jwt__Audience: Tramplin.Client

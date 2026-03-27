@@ -2,6 +2,7 @@ export const PlatformRole = {
   Seeker: 1,
   Employer: 2,
   Curator: 3,
+  Admin: 4,
 } as const
 
 export type PlatformRole = (typeof PlatformRole)[keyof typeof PlatformRole]
@@ -42,8 +43,7 @@ export type LogoutRequest = {
 export type RegisterRequest = {
   email: string
   password: string
-  firstName: string
-  lastName: string
+  fio: string
   role: PlatformRole
 }
 

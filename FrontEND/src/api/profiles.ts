@@ -4,9 +4,10 @@ import type { PublicProfile } from '../types/public-profile'
 type PublicProfileApi = {
   userId: number
   username: string
-  firstName: string
-  lastName: string
-  middleName: string | null
+  fio?: string | null
+  firstName?: string | null
+  lastName?: string | null
+  middleName?: string | null
   birthDate: string | null
   gender: number | null
   phone: string | null
@@ -67,18 +68,28 @@ type PublicProfileApi = {
   visibilityMode: string
 }
 
+function splitFio(fio: string | null | undefined) {
+  const parts = (fio ?? '').trim().split(/\s+/).filter(Boolean)
+  return {
+    firstName: parts[0] ?? '',
+    lastName: parts[1] ?? '',
+    middleName: parts.slice(2).join(' ') || null,
+  }
+}
+
 export async function fetchPublicProfileByUsername(username: string, signal?: AbortSignal): Promise<PublicProfile> {
   const normalized = username.trim()
   const response = await getJson<PublicProfileApi>(`/profiles/${encodeURIComponent(normalized)}`, {
     signal,
   })
+  const fromFio = splitFio(response.fio)
 
   return {
     userId: response.userId,
     username: response.username,
-    firstName: response.firstName,
-    lastName: response.lastName,
-    middleName: response.middleName,
+    firstName: response.firstName ?? fromFio.firstName,
+    lastName: response.lastName ?? fromFio.lastName,
+    middleName: response.middleName ?? fromFio.middleName,
     birthDate: response.birthDate,
     gender: response.gender,
     phone: response.phone,

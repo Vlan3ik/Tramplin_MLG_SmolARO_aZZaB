@@ -5,7 +5,7 @@ namespace Monolith.Models.Subscriptions;
 public record SubscriptionUserDto(
     long UserId,
     string Username,
-    string DisplayName,
+    string Fio,
     string? AvatarUrl,
     PlatformRole AccountType,
     string? OrganizationName,

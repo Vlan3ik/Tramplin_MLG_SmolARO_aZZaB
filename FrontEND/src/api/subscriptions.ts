@@ -13,6 +13,7 @@ export type SubscriptionUser = {
 type SubscriptionUserApi = {
   userId: number
   username?: string | null
+  fio?: string | null
   displayName?: string | null
   avatarUrl?: string | null
   accountType?: number | null
@@ -24,7 +25,7 @@ function mapSubscriptionUser(item: SubscriptionUserApi): SubscriptionUser {
   return {
     userId: item.userId,
     username: item.username ?? '',
-    displayName: item.displayName ?? item.username ?? `Пользователь #${item.userId}`,
+    displayName: item.fio ?? item.displayName ?? item.username ?? `Пользователь #${item.userId}`,
     avatarUrl: item.avatarUrl ?? null,
     accountType: item.accountType ?? 1,
     organizationName: item.organizationName ?? null,
@@ -49,3 +50,4 @@ export async function fetchMyFollowerSubscriptions(signal?: AbortSignal) {
   const response = await getJson<SubscriptionUserApi[]>('/subscriptions/me/followers', { signal })
   return response.map(mapSubscriptionUser)
 }
+

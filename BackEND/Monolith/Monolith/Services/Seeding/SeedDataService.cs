@@ -964,7 +964,7 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         {
             Email = normalizedEmail,
             Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, fullName, CancellationToken.None),
-            DisplayName = fullName,
+            Fio = fullName,
             AvatarUrl = avatarUrl,
             PasswordHash = passwordHasher.HashPassword(password),
             Status = status
@@ -1000,9 +1000,7 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
             dbContext.CandidateProfiles.Add(new CandidateProfile
             {
                 UserId = userId,
-                LastName = lastName,
-                FirstName = firstName,
-                MiddleName = middleName,
+                Fio = $"{lastName} {firstName} {middleName}".Trim(),
                 Phone = phone,
                 CityId = cityId,
                 About = "Соискатель в IT-сфере",

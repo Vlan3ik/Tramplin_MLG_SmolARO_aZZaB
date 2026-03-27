@@ -6,16 +6,20 @@ public record AdminUserListItemDto(
     long Id,
     string Email,
     string Username,
+    string Fio,
+    string? AvatarUrl,
     AccountStatus Status,
     IReadOnlyCollection<string> Roles,
     DateTimeOffset CreatedAt);
 
 public record AdminUserUpsertRequest(
     string Email,
-    string FirstName,
-    string LastName,
+    string Username,
+    string Fio,
     AccountStatus Status,
     IReadOnlyCollection<PlatformRole> Roles);
+
+public record AdminUserResetPasswordResponse(string TempPassword);
 
 public record AdminCompanyListItemDto(
     long Id,

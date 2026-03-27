@@ -15,7 +15,7 @@ public record ChatMessageDto(
     long Id,
     long ChatId,
     long SenderUserId,
-    string SenderDisplayName,
+    string SenderFio,
     string? SenderUsername,
     string? SenderAvatarUrl,
     string Text,
@@ -117,7 +117,7 @@ public record VacancyLinkedCardDto(
 
 public record CandidateLinkedCardDto(
     long UserId,
-    string DisplayName,
+    string Fio,
     string? AvatarUrl,
     string? Headline,
     string? DesiredPosition,

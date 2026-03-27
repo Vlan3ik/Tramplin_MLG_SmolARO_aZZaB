@@ -58,7 +58,7 @@ public record EmployerOpportunityStatsDto(
 
 public record EmployerOpportunityRecentParticipantDto(
     long UserId,
-    string DisplayName,
+    string Fio,
     string? AvatarUrl,
     DateTimeOffset JoinedAt);
 

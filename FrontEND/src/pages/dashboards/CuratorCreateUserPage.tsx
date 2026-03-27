@@ -1,157 +1,125 @@
-import { ArrowLeft, Copy, KeyRound, Paperclip, RefreshCcw, Save, UserPlus } from 'lucide-react'
+import { ArrowLeft, Copy, KeyRound, Paperclip, Save, UserPlus } from 'lucide-react'
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
-import { createAdminUser, updateAdminUser, type AdminUser, type AdminUserUpsertRequest } from '../../api/admin'
+import { Link, useSearchParams } from 'react-router-dom'
+import {
+  createAdminUser,
+  fetchAdminUserById,
+  resetAdminUserPassword,
+  updateAdminUser,
+  uploadAdminUserAvatar,
+  type AdminUser,
+  type AdminUserUpsertRequest,
+} from '../../api/admin'
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
 import { useAuth } from '../../hooks/useAuth'
 
-type PasswordScenario = 'auto' | 'manual-generate' | 'unchanged' | 'reset-generate'
-
 type UserEditorForm = {
   email: string
   username: string
-  avatarUrl: string
-  firstName: string
-  lastName: string
+  fio: string
   status: number
   seeker: boolean
   employer: boolean
-  curatorAccess: boolean
   adminAccess: boolean
-  passwordScenario: PasswordScenario
+  curatorAccess: boolean
 }
 
 function normalizeRole(value: string) {
   return value.trim().toLowerCase()
 }
 
-function isSuperCuratorRole(roles: string[]) {
-  return roles.some((role) => {
-    const normalized = normalizeRole(role)
-    return normalized.includes('super') || normalized.includes('admin') || normalized.includes('root')
-  })
-}
-
-function generateReadablePassword() {
-  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
-  const lower = 'abcdefghijkmnopqrstuvwxyz'
-  const digits = '23456789'
-  const symbols = '!@#$%&*'
-  const pools = [upper, lower, digits, symbols]
-
-  const chars: string[] = []
-  pools.forEach((pool) => {
-    chars.push(pool[Math.floor(Math.random() * pool.length)])
-  })
-
-  const all = `${upper}${lower}${digits}${symbols}`
-  while (chars.length < 14) {
-    chars.push(all[Math.floor(Math.random() * all.length)])
-  }
-
-  for (let index = chars.length - 1; index > 0; index -= 1) {
-    const nextIndex = Math.floor(Math.random() * (index + 1))
-    ;[chars[index], chars[nextIndex]] = [chars[nextIndex], chars[index]]
-  }
-
-  return chars.join('')
-}
-
-function splitDisplayName(value: string) {
-  const chunks = value.trim().split(/\s+/).filter(Boolean)
-  return {
-    firstName: chunks[0] ?? '',
-    lastName: chunks.slice(1).join(' '),
-  }
-}
-
 function getInitialForm(): UserEditorForm {
   return {
     email: '',
     username: '',
-    avatarUrl: '',
-    firstName: '',
-    lastName: '',
+    fio: '',
     status: 1,
     seeker: false,
     employer: true,
-    curatorAccess: false,
     adminAccess: false,
-    passwordScenario: 'auto',
+    curatorAccess: false,
   }
 }
 
 function mapUserToForm(user: AdminUser): UserEditorForm {
-  const namesFromDisplay = splitDisplayName(user.displayName)
-  const firstName = user.firstName || namesFromDisplay.firstName
-  const lastName = user.lastName || namesFromDisplay.lastName
-
+  const roles = user.roles.map(normalizeRole)
   return {
     email: user.email,
     username: user.username,
-    avatarUrl: user.avatarUrl ?? '',
-    firstName,
-    lastName,
+    fio: user.fio,
     status: user.status,
-    seeker: user.roles.includes('seeker'),
-    employer: user.roles.includes('employer'),
-    curatorAccess: user.roles.includes('curator'),
-    adminAccess: user.roles.includes('admin') || user.roles.includes('administrator'),
-    passwordScenario: 'unchanged',
+    seeker: roles.includes('seeker'),
+    employer: roles.includes('employer'),
+    adminAccess: roles.includes('admin'),
+    curatorAccess: roles.includes('curator'),
   }
 }
 
 export function CuratorCreateUserPage() {
   const [searchParams] = useSearchParams()
-  const location = useLocation()
   const { session } = useAuth()
-  const routeState = location.state as { user?: AdminUser } | null
 
   const userIdParam = Number(searchParams.get('userId'))
   const editingUserId = Number.isInteger(userIdParam) && userIdParam > 0 ? userIdParam : null
   const isEditMode = editingUserId !== null
 
   const currentRoles = useMemo(() => (session?.user?.roles ?? []).map(normalizeRole), [session?.user?.roles])
-  const isSuperCurator = useMemo(() => isSuperCuratorRole(currentRoles), [currentRoles])
+  const isSuperCurator = useMemo(() => currentRoles.includes('curator'), [currentRoles])
 
   const [form, setForm] = useState<UserEditorForm>(getInitialForm)
-  const [avatarFileName, setAvatarFileName] = useState('')
+  const [loadedUser, setLoadedUser] = useState<AdminUser | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [generatedPassword, setGeneratedPassword] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isPreparing, setIsPreparing] = useState(true)
+  const [isResettingPassword, setIsResettingPassword] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  const stateUser = useMemo(() => {
-    if (!isEditMode) return null
-    if (!routeState?.user) return null
-    return routeState.user.id === editingUserId ? routeState.user : null
-  }, [editingUserId, isEditMode, routeState])
-
   useEffect(() => {
-    setIsPreparing(true)
-    setGeneratedPassword('')
-    setAvatarFileName('')
+    let isCancelled = false
 
-    if (!isEditMode) {
-      setForm(getInitialForm())
+    async function load() {
+      setIsPreparing(true)
+      setGeneratedPassword('')
+      setAvatarFile(null)
       setError('')
-      setIsPreparing(false)
-      return
+      setSuccess('')
+
+      if (!isEditMode || !editingUserId) {
+        setLoadedUser(null)
+        setForm(getInitialForm())
+        setIsPreparing(false)
+        return
+      }
+
+      try {
+        const user = await fetchAdminUserById(editingUserId)
+        if (isCancelled) {
+          return
+        }
+        setLoadedUser(user)
+        setForm(mapUserToForm(user))
+      } catch (loadError) {
+        if (!isCancelled) {
+          setError(loadError instanceof Error ? loadError.message : 'Не удалось загрузить пользователя.')
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsPreparing(false)
+        }
+      }
     }
 
-    if (!stateUser) {
-      setError('Не удалось загрузить пользователя для редактирования. Откройте экран из списка пользователей.')
-      setIsPreparing(false)
-      return
-    }
+    void load()
 
-    setForm(mapUserToForm(stateUser))
-    setError('')
-    setIsPreparing(false)
-  }, [isEditMode, stateUser])
+    return () => {
+      isCancelled = true
+    }
+  }, [editingUserId, isEditMode])
 
   useEffect(() => {
     if (isSuperCurator) {
@@ -160,12 +128,10 @@ export function CuratorCreateUserPage() {
 
     setForm((state) => ({
       ...state,
-      curatorAccess: false,
       adminAccess: false,
+      curatorAccess: false,
     }))
   }, [isSuperCurator])
-
-  const previewTitle = `${form.firstName} ${form.lastName}`.trim() || form.username.trim() || 'Новый пользователь'
 
   function clearMessages() {
     setError('')
@@ -182,50 +148,52 @@ export function CuratorCreateUserPage() {
     }))
   }
 
-  async function onAvatarFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) {
-      return
-    }
-
-    setAvatarFileName(file.name)
-    clearMessages()
-
-    try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
-        reader.onerror = () => reject(new Error('Не удалось прочитать файл аватара.'))
-        reader.readAsDataURL(file)
-      })
-
-      if (!dataUrl) {
-        throw new Error('Не удалось прочитать файл аватара.')
-      }
-
-      setForm((state) => ({
-        ...state,
-        avatarUrl: dataUrl,
-      }))
-    } catch (readError) {
-      setError(readError instanceof Error ? readError.message : 'Не удалось загрузить файл аватара.')
-    } finally {
-      event.target.value = ''
-    }
-  }
-
-  function onGeneratePassword() {
-    const nextPassword = generateReadablePassword()
-    setGeneratedPassword(nextPassword)
-    clearMessages()
+  function onAvatarFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null
+    setAvatarFile(file)
+    event.target.value = ''
   }
 
   function buildRoles() {
     const roles: number[] = []
     if (form.seeker) roles.push(1)
     if (form.employer) roles.push(2)
-    if (isSuperCurator && (form.curatorAccess || form.adminAccess)) roles.push(3)
+    if (isSuperCurator && form.adminAccess) roles.push(4)
+    if (isSuperCurator && form.curatorAccess) roles.push(3)
     return Array.from(new Set(roles))
+  }
+
+  async function saveAvatarIfSelected(userId: number) {
+    if (!avatarFile) {
+      return ''
+    }
+
+    setIsUploadingAvatar(true)
+    try {
+      const avatarUrl = await uploadAdminUserAvatar(userId, avatarFile)
+      setAvatarFile(null)
+      return avatarUrl
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
+
+  async function onResetPassword() {
+    if (!editingUserId) {
+      return
+    }
+
+    clearMessages()
+    setIsResettingPassword(true)
+    try {
+      const response = await resetAdminUserPassword(editingUserId)
+      setGeneratedPassword(response.tempPassword)
+      setSuccess('Временный пароль сгенерирован.')
+    } catch (resetError) {
+      setError(resetError instanceof Error ? resetError.message : 'Не удалось сбросить пароль.')
+    } finally {
+      setIsResettingPassword(false)
+    }
   }
 
   async function onCopyPassword() {
@@ -234,13 +202,13 @@ export function CuratorCreateUserPage() {
     }
 
     if (typeof navigator === 'undefined' || !navigator.clipboard) {
-      setError('Буфер обмена недоступен в этом браузере.')
+      setError('Буфер обмена недоступен.')
       return
     }
 
     try {
       await navigator.clipboard.writeText(generatedPassword)
-      setSuccess('Сгенерированный пароль скопирован.')
+      setSuccess('Пароль скопирован.')
     } catch {
       setError('Не удалось скопировать пароль.')
     }
@@ -260,66 +228,53 @@ export function CuratorCreateUserPage() {
       return
     }
 
-    const roles = buildRoles()
-    if (!roles.length) {
-      setError('Выберите хотя бы одну роль пользователя.')
+    if (!form.fio.trim()) {
+      setError('Укажите ФИО.')
       return
     }
 
-    const shouldUseGeneratedPassword = form.passwordScenario === 'manual-generate' || form.passwordScenario === 'reset-generate'
-    const passwordForPayload = shouldUseGeneratedPassword ? generatedPassword || generateReadablePassword() : ''
-
-    if (shouldUseGeneratedPassword && !generatedPassword) {
-      setGeneratedPassword(passwordForPayload)
+    const roles = buildRoles()
+    if (!roles.length) {
+      setError('Выберите хотя бы одну роль.')
+      return
     }
 
     const payload: AdminUserUpsertRequest = {
       email: form.email,
       username: form.username,
-      avatarUrl: form.avatarUrl,
-      displayName: `${form.firstName} ${form.lastName}`.trim(),
-      firstName: form.firstName,
-      lastName: form.lastName,
+      fio: form.fio,
       status: form.status,
       roles,
-      password: shouldUseGeneratedPassword ? passwordForPayload : undefined,
-      adminAccess: isSuperCurator ? form.adminAccess : undefined,
-      curatorAccess: isSuperCurator ? form.curatorAccess : undefined,
     }
 
     setIsSaving(true)
     try {
+      const saved = editingUserId
+        ? await updateAdminUser(editingUserId, payload)
+        : await createAdminUser(payload)
+
+      const avatarUrl = await saveAvatarIfSelected(saved.id)
       if (editingUserId) {
-        const result = await updateAdminUser(editingUserId, payload)
-        const serverPassword = result.generatedPassword
-        if (serverPassword) {
-          setGeneratedPassword(serverPassword)
-        }
-
-        setSuccess(shouldUseGeneratedPassword ? 'Пользователь обновлен. Новый пароль отображен ниже.' : 'Пользователь успешно обновлен.')
+        const refreshed = await fetchAdminUserById(editingUserId)
+        setLoadedUser(refreshed)
+        setForm(mapUserToForm(refreshed))
       } else {
-        const result = await createAdminUser(payload)
-        const serverPassword = result.generatedPassword
-        if (serverPassword) {
-          setGeneratedPassword(serverPassword)
-        }
-
-        setSuccess(serverPassword || shouldUseGeneratedPassword
-          ? 'Пользователь создан. Пароль отображен ниже.'
-          : 'Пользователь успешно создан.')
-
-        setForm((state) => ({
-          ...getInitialForm(),
-          passwordScenario: state.passwordScenario,
-        }))
-        setAvatarFileName('')
+        setLoadedUser(saved)
+        setForm(getInitialForm())
       }
+
+      const message = editingUserId
+        ? 'Пользователь обновлен.'
+        : 'Пользователь создан.'
+      setSuccess(avatarUrl ? `${message} Аватар загружен.` : message)
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : isEditMode ? 'Не удалось обновить пользователя.' : 'Не удалось создать пользователя.')
+      setError(submitError instanceof Error ? submitError.message : editingUserId ? 'Не удалось обновить пользователя.' : 'Не удалось создать пользователя.')
     } finally {
       setIsSaving(false)
     }
   }
+
+  const previewTitle = form.fio.trim() || form.username.trim() || 'Новый пользователь'
 
   return (
     <div>
@@ -334,11 +289,7 @@ export function CuratorCreateUserPage() {
             </Link>
           </div>
 
-          <p className="status-line">
-            Полноценный экран управления пользователем: профиль, роли и сценарий пароля.
-          </p>
-
-          {isPreparing ? <p>Подготавливаем экран пользователя...</p> : null}
+          {isPreparing ? <p>Загрузка...</p> : null}
           {error ? <div className="auth-feedback auth-feedback--error">{error}</div> : null}
           {success ? <div className="auth-feedback">{success}</div> : null}
 
@@ -354,6 +305,11 @@ export function CuratorCreateUserPage() {
                   <input type="text" name="username" value={form.username} onChange={onInputChange} required />
                 </label>
 
+                <label className="full-width">
+                  ФИО
+                  <input type="text" name="fio" value={form.fio} onChange={onInputChange} required />
+                </label>
+
                 <div className="curator-user-editor__field">
                   <span>Аватар (файл)</span>
                   <label className="curator-user-editor__file-button">
@@ -361,17 +317,11 @@ export function CuratorCreateUserPage() {
                     Выберите файл
                     <input type="file" accept="image/*" onChange={onAvatarFileChange} />
                   </label>
-                  {avatarFileName ? <small>{avatarFileName}</small> : null}
+                  {avatarFile ? <small>{avatarFile.name}</small> : null}
+                  {isEditMode ? (
+                    <small>Для существующего пользователя файл загрузится через отдельный endpoint.</small>
+                  ) : null}
                 </div>
-
-                <label>
-                  Имя
-                  <input type="text" name="firstName" value={form.firstName} onChange={onInputChange} />
-                </label>
-                <label>
-                  Фамилия
-                  <input type="text" name="lastName" value={form.lastName} onChange={onInputChange} />
-                </label>
 
                 <label>
                   Статус
@@ -396,55 +346,36 @@ export function CuratorCreateUserPage() {
                   {isSuperCurator ? (
                     <div className="admin-checkbox-row">
                       <label className="employer-checkbox">
-                        <input type="checkbox" name="curatorAccess" checked={form.curatorAccess} onChange={onInputChange} /> Куратор
+                        <input type="checkbox" name="adminAccess" checked={form.adminAccess} onChange={onInputChange} /> Куратор (Admin)
                       </label>
                       <label className="employer-checkbox">
-                        <input type="checkbox" name="adminAccess" checked={form.adminAccess} onChange={onInputChange} /> Admin
+                        <input type="checkbox" name="curatorAccess" checked={form.curatorAccess} onChange={onInputChange} /> Super Curator
                       </label>
                     </div>
                   ) : null}
                 </div>
 
-                <div className="full-width curator-user-editor__password-block">
-                  <strong>Сценарий пароля</strong>
-                  <div className="admin-checkbox-row">
-                    {!isEditMode ? (
-                      <>
-                        <label className="employer-checkbox">
-                          <input type="radio" name="passwordScenario" value="auto" checked={form.passwordScenario === 'auto'} onChange={onInputChange} /> Автогенерация сервером
-                        </label>
-                        <label className="employer-checkbox">
-                          <input type="radio" name="passwordScenario" value="manual-generate" checked={form.passwordScenario === 'manual-generate'} onChange={onInputChange} /> Сгенерировать вручную
-                        </label>
-                      </>
-                    ) : (
-                      <>
-                        <label className="employer-checkbox">
-                          <input type="radio" name="passwordScenario" value="unchanged" checked={form.passwordScenario === 'unchanged'} onChange={onInputChange} /> Не менять пароль
-                        </label>
-                        <label className="employer-checkbox">
-                          <input type="radio" name="passwordScenario" value="reset-generate" checked={form.passwordScenario === 'reset-generate'} onChange={onInputChange} /> Сбросить и сгенерировать новый
-                        </label>
-                      </>
-                    )}
+                {isEditMode ? (
+                  <div className="full-width curator-user-editor__password-block">
+                    <button type="button" className="btn btn--ghost" onClick={() => void onResetPassword()} disabled={isResettingPassword}>
+                      <KeyRound size={14} /> {isResettingPassword ? 'Сбрасываем...' : 'Сбросить пароль'}
+                    </button>
+                    {generatedPassword ? (
+                      <div className="curator-user-editor__password-actions">
+                        <input type="text" readOnly value={generatedPassword} />
+                        <button type="button" className="btn btn--secondary" onClick={() => void onCopyPassword()}>
+                          <Copy size={14} /> Копировать
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
-
-                  {form.passwordScenario === 'manual-generate' || form.passwordScenario === 'reset-generate' ? (
-                    <div className="curator-user-editor__password-actions">
-                      <button type="button" className="btn btn--ghost" onClick={onGeneratePassword}>
-                        <RefreshCcw size={14} /> Сгенерировать пароль
-                      </button>
-                      <input type="text" readOnly value={generatedPassword} placeholder="Пароль появится здесь" />
-                      <button type="button" className="btn btn--secondary" onClick={() => void onCopyPassword()} disabled={!generatedPassword}>
-                        <Copy size={14} /> Копировать
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+                ) : null}
 
                 <div className="favorite-card__actions full-width">
-                  <button type="submit" className="btn btn--primary" disabled={isSaving}>
-                    {isEditMode ? <Save size={14} /> : <UserPlus size={14} />} {isSaving ? (isEditMode ? 'Сохраняем...' : 'Создаем...') : isEditMode ? 'Сохранить пользователя' : 'Создать пользователя'}
+                  <button type="submit" className="btn btn--primary" disabled={isSaving || isUploadingAvatar}>
+                    {isEditMode ? <Save size={14} /> : <UserPlus size={14} />}
+                    {' '}
+                    {isSaving ? 'Сохраняем...' : isEditMode ? 'Сохранить пользователя' : 'Создать пользователя'}
                   </button>
                 </div>
               </form>
@@ -453,7 +384,7 @@ export function CuratorCreateUserPage() {
                 <h3>Карточка пользователя</h3>
                 <div className="curator-user-editor__preview-head">
                   <div className="curator-user-editor__avatar">
-                    {form.avatarUrl.trim() ? <img src={form.avatarUrl} alt={previewTitle} /> : <span>{previewTitle.charAt(0).toUpperCase() || 'U'}</span>}
+                    {loadedUser?.avatarUrl ? <img src={loadedUser.avatarUrl} alt={previewTitle} /> : <span>{previewTitle.charAt(0).toUpperCase() || 'U'}</span>}
                   </div>
                   <div>
                     <strong>{previewTitle}</strong>
@@ -461,17 +392,10 @@ export function CuratorCreateUserPage() {
                   </div>
                 </div>
                 <div className="status-table">
-                  <div><span>Email</span><strong>{form.email || '—'}</strong></div>
+                  <div><span>Email</span><strong>{form.email || '-'}</strong></div>
                   <div><span>Статус</span><strong>{form.status === 1 ? 'Активен' : form.status === 2 ? 'Заблокирован' : 'Удален'}</strong></div>
-                  <div><span>Роли</span><strong>{[form.seeker ? 'seeker' : '', form.employer ? 'employer' : '', isSuperCurator && form.curatorAccess ? 'curator' : '', isSuperCurator && form.adminAccess ? 'admin' : ''].filter(Boolean).join(', ') || 'не выбраны'}</strong></div>
+                  <div><span>Роли</span><strong>{[form.seeker ? 'seeker' : '', form.employer ? 'employer' : '', isSuperCurator && form.adminAccess ? 'admin' : '', isSuperCurator && form.curatorAccess ? 'curator' : ''].filter(Boolean).join(', ') || 'не выбраны'}</strong></div>
                 </div>
-
-                {generatedPassword ? (
-                  <div className="curator-user-editor__generated card">
-                    <p><KeyRound size={14} /> Новый пароль</p>
-                    <code>{generatedPassword}</code>
-                  </div>
-                ) : null}
               </aside>
             </div>
           ) : null}

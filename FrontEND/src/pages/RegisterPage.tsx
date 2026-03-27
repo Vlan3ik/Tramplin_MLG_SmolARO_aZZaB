@@ -68,9 +68,6 @@ export function RegisterPage() {
       return
     }
 
-    const [firstName, ...lastNameParts] = fullName.split(/\s+/)
-    const lastName = lastNameParts.join(' ') || firstName
-
     setErrorMessage('')
     setIsSubmitting(true)
 
@@ -78,8 +75,7 @@ export function RegisterPage() {
       const response = await registerUser({
         email,
         password,
-        firstName,
-        lastName,
+        fio: fullName,
         role: selectedRole,
       })
 

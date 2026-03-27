@@ -65,9 +65,7 @@ public class MeController(AppDbContext dbContext) : ControllerBase
         return Ok(new ProfileResponse(
             profile.UserId,
             profile.User.Username,
-            profile.FirstName,
-            profile.LastName,
-            profile.MiddleName,
+            profile.Fio,
             profile.BirthDate,
             profile.Gender,
             profile.Phone,
@@ -98,9 +96,8 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             return this.ToNotFoundError("me.profile.not_found", "Профиль соискателя не найден.");
         }
 
-        var firstName = request.FirstName?.Trim();
-        var lastName = request.LastName?.Trim();
-        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
+        var fio = request.Fio?.Trim();
+        if (string.IsNullOrWhiteSpace(fio))
         {
             return this.ToBadRequestError("me.profile.invalid_name", "Имя и фамилия обязательны.");
         }
@@ -139,10 +136,8 @@ public class MeController(AppDbContext dbContext) : ControllerBase
             }
         }
 
-        profile.FirstName = firstName;
-        profile.LastName = lastName;
-        profile.User.DisplayName = $"{profile.FirstName} {profile.LastName}".Trim();
-        profile.MiddleName = string.IsNullOrWhiteSpace(request.MiddleName) ? null : request.MiddleName.Trim();
+        profile.Fio = fio;
+        profile.User.Fio = fio;
         profile.BirthDate = request.BirthDate;
         profile.Gender = request.Gender ?? CandidateGender.Unknown;
         profile.Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
@@ -156,9 +151,7 @@ public class MeController(AppDbContext dbContext) : ControllerBase
         return Ok(new ProfileResponse(
             profile.UserId,
             profile.User.Username,
-            profile.FirstName,
-            profile.LastName,
-            profile.MiddleName,
+            profile.Fio,
             profile.BirthDate,
             profile.Gender,
             profile.Phone,

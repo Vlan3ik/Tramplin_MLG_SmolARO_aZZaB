@@ -42,7 +42,7 @@ public class AuthController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request, CancellationToken cancellationToken)
     {
-        if (request.Role is PlatformRole.Curator)
+        if (request.Role is PlatformRole.Curator or PlatformRole.Admin)
         {
             return this.ToBadRequestError("auth.registration.role_forbidden", "Публичная регистрация роли куратора запрещена.");
         }
@@ -53,16 +53,18 @@ public class AuthController(
             return this.ToConflictError("auth.registration.email_exists", "Пользователь с таким email уже зарегистрирован.");
         }
 
-        var firstName = request.FirstName.Trim();
-        var lastName = request.LastName.Trim();
-        var fullName = $"{firstName} {lastName}".Trim();
+        var fullName = request.Fio.Trim();
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            return this.ToBadRequestError("auth.registration.fio_required", "Поле fio обязательно.");
+        }
 
         var user = new User
         {
             Email = request.Email.Trim().ToLowerInvariant(),
             Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, fullName, cancellationToken),
             PasswordHash = passwordHasher.HashPassword(request.Password),
-            DisplayName = fullName,
+            Fio = fullName,
             Status = AccountStatus.Active
         };
         dbContext.Users.Add(user);
@@ -80,8 +82,7 @@ public class AuthController(
             dbContext.CandidateProfiles.Add(new CandidateProfile
             {
                 UserId = user.Id,
-                LastName = lastName,
-                FirstName = firstName
+                Fio = fullName
             });
             dbContext.CandidatePrivacySettings.Add(new CandidatePrivacySettings { UserId = user.Id });
             dbContext.CandidateResumeProfiles.Add(new CandidateResumeProfile { UserId = user.Id });
@@ -100,12 +101,12 @@ public class AuthController(
     [HttpGet("roles")]
     [ProducesResponseType(typeof(IReadOnlyCollection<RoleDictionaryItemDto>), StatusCodes.Status200OK)]
     public ActionResult<IReadOnlyCollection<RoleDictionaryItemDto>> GetRoles()
-    {
-        var roles = new List<RoleDictionaryItemDto>
+    {        var roles = new List<RoleDictionaryItemDto>
         {
-            new((int)PlatformRole.Seeker, "seeker", "Соискатель"),
-            new((int)PlatformRole.Employer, "employer", "Работодатель"),
-            new((int)PlatformRole.Curator, "curator", "Куратор")
+            new((int)PlatformRole.Seeker, "seeker", "Seeker"),
+            new((int)PlatformRole.Employer, "employer", "Employer"),
+            new((int)PlatformRole.Curator, "curator", "Curator"),
+            new((int)PlatformRole.Admin, "admin", "Admin")
         };
         return Ok(roles);
     }
@@ -194,7 +195,7 @@ public class AuthController(
                 Email = normalizedEmail ?? $"vk_{vkUserId}@vk.local",
                 Username = await UsernameGenerator.GenerateUniqueAsync(dbContext, displayName, cancellationToken),
                 PasswordHash = passwordHasher.HashPassword(Guid.NewGuid().ToString("N")),
-                DisplayName = displayName,
+                Fio = displayName,
                 AvatarUrl = vkProfile.Photo200,
                 Status = AccountStatus.Active
             };
@@ -211,8 +212,7 @@ public class AuthController(
             dbContext.CandidateProfiles.Add(new CandidateProfile
             {
                 UserId = user.Id,
-                LastName = lastName,
-                FirstName = firstName
+                Fio = displayName
             });
             dbContext.CandidatePrivacySettings.Add(new CandidatePrivacySettings { UserId = user.Id });
             dbContext.CandidateResumeProfiles.Add(new CandidateResumeProfile { UserId = user.Id });

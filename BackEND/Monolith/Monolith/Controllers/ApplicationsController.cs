@@ -205,14 +205,14 @@ public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub>
             var sender = await dbContext.Users
                 .AsNoTracking()
                 .Where(x => x.Id == greeting.SenderUserId)
-                .Select(x => new { x.DisplayName, x.Username, x.AvatarUrl })
+                .Select(x => new { x.Fio, x.Username, x.AvatarUrl })
                 .FirstOrDefaultAsync(cancellationToken);
 
             await hubContext.Clients.Group(ChatHub.GroupName(chat.Id)).SendAsync("new", new ChatMessageDto(
                 greeting.Id,
                 greeting.ChatId,
                 greeting.SenderUserId,
-                sender?.DisplayName ?? "System",
+                sender?.Fio ?? "System",
                 sender?.Username,
                 sender?.AvatarUrl,
                 greeting.Text,

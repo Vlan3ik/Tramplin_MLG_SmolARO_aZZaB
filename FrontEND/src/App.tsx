@@ -76,7 +76,7 @@ function App() {
           <Route path="dashboard/seeker/resume/print" element={<SeekerResumePrintPage />} />
         </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Curator]} />}>
+        <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Curator, PlatformRole.Admin]} />}>
           <Route path="dashboard/curator" element={<CuratorDashboardPage />} />
           <Route path="dashboard/curator/users/create" element={<CuratorCreateUserPage />} />
           <Route path="dashboard/curator/companies/create" element={<CuratorCreateCompanyPage />} />

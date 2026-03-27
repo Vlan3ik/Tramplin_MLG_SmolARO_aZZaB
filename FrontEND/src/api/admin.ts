@@ -1,4 +1,4 @@
-import { deleteJson, getJson, patchJson, postJson, putJson } from './client'
+import { deleteJson, getJson, patchJson, postForm, postJson, putJson } from './client'
 
 type PagedResponse<TItem> = {
   items?: TItem[] | null
@@ -11,13 +11,16 @@ type AdminUserApi = {
   id: number
   email: string
   username: string
-  firstName: string | null
-  lastName: string | null
-  displayName: string | null
+  fio: string
   avatarUrl: string | null
   status: number | string
   roles: string[] | null
   createdAt: string
+}
+
+type UploadMediaApi = {
+  url?: string | null
+  avatarUrl?: string | null
 }
 
 type AdminCompanyApi = {
@@ -52,14 +55,8 @@ type AdminOpportunityApi = {
 
 type AdminUserUpsertApiRequest = {
   email: string
-  firstName: string | null
-  lastName: string | null
-  username?: string | null
-  displayName?: string | null
-  avatarUrl?: string | null
-  password?: string | null
-  adminAccess?: boolean
-  curatorAccess?: boolean
+  username: string
+  fio: string
   status: number
   roles: number[]
 }
@@ -121,9 +118,7 @@ export type AdminUser = {
   id: number
   email: string
   username: string
-  firstName: string
-  lastName: string
-  displayName: string
+  fio: string
   avatarUrl: string | null
   status: number
   roles: string[]
@@ -162,21 +157,14 @@ export type AdminOpportunity = {
 
 export type AdminUserUpsertRequest = {
   email: string
-  firstName: string
-  lastName: string
-  username?: string
-  displayName?: string
-  avatarUrl?: string
-  password?: string
-  adminAccess?: boolean
-  curatorAccess?: boolean
+  username: string
+  fio: string
   status: number
   roles: number[]
 }
 
-export type AdminUserMutationResult = {
-  user: AdminUser
-  generatedPassword: string | null
+export type AdminUserResetPasswordResponse = {
+  tempPassword: string
 }
 
 export type AdminCompanyUpsertRequest = {
@@ -251,9 +239,7 @@ function mapUser(item: AdminUserApi): AdminUser {
     id: item.id,
     email: item.email ?? '',
     username: item.username ?? '',
-    firstName: item.firstName ?? '',
-    lastName: item.lastName ?? '',
-    displayName: item.displayName ?? '',
+    fio: item.fio ?? '',
     avatarUrl: item.avatarUrl ?? null,
     status: parseEnum(item.status),
     roles: item.roles ?? [],
@@ -300,35 +286,11 @@ function mapOpportunity(item: AdminOpportunityApi): AdminOpportunity {
 function mapUserUpsertRequest(payload: AdminUserUpsertRequest): AdminUserUpsertApiRequest {
   return {
     email: payload.email.trim(),
-    firstName: toNullableString(payload.firstName),
-    lastName: toNullableString(payload.lastName),
-    username: toNullableString(payload.username ?? ''),
-    displayName: toNullableString(payload.displayName ?? ''),
-    avatarUrl: toNullableString(payload.avatarUrl ?? ''),
-    password: toNullableString(payload.password ?? ''),
-    adminAccess: Boolean(payload.adminAccess),
-    curatorAccess: Boolean(payload.curatorAccess),
+    username: payload.username.trim(),
+    fio: payload.fio.trim(),
     status: payload.status,
     roles: payload.roles,
   }
-}
-
-function extractGeneratedPassword(response: unknown) {
-  if (!response || typeof response !== 'object') {
-    return null
-  }
-
-  const candidate = response as Record<string, unknown>
-  const possibleKeys = ['generatedPassword', 'temporaryPassword', 'tempPassword', 'newPassword', 'password']
-
-  for (const key of possibleKeys) {
-    const value = candidate[key]
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim()
-    }
-  }
-
-  return null
 }
 
 function mapCompanyUpsertRequest(payload: AdminCompanyUpsertRequest): AdminCompanyUpsertApiRequest {
@@ -415,18 +377,28 @@ export async function fetchAdminUsers(options: FetchListOptions = {}) {
   }
 }
 
+export async function fetchAdminUserById(id: number, signal?: AbortSignal) {
+  const response = await getJson<AdminUserApi>(`/admin/users/${id}`, { signal })
+  return mapUser(response)
+}
+
 export function createAdminUser(payload: AdminUserUpsertRequest) {
-  return postJson<AdminUserApi | (AdminUserApi & Record<string, unknown>), AdminUserUpsertApiRequest>('/admin/users', mapUserUpsertRequest(payload)).then((response) => ({
-    user: mapUser(response as AdminUserApi),
-    generatedPassword: extractGeneratedPassword(response),
-  }))
+  return postJson<AdminUserApi, AdminUserUpsertApiRequest>('/admin/users', mapUserUpsertRequest(payload)).then(mapUser)
 }
 
 export function updateAdminUser(id: number, payload: AdminUserUpsertRequest) {
-  return putJson<AdminUserApi | (AdminUserApi & Record<string, unknown>), AdminUserUpsertApiRequest>(`/admin/users/${id}`, mapUserUpsertRequest(payload)).then((response) => ({
-    user: mapUser(response as AdminUserApi),
-    generatedPassword: extractGeneratedPassword(response),
-  }))
+  return putJson<AdminUserApi, AdminUserUpsertApiRequest>(`/admin/users/${id}`, mapUserUpsertRequest(payload)).then(mapUser)
+}
+
+export function resetAdminUserPassword(id: number) {
+  return postJson<AdminUserResetPasswordResponse, Record<string, never>>(`/admin/users/${id}/reset-password`, {})
+}
+
+export async function uploadAdminUserAvatar(id: number, file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await postForm<UploadMediaApi>(`/admin/users/${id}/avatar`, formData)
+  return (response.url ?? response.avatarUrl ?? '').trim()
 }
 
 export function deleteAdminUser(id: number) {

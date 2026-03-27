@@ -181,7 +181,7 @@ public class EmployerVacanciesController(
             .Select(x => new EmployerVacancyRecentApplicationDto(
                 x.Id,
                 x.CandidateUserId,
-                x.CandidateUser.DisplayName,
+                x.CandidateUser.Fio,
                 x.CandidateUser.AvatarUrl,
                 x.Status,
                 x.CreatedAt))
@@ -414,7 +414,7 @@ public class EmployerVacanciesController(
         var sender = await dbContext.Users
             .AsNoTracking()
             .Where(x => x.Id == membership.UserId)
-            .Select(x => new { x.DisplayName, x.Username, x.AvatarUrl })
+            .Select(x => new { x.Fio, x.Username, x.AvatarUrl })
             .FirstAsync(cancellationToken);
 
         await hubContext.Clients.Group(ChatHub.GroupName(directChatId.Value)).SendAsync(
@@ -423,7 +423,7 @@ public class EmployerVacanciesController(
                 message.Id,
                 message.ChatId,
                 message.SenderUserId,
-                sender.DisplayName,
+                sender.Fio,
                 sender.Username,
                 sender.AvatarUrl,
                 message.Text,

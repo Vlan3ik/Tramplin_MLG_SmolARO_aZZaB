@@ -61,7 +61,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Email).HasColumnName("email").HasMaxLength(320);
             entity.Property(x => x.Username).HasColumnName("username").HasMaxLength(50);
             entity.Property(x => x.PasswordHash).HasColumnName("password_hash");
-            entity.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(150);
+            entity.Property(x => x.Fio).HasColumnName("fio").HasMaxLength(150);
             entity.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(500);
             entity.Property(x => x.ProfileBannerUrl).HasColumnName("profile_banner_url").HasMaxLength(500);
             entity.Property(x => x.Status).HasColumnName("status");
@@ -88,9 +88,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.ToTable("candidate_profiles");
             entity.HasKey(x => x.UserId);
             entity.Property(x => x.UserId).HasColumnName("user_id");
-            entity.Property(x => x.LastName).HasColumnName("last_name").HasMaxLength(100);
-            entity.Property(x => x.FirstName).HasColumnName("first_name").HasMaxLength(100);
-            entity.Property(x => x.MiddleName).HasColumnName("middle_name").HasMaxLength(100);
+            entity.Property(x => x.Fio).HasColumnName("fio").HasMaxLength(200);
             entity.Property(x => x.BirthDate).HasColumnName("birth_date");
             entity.Property(x => x.Gender).HasColumnName("gender");
             entity.Property(x => x.Phone).HasColumnName("phone").HasMaxLength(30);

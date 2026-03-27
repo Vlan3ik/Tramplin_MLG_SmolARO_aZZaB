@@ -145,33 +145,33 @@ public class SearchController(AppDbContext dbContext, IMemoryCache memoryCache) 
                 .Where(x => x.Status == AccountStatus.Active)
                 .Where(x =>
                     EF.Functions.ILike(x.Username, like) ||
-                    EF.Functions.ILike(x.DisplayName, like) ||
+                    EF.Functions.ILike(x.Fio, like) ||
                     (x.CandidateProfile != null && (
-                        EF.Functions.ILike(x.CandidateProfile.FirstName, like) ||
-                        EF.Functions.ILike(x.CandidateProfile.LastName, like) ||
-                        (x.CandidateProfile.MiddleName != null && EF.Functions.ILike(x.CandidateProfile.MiddleName, like)))))
+                        EF.Functions.ILike(x.CandidateProfile.Fio, like) ||
+                        EF.Functions.ILike(x.CandidateProfile.Fio, like) ||
+                        (x.CandidateProfile.Fio != null && EF.Functions.ILike(x.CandidateProfile.Fio, like)))))
                 .Select(x => new
                 {
                     x.Id,
                     x.Username,
-                    x.DisplayName,
-                    FirstName = x.CandidateProfile != null ? x.CandidateProfile.FirstName : null,
-                    LastName = x.CandidateProfile != null ? x.CandidateProfile.LastName : null,
+                    x.Fio,
+                    FirstName = x.CandidateProfile != null ? x.CandidateProfile.Fio : null,
+                    LastName = x.CandidateProfile != null ? x.CandidateProfile.Fio : null,
                     x.UpdatedAt,
                     UsernameSimilarity = EF.Functions.TrigramsSimilarity(x.Username, normalizedQuery),
-                    DisplayNameSimilarity = EF.Functions.TrigramsSimilarity(x.DisplayName, normalizedQuery)
+                    FioSimilarity = EF.Functions.TrigramsSimilarity(x.Fio, normalizedQuery)
                 })
                 .OrderByDescending(x => x.UsernameSimilarity)
-                .ThenByDescending(x => x.DisplayNameSimilarity)
+                .ThenByDescending(x => x.FioSimilarity)
                 .ThenByDescending(x => x.UpdatedAt)
                 .Take(safeLimit * 2)
                 .ToListAsync(cancellationToken);
 
             items.AddRange(profileRows.Select(x =>
             {
-                var fio = $"{x.FirstName} {x.LastName}".Trim();
-                var title = !string.IsNullOrWhiteSpace(x.DisplayName)
-                    ? x.DisplayName
+                var fio = $"{x.Fio} {x.Fio}".Trim();
+                var title = !string.IsNullOrWhiteSpace(x.Fio)
+                    ? x.Fio
                     : !string.IsNullOrWhiteSpace(fio)
                         ? fio
                         : x.Username;
@@ -183,7 +183,7 @@ public class SearchController(AppDbContext dbContext, IMemoryCache memoryCache) 
                     string.Empty,
                     string.Empty,
                     x.UpdatedAt,
-                    Math.Max(x.UsernameSimilarity, x.DisplayNameSimilarity),
+                    Math.Max(x.UsernameSimilarity, x.FioSimilarity),
                     x.Username);
             }));
         }
@@ -369,26 +369,26 @@ public class SearchController(AppDbContext dbContext, IMemoryCache memoryCache) 
             .AsNoTracking()
             .Where(x =>
                 EF.Functions.ILike(x.Username, like) ||
-                EF.Functions.ILike(x.DisplayName, like) ||
+                EF.Functions.ILike(x.Fio, like) ||
                 (x.CandidateProfile != null && (
-                    EF.Functions.ILike(x.CandidateProfile.FirstName, like) ||
-                    EF.Functions.ILike(x.CandidateProfile.LastName, like) ||
-                    (x.CandidateProfile.MiddleName != null && EF.Functions.ILike(x.CandidateProfile.MiddleName, like))
+                    EF.Functions.ILike(x.CandidateProfile.Fio, like) ||
+                    EF.Functions.ILike(x.CandidateProfile.Fio, like) ||
+                    (x.CandidateProfile.Fio != null && EF.Functions.ILike(x.CandidateProfile.Fio, like))
                 )) ||
                 (isNumeric && x.Id == numericId))
             .Select(x => new
             {
                 x.Id,
                 x.Username,
-                x.DisplayName,
-                FirstName = x.CandidateProfile != null ? x.CandidateProfile.FirstName : null,
-                LastName = x.CandidateProfile != null ? x.CandidateProfile.LastName : null,
+                x.Fio,
+                FirstName = x.CandidateProfile != null ? x.CandidateProfile.Fio : null,
+                LastName = x.CandidateProfile != null ? x.CandidateProfile.Fio : null,
                 x.UpdatedAt,
                 UsernameSimilarity = EF.Functions.TrigramsSimilarity(x.Username, normalizedQuery),
-                DisplayNameSimilarity = EF.Functions.TrigramsSimilarity(x.DisplayName, normalizedQuery)
+                FioSimilarity = EF.Functions.TrigramsSimilarity(x.Fio, normalizedQuery)
             })
             .OrderByDescending(x => x.UsernameSimilarity)
-            .ThenByDescending(x => x.DisplayNameSimilarity)
+            .ThenByDescending(x => x.FioSimilarity)
             .ThenByDescending(x => x.UpdatedAt)
             .Take(safeLimit)
             .ToListAsync(cancellationToken);
@@ -397,9 +397,9 @@ public class SearchController(AppDbContext dbContext, IMemoryCache memoryCache) 
             normalizedQuery,
             rows.Select(x =>
             {
-                var fio = $"{x.FirstName} {x.LastName}".Trim();
-                var title = !string.IsNullOrWhiteSpace(x.DisplayName)
-                    ? x.DisplayName
+                var fio = $"{x.Fio} {x.Fio}".Trim();
+                var title = !string.IsNullOrWhiteSpace(x.Fio)
+                    ? x.Fio
                     : !string.IsNullOrWhiteSpace(fio)
                         ? fio
                         : x.Username;
@@ -411,7 +411,7 @@ public class SearchController(AppDbContext dbContext, IMemoryCache memoryCache) 
                     string.Empty,
                     string.Empty,
                     x.UpdatedAt,
-                    Math.Max(x.UsernameSimilarity, x.DisplayNameSimilarity),
+                    Math.Max(x.UsernameSimilarity, x.FioSimilarity),
                     x.Username);
             }).ToArray());
 

@@ -68,7 +68,7 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
             var term = query.Search.Trim().ToLowerInvariant();
             applications = applications.Where(x =>
                 x.Vacancy.Title.ToLower().Contains(term) ||
-                x.CandidateUser.DisplayName.ToLower().Contains(term) ||
+                x.CandidateUser.Fio.ToLower().Contains(term) ||
                 x.CandidateUser.Username.ToLower().Contains(term) ||
                 x.CandidateUser.Email.ToLower().Contains(term));
         }
@@ -83,7 +83,7 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
                 x.VacancyId,
                 x.Vacancy.Title,
                 x.CandidateUserId,
-                x.CandidateUser.DisplayName,
+                x.CandidateUser.Fio,
                 x.CandidateUser.AvatarUrl,
                 x.Status,
                 x.CreatedAt,
@@ -200,22 +200,16 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
             education.Count > 0 ||
             links.Count > 0;
 
-        var fallbackNameParts = application.CandidateUser.DisplayName
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var fallbackFirstName = fallbackNameParts.Length > 0 ? fallbackNameParts[0] : application.CandidateUser.Username;
-        var fallbackLastName = fallbackNameParts.Length > 1 ? fallbackNameParts[^1] : string.Empty;
-        var fallbackMiddleName = fallbackNameParts.Length > 2
-            ? string.Join(' ', fallbackNameParts.Skip(1).Take(fallbackNameParts.Length - 2))
-            : null;
+        var fallbackFio = string.IsNullOrWhiteSpace(application.CandidateUser.Fio)
+            ? application.CandidateUser.Username
+            : application.CandidateUser.Fio;
 
         var candidateResume = !hasResumeData
             ? null
             : new ResumeDetailDto(
                 candidateProfile?.UserId ?? application.CandidateUserId,
                 application.CandidateUser.Username,
-                string.IsNullOrWhiteSpace(candidateProfile?.FirstName) ? fallbackFirstName : candidateProfile.FirstName,
-                string.IsNullOrWhiteSpace(candidateProfile?.LastName) ? fallbackLastName : candidateProfile.LastName,
-                candidateProfile?.MiddleName ?? fallbackMiddleName,
+                string.IsNullOrWhiteSpace(candidateProfile?.Fio) ? fallbackFio : candidateProfile.Fio,
                 candidateProfile?.BirthDate,
                 candidateProfile?.Gender ?? CandidateGender.Unknown,
                 candidateProfile?.Phone,
@@ -240,7 +234,7 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
             application.VacancyId,
             application.Vacancy.Title,
             application.CandidateUserId,
-            application.CandidateUser.DisplayName,
+            application.CandidateUser.Fio,
             application.CandidateUser.AvatarUrl,
             resume?.Headline,
             resume?.DesiredPosition,
