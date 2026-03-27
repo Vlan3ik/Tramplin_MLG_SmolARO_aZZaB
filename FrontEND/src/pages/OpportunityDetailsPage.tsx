@@ -15,6 +15,7 @@ import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityDetail } from '../types/opportunity'
 import { typeLabel } from '../types/opportunity'
 import type { OpportunityEntityType } from '../utils/opportunity-routing'
+import { resolveOpportunitySocialEntityType, setOpportunityFavoriteState, upsertOpportunitySocialState, upsertOpportunitySocialStates } from '../utils/opportunity-social-state'
 import { getTagDisplayLabel } from '../utils/tag-labels'
 
 function formatAbsoluteDate(value: string | null) {
@@ -92,6 +93,7 @@ export function OpportunityDetailsPage() {
         setOpportunity(detail)
         setEventParticipating(Boolean(detail.isParticipating))
         setIsFavorite(Boolean(detail.isFavoriteByMe))
+        upsertOpportunitySocialState(detail)
 
         const similarResponse = await fetchHomeOpportunities(
           {
@@ -108,6 +110,7 @@ export function OpportunityDetailsPage() {
         }
 
         setSimilarOpportunities(similarResponse.items.filter((item) => item.id !== detail.id).slice(0, 3))
+        upsertOpportunitySocialStates(similarResponse.items)
       } catch (error) {
         if (!controller.signal.aborted) {
           setErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить вакансию.')
@@ -141,10 +144,11 @@ export function OpportunityDetailsPage() {
       return
     }
 
+    const entityType = resolveOpportunitySocialEntityType(opportunity)
     const nextValue = !isFavorite
 
     try {
-      if (opportunity.entityType === 'vacancy') {
+      if (entityType === 'vacancy') {
         if (nextValue) {
           await addVacancyToFavorites(opportunity.id)
         } else {
@@ -160,6 +164,7 @@ export function OpportunityDetailsPage() {
 
       setIsFavorite(nextValue)
       setOpportunity((current) => (current ? { ...current, isFavoriteByMe: nextValue } : current))
+      setOpportunityFavoriteState(entityType, opportunity.id, nextValue)
       setActionError(false)
       setActionMessage(nextValue ? 'Добавлено в избранное.' : 'Удалено из избранного.')
     } catch (error) {

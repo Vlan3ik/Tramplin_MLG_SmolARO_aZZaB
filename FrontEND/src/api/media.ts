@@ -1,4 +1,4 @@
-import { postForm } from './client'
+import { deleteJson, postForm } from './client'
 
 type UploadMediaResponse = {
   url: string
@@ -23,4 +23,15 @@ export async function uploadCompanyLogo(companyId: number, file: File) {
   formData.append('file', file)
 
   return postForm<UploadMediaResponse>(`/media/companies/${companyId}/logo`, formData)
+}
+
+export async function uploadCompanyGalleryMedia(companyId: number, file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  return postForm<UploadMediaResponse>(`/media/companies/${companyId}/gallery`, formData)
+}
+
+export async function deleteCompanyGalleryMedia(companyId: number, mediaId: number) {
+  return deleteJson<unknown>(`/media/companies/${companyId}/gallery/${mediaId}`)
 }

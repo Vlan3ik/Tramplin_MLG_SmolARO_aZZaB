@@ -1,9 +1,12 @@
+import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import { fetchSeekerSettings } from './api/me'
 import { DashboardRedirect } from './components/auth/DashboardRedirect'
 import { GuestOnlyRoute } from './components/auth/GuestOnlyRoute'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { ChatWidget } from './components/chat/ChatWidget'
 import { PublicLayout } from './components/layout/PublicLayout'
+import { useAuth } from './hooks/useAuth'
 import { AboutPlatformPage } from './pages/AboutPlatformPage'
 import { CompaniesListPage } from './pages/CompaniesListPage'
 import { CompanyPage } from './pages/CompanyPage'
@@ -21,10 +24,12 @@ import { CuratorCreateCompanyPage } from './pages/dashboards/CuratorCreateCompan
 import { CuratorCreateUserPage } from './pages/dashboards/CuratorCreateUserPage'
 import { CuratorCreateVacancyPage } from './pages/dashboards/CuratorCreateVacancyPage'
 import { EmployerDashboardPage } from './pages/dashboards/EmployerDashboardPage'
+import { CuratorModerationPage } from './pages/dashboards/CuratorModerationPage'
 import { SeekerDashboardPage } from './pages/dashboards/SeekerDashboardPage'
 import { SeekerPortfolioProjectPage } from './pages/dashboards/SeekerPortfolioProjectPage'
 import { SeekerResumePrintPage } from './pages/dashboards/SeekerResumePrintPage'
 import { PlatformRole } from './types/auth'
+import { applySeekerPrivacySettings, resetSeekerPrivacySettings } from './utils/seeker-privacy-settings'
 
 function PortfolioLegacyRedirect() {
   const { username = '' } = useParams<{ username?: string }>()
@@ -33,11 +38,30 @@ function PortfolioLegacyRedirect() {
 }
 
 function App() {
+  const { session } = useAuth()
   const location = useLocation()
   const isResumePrintPage = location.pathname.startsWith('/dashboard/seeker/resume/print')
   const isResumeEditPage = location.pathname.startsWith('/dashboard/seeker/resume/edit')
   const isResumeViewPage = location.pathname === '/resumes'
   const shouldHideChatWidget = isResumePrintPage || isResumeEditPage || isResumeViewPage
+
+  useEffect(() => {
+    if (!session?.accessToken || session.platformRole !== PlatformRole.Seeker) {
+      resetSeekerPrivacySettings()
+      return
+    }
+
+    const controller = new AbortController()
+    void fetchSeekerSettings(controller.signal)
+      .then((settings) => {
+        applySeekerPrivacySettings(settings)
+      })
+      .catch(() => {
+        // No-op: keep defaults if settings are temporarily unavailable.
+      })
+
+    return () => controller.abort()
+  }, [session?.accessToken, session?.platformRole, session?.user?.id])
 
   return (
     <>
@@ -78,6 +102,7 @@ function App() {
 
         <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Curator, PlatformRole.Admin]} />}>
           <Route path="dashboard/curator" element={<CuratorDashboardPage />} />
+          <Route path="dashboard/curator/moderation" element={<CuratorModerationPage />} />
           <Route path="dashboard/curator/users/create" element={<CuratorCreateUserPage />} />
           <Route path="dashboard/curator/companies/create" element={<CuratorCreateCompanyPage />} />
           <Route path="dashboard/curator/vacancies/create" element={<CuratorCreateVacancyPage />} />

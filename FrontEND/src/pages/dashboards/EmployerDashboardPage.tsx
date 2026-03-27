@@ -31,7 +31,8 @@ import {
   type EmployerCompanyLink,
   type EmployerOpportunity,
 } from '../../api/employer'
-import { uploadCompanyLogo } from '../../api/media'
+import { deleteCompanyGalleryMedia, uploadCompanyGalleryMedia, uploadCompanyLogo } from '../../api/media'
+import { CompanyMediaGallery } from '../../components/company/CompanyMediaGallery'
 import { Footer } from '../../components/layout/Footer'
 import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
@@ -325,6 +326,8 @@ export function EmployerDashboardPage() {
   const [submittingVerification, setSubmittingVerification] = useState(false)
   const [creatingCompany, setCreatingCompany] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingGalleryMedia, setUploadingGalleryMedia] = useState(false)
+  const [deletingGalleryMediaId, setDeletingGalleryMediaId] = useState<number | null>(null)
   const [creatingVacancy, setCreatingVacancy] = useState(false)
   const [creatingOpportunity, setCreatingOpportunity] = useState(false)
   const [updatingApplicationId, setUpdatingApplicationId] = useState<number | null>(null)
@@ -1346,6 +1349,46 @@ export function EmployerDashboardPage() {
     }
   }
 
+  async function onUploadGalleryMedia(file: File) {
+    if (!company) {
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setUploadingGalleryMedia(true)
+
+    try {
+      await uploadCompanyGalleryMedia(company.id, file)
+      setSuccess('Медиа добавлено в галерею компании.')
+      await loadDashboard()
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Не удалось добавить медиа в галерею компании.')
+    } finally {
+      setUploadingGalleryMedia(false)
+    }
+  }
+
+  async function onDeleteGalleryMedia(mediaId: number) {
+    if (!company) {
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setDeletingGalleryMediaId(mediaId)
+
+    try {
+      await deleteCompanyGalleryMedia(company.id, mediaId)
+      setSuccess('Элемент галереи удален.')
+      await loadDashboard()
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Не удалось удалить элемент галереи.')
+    } finally {
+      setDeletingGalleryMediaId(null)
+    }
+  }
+
   return (
     <div className="app-shell">
       <TopServiceBar />
@@ -1552,6 +1595,20 @@ export function EmployerDashboardPage() {
             </button>
           </form>
         )}
+        {!companyMissing && company ? (
+          <CompanyMediaGallery
+            className="employer-company-media"
+            items={company.media}
+            title="Галерея компании"
+            emptyText="Добавьте фото или видео офиса и команды."
+            canManage
+            uploadButtonLabel="Добавить медиа"
+            isUploading={uploadingGalleryMedia}
+            deletingMediaId={deletingGalleryMediaId}
+            onUpload={onUploadGalleryMedia}
+            onDelete={onDeleteGalleryMedia}
+          />
+        ) : null}
               </section> : null}
 
               {tab === 'create' ? <section className="dashboard-section card seeker-profile-panel">

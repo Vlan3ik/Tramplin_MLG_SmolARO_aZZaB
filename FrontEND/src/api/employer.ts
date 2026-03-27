@@ -1,6 +1,7 @@
 import { deleteJson, getJson, patchJson, postJson } from './client'
 import type { OpportunityType } from '../types/opportunity'
 import type { ResumeEducation, ResumeExperience, ResumeLink, ResumeProject, ResumeSkill } from '../types/resume'
+import type { CompanyMedia, CompanyMediaType } from '../types/company'
 
 type PagedResponse<TItem> = {
   items?: TItem[] | null
@@ -32,10 +33,19 @@ type EmployerCompanyApi = {
   websiteUrl: string | null
   publicEmail: string | null
   publicPhone: string | null
+  media: EmployerCompanyMediaApi[] | null
   baseCityId: number
   status: number | string
   membershipRole: number | string
   chatSettings: EmployerCompanyChatSettingsApi | null
+}
+
+type EmployerCompanyMediaApi = {
+  id: number
+  type: string | number | null
+  url: string | null
+  mimeType: string | null
+  sortOrder: number | null
 }
 
 type EmployerVacancyListItemApi = {
@@ -217,6 +227,10 @@ type EmployerVacancyUpsertRequest = {
   kind: number
   format: number
   status: number
+  cityId: number | null
+  locationId: number | null
+  streetName: string | null
+  houseNumber: string | null
   mapPoint: {
     latitude: number
     longitude: number
@@ -237,6 +251,10 @@ type EmployerOpportunityUpsertRequest = {
   kind: number
   format: number
   status: number
+  cityId: number | null
+  locationId: number | null
+  streetName: string | null
+  houseNumber: string | null
   mapPoint: {
     latitude: number
     longitude: number
@@ -256,6 +274,21 @@ type EmployerLocationApi = {
   latitude: number | null
   longitude: number | null
   streetName: string | null
+  houseNumber: string | null
+}
+
+type EmployerAddressCitySuggestionApi = {
+  cityId: number
+  cityName: string | null
+  regionName: string | null
+  countryCode: string | null
+}
+
+type EmployerAddressStreetSuggestionApi = {
+  streetName: string | null
+}
+
+type EmployerAddressHouseSuggestionApi = {
   houseNumber: string | null
 }
 
@@ -305,6 +338,7 @@ export type EmployerCompany = {
   industry: string
   description: string
   logoUrl: string | null
+  media: CompanyMedia[]
   websiteUrl: string
   publicEmail: string
   publicPhone: string
@@ -319,6 +353,43 @@ export type EmployerCompany = {
     workingHoursTimezone: string
     workingHoursFrom: string
     workingHoursTo: string
+  }
+}
+
+function parseCompanyMediaType(value: EmployerCompanyMediaApi['type'], mimeType: string | null): CompanyMediaType | null {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (normalized === 'photo' || normalized === 'image') return 'photo'
+    if (normalized === 'video') return 'video'
+  }
+
+  if (typeof value === 'number') {
+    if (value === 1) return 'photo'
+    if (value === 2) return 'video'
+  }
+
+  if (mimeType?.toLowerCase().startsWith('video/')) return 'video'
+  if (mimeType?.toLowerCase().startsWith('image/')) return 'photo'
+
+  return null
+}
+
+function mapCompanyMedia(item: EmployerCompanyMediaApi): CompanyMedia | null {
+  if (!item.url) {
+    return null
+  }
+
+  const mediaType = parseCompanyMediaType(item.type, item.mimeType)
+  if (!mediaType) {
+    return null
+  }
+
+  return {
+    id: item.id,
+    type: mediaType,
+    url: item.url,
+    mimeType: item.mimeType,
+    sortOrder: item.sortOrder ?? 0,
   }
 }
 
@@ -450,6 +521,8 @@ export type CreateEmployerVacancyRequest = {
   } | null
   cityId?: number | null
   locationId?: number | null
+  streetName?: string | null
+  houseNumber?: string | null
   locationLatitude?: number | null
   locationLongitude?: number | null
   salaryFrom?: number | null
@@ -474,6 +547,8 @@ export type CreateEmployerOpportunityRequest = {
   } | null
   cityId?: number | null
   locationId?: number | null
+  streetName?: string | null
+  houseNumber?: string | null
   locationLatitude?: number | null
   locationLongitude?: number | null
   priceType?: number
@@ -523,6 +598,21 @@ export type EmployerOpportunityDetail = {
   locationStreetName: string
   locationHouseNumber: string
   tags: string[]
+}
+
+export type EmployerAddressCitySuggestion = {
+  cityId: number
+  cityName: string
+  regionName: string
+  countryCode: string
+}
+
+export type EmployerAddressStreetSuggestion = {
+  streetName: string
+}
+
+export type EmployerAddressHouseSuggestion = {
+  houseNumber: string
 }
 
 const companyStatusMap: Record<number, string> = {
@@ -635,6 +725,10 @@ function mapEmployerCompany(response: EmployerCompanyApi): EmployerCompany {
     industry: response.industry ?? '',
     description: response.description ?? '',
     logoUrl: response.logoUrl,
+    media: (response.media ?? [])
+      .map(mapCompanyMedia)
+      .filter((item): item is CompanyMedia => item != null)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
     websiteUrl: response.websiteUrl ?? '',
     publicEmail: response.publicEmail ?? '',
     publicPhone: response.publicPhone ?? '',
@@ -705,6 +799,10 @@ function mapVacancyForCreate(payload: CreateEmployerVacancyRequest): EmployerVac
     kind: payload.kind ?? 2,
     format: payload.format ?? 2,
     status: payload.status ?? 1,
+    cityId: payload.cityId ?? null,
+    locationId: payload.locationId ?? null,
+    streetName: payload.streetName?.trim() || null,
+    houseNumber: payload.houseNumber?.trim() || null,
     mapPoint: resolveMapPoint(payload),
     salaryFrom: payload.salaryFrom ?? null,
     salaryTo: payload.salaryTo ?? null,
@@ -724,6 +822,10 @@ function mapOpportunityForCreate(payload: CreateEmployerOpportunityRequest): Emp
     kind: payload.kind ?? 4,
     format: payload.format ?? 2,
     status: payload.status ?? 1,
+    cityId: payload.cityId ?? null,
+    locationId: payload.locationId ?? null,
+    streetName: payload.streetName?.trim() || null,
+    houseNumber: payload.houseNumber?.trim() || null,
     mapPoint: resolveMapPoint(payload),
     priceType: payload.priceType ?? 1,
     priceAmount: payload.priceAmount ?? null,
@@ -897,6 +999,59 @@ export async function fetchEmployerOpportunities(signal?: AbortSignal) {
 export async function fetchEmployerCompanyOpportunities(signal?: AbortSignal) {
   const [vacancies, opportunities] = await Promise.all([fetchEmployerVacancies(signal), fetchEmployerOpportunities(signal)])
   return [...vacancies, ...opportunities].sort((a, b) => Date.parse(b.publishAt) - Date.parse(a.publishAt))
+}
+
+export async function fetchEmployerLocationCities(query: string, limit = 10, signal?: AbortSignal) {
+  const params = new URLSearchParams()
+  params.set('query', query)
+  params.set('limit', String(limit))
+
+  const response = await getJson<EmployerAddressCitySuggestionApi[]>(`/employer/locations/cities?${params.toString()}`, { signal })
+  return (Array.isArray(response) ? response : []).map(
+    (item): EmployerAddressCitySuggestion => ({
+      cityId: item.cityId,
+      cityName: item.cityName ?? '',
+      regionName: item.regionName ?? '',
+      countryCode: item.countryCode ?? '',
+    }),
+  )
+}
+
+export async function fetchEmployerLocationStreets(cityId: number, query: string, limit = 10, signal?: AbortSignal) {
+  const params = new URLSearchParams()
+  params.set('cityId', String(cityId))
+  params.set('query', query)
+  params.set('limit', String(limit))
+
+  const response = await getJson<EmployerAddressStreetSuggestionApi[]>(`/employer/locations/streets?${params.toString()}`, { signal })
+  return (Array.isArray(response) ? response : []).map(
+    (item): EmployerAddressStreetSuggestion => ({
+      streetName: item.streetName ?? '',
+    }),
+  )
+}
+
+export async function fetchEmployerLocationHouses(
+  cityId: number,
+  streetName: string,
+  query = '',
+  limit = 10,
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams()
+  params.set('cityId', String(cityId))
+  params.set('streetName', streetName)
+  if (query.trim()) {
+    params.set('query', query)
+  }
+  params.set('limit', String(limit))
+
+  const response = await getJson<EmployerAddressHouseSuggestionApi[]>(`/employer/locations/houses?${params.toString()}`, { signal })
+  return (Array.isArray(response) ? response : []).map(
+    (item): EmployerAddressHouseSuggestion => ({
+      houseNumber: item.houseNumber ?? '',
+    }),
+  )
 }
 
 export function createEmployerVacancy(payload: CreateEmployerVacancyRequest) {

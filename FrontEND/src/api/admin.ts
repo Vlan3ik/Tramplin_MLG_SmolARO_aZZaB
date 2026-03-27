@@ -53,6 +53,17 @@ type AdminOpportunityApi = {
   publishAt: string
 }
 
+type AdminResumeApi = {
+  userId: number
+  username: string
+  fio: string
+  headline: string | null
+  desiredPosition: string | null
+  updatedAt: string
+  isArchived: boolean
+  userStatus: number | string
+}
+
 type AdminUserUpsertApiRequest = {
   email: string
   username: string
@@ -153,6 +164,17 @@ export type AdminOpportunity = {
   kind: number
   format: number
   publishAt: string
+}
+
+export type AdminResume = {
+  userId: number
+  username: string
+  fio: string
+  headline: string
+  desiredPosition: string
+  updatedAt: string
+  isArchived: boolean
+  userStatus: number
 }
 
 export type AdminUserUpsertRequest = {
@@ -283,6 +305,19 @@ function mapOpportunity(item: AdminOpportunityApi): AdminOpportunity {
   }
 }
 
+function mapResume(item: AdminResumeApi): AdminResume {
+  return {
+    userId: item.userId,
+    username: item.username ?? '',
+    fio: item.fio ?? '',
+    headline: item.headline ?? '',
+    desiredPosition: item.desiredPosition ?? '',
+    updatedAt: item.updatedAt,
+    isArchived: item.isArchived ?? false,
+    userStatus: parseEnum(item.userStatus),
+  }
+}
+
 function mapUserUpsertRequest(payload: AdminUserUpsertRequest): AdminUserUpsertApiRequest {
   return {
     email: payload.email.trim(),
@@ -405,6 +440,10 @@ export function deleteAdminUser(id: number) {
   return deleteJson<unknown>(`/admin/users/${id}`)
 }
 
+export function updateAdminUserStatus(id: number, status: number) {
+  return patchJson<unknown, { status: number }>(`/admin/users/${id}/status`, { status })
+}
+
 export async function fetchAdminCompanies(options: FetchListOptions = {}) {
   const response = await getJson<PagedResponse<AdminCompanyApi>>(`/admin/companies?${buildListQuery(options)}`, { signal: options.signal })
   return {
@@ -431,6 +470,10 @@ export function verifyAdminCompany(id: number) {
 
 export function rejectAdminCompany(id: number) {
   return postJson<unknown, Record<string, never>>(`/admin/companies/${id}/reject`, {})
+}
+
+export function updateAdminCompanyStatus(id: number, status: number) {
+  return patchJson<unknown, { status: number }>(`/admin/companies/${id}/status`, { status })
 }
 
 export async function fetchAdminVacancies(options: FetchListOptions = {}) {
@@ -479,4 +522,24 @@ export function updateAdminOpportunityStatus(id: number, status: number) {
 
 export function deleteAdminOpportunity(id: number) {
   return deleteJson<unknown>(`/admin/opportunities/${id}`)
+}
+
+export async function fetchAdminResumes(options: FetchListOptions = {}) {
+  const response = await getJson<PagedResponse<AdminResumeApi>>(`/admin/resumes?${buildListQuery(options)}`, { signal: options.signal })
+  return {
+    items: (response.items ?? []).map(mapResume),
+    totalCount: response.totalCount ?? 0,
+  }
+}
+
+export function updateAdminResumeArchive(userId: number, isArchived: boolean) {
+  return patchJson<unknown, { isArchived: boolean }>(`/admin/resumes/${userId}/archive`, { isArchived })
+}
+
+export function banAdminResumeAuthor(userId: number) {
+  return postJson<unknown, Record<string, never>>(`/admin/resumes/${userId}/ban-author`, {})
+}
+
+export function deleteAdminResume(userId: number) {
+  return deleteJson<unknown>(`/admin/resumes/${userId}`)
 }

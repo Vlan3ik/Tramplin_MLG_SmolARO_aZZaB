@@ -3,9 +3,8 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useNavigate } from 'react-router-dom'
 import type { Opportunity } from '../../types/opportunity'
-import { getOpportunityStateBadges } from '../../utils/opportunity-state'
 import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
-import { getFavoriteEntityType, isFavoriteEntity, subscribeToFavoriteOpportunities } from '../../utils/favorites'
+import { getFavoriteEntityType, isFavoriteEntity } from '../../utils/favorites'
 import { OpportunityStateBadges } from './OpportunityStateBadges'
 import {
   isMapItemViewed,
@@ -13,7 +12,13 @@ import {
   subscribeToViewedMapItems,
   type ViewedMapEntityType,
 } from '../../utils/viewedMapItems'
+import {
+  readOpportunitySocialState,
+  subscribeToOpportunitySocialState,
+  upsertOpportunitySocialStates,
+} from '../../utils/opportunity-social-state'
 import { cartoStyle } from './mapStyle'
+import { buildMapHoverCardNode } from './map-hover-card'
 
 type MarkerKind = 'single' | 'cluster'
 type MarkerTone = 'vacancy-like' | 'event'
@@ -54,80 +59,6 @@ function resolveIsFavorite(item: Opportunity) {
   return Boolean(item.isFavoriteByMe) || isFavoriteEntity(getFavoriteEntityType(item), item.id)
 }
 
-function buildHoverCardNode(marker: OpportunityMarker) {
-  const root = document.createElement('div')
-  root.className = 'map-hover-card'
-
-  if (marker.kind === 'cluster') {
-    const title = document.createElement('strong')
-    title.textContent = `В точке: ${marker.count}`
-    root.append(title)
-
-    const list = document.createElement('div')
-    list.className = 'map-hover-card__list'
-
-    marker.opportunities.slice(0, 3).forEach((item) => {
-      const row = document.createElement('div')
-      row.className = 'map-hover-card__item'
-
-      const itemTitle = document.createElement('p')
-      itemTitle.textContent = item.title
-      row.append(itemTitle)
-
-      const badges = getOpportunityStateBadges(item, resolveIsFavorite(item))
-      if (badges.length) {
-        const badgesRow = document.createElement('div')
-        badgesRow.className = 'map-hover-card__badges'
-        badges.forEach((badge) => {
-          const badgeNode = document.createElement('span')
-          badgeNode.className = `map-hover-card__badge map-hover-card__badge--${badge.tone}`
-          badgeNode.textContent = badge.label
-          badgesRow.append(badgeNode)
-        })
-        row.append(badgesRow)
-      }
-
-      list.append(row)
-    })
-
-    root.append(list)
-    return root
-  }
-
-  const [item] = marker.opportunities
-  if (!item) {
-    return root
-  }
-
-  const title = document.createElement('strong')
-  title.textContent = item.title
-  root.append(title)
-
-  const company = document.createElement('p')
-  company.textContent = item.company
-  root.append(company)
-
-  const compensation = document.createElement('p')
-  compensation.className = 'map-hover-card__compensation'
-  compensation.textContent = item.compensation
-  root.append(compensation)
-
-  const badges = getOpportunityStateBadges(item, marker.isFavorite)
-  if (badges.length) {
-    const badgesRow = document.createElement('div')
-    badgesRow.className = 'map-hover-card__badges'
-    badges.forEach((badge) => {
-      const badgeNode = document.createElement('span')
-      badgeNode.className = `map-hover-card__badge map-hover-card__badge--${badge.tone}`
-      badgeNode.textContent = badge.label
-      badgesRow.append(badgeNode)
-    })
-    root.append(badgesRow)
-  }
-
-  return root
-}
-
 export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetry, onBoundsChange, jumpToRequest }: MapBoardProps) {
   const navigate = useNavigate()
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
@@ -140,6 +71,10 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
   const hoverPopupRef = useRef<maplibregl.Popup | null>(null)
   const [markersVersion, setMarkersVersion] = useState(0)
   const [activePoint, setActivePoint] = useState<OpportunityMarker | null>(null)
+
+  useEffect(() => {
+    upsertOpportunitySocialStates(opportunities)
+  }, [opportunities])
 
   const markerData = useMemo<OpportunityMarker[]>(() => {
     const groups = new Map<
@@ -169,13 +104,23 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
       })
 
     return Array.from(groups.entries()).map(([key, group]) => {
-      const hasOnlyEvents = group.opportunities.every((item) => item.type === 'event')
-      const tone: MarkerTone = hasOnlyEvents ? 'event' : 'vacancy-like'
-      const isGroupViewed = group.opportunities.some((item) => isMapItemViewed(resolveEntityType(item), item.id))
-      const isGroupFavorite = group.opportunities.some((item) => resolveIsFavorite(item))
-      const hasGroupFriendsFavorite = group.opportunities.some((item) => item.friendFavoritesCount > 0)
+      const enrichedOpportunities = group.opportunities.map((item) => {
+        const socialState = readOpportunitySocialState(item)
+        return {
+          ...item,
+          isFavoriteByMe: socialState.isFavoriteByMe,
+          friendFavoritesCount: socialState.friendFavoritesCount,
+          friendsAppliedCount: socialState.friendsAppliedCount,
+        }
+      })
 
-      if (group.opportunities.length > 1) {
+      const hasOnlyEvents = enrichedOpportunities.every((item) => item.type === 'event')
+      const tone: MarkerTone = hasOnlyEvents ? 'event' : 'vacancy-like'
+      const isGroupViewed = enrichedOpportunities.some((item) => isMapItemViewed(resolveEntityType(item), item.id))
+      const isGroupFavorite = enrichedOpportunities.some((item) => resolveIsFavorite(item))
+      const hasGroupFriendsFavorite = enrichedOpportunities.some((item) => item.friendFavoritesCount > 0)
+
+      if (enrichedOpportunities.length > 1) {
         return {
           id: key,
           lngLat: group.lngLat,
@@ -186,12 +131,12 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
           hasFriendsFavorite: hasGroupFriendsFavorite,
           entityType: null,
           opportunityId: null,
-          count: group.opportunities.length,
-          opportunities: group.opportunities,
+          count: enrichedOpportunities.length,
+          opportunities: enrichedOpportunities,
         }
       }
 
-      const [singleItem] = group.opportunities
+      const [singleItem] = enrichedOpportunities
       const entityType = resolveEntityType(singleItem)
 
       return {
@@ -205,13 +150,13 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
         entityType,
         opportunityId: singleItem.id,
         count: 1,
-        opportunities: group.opportunities,
+        opportunities: enrichedOpportunities,
       }
     })
   }, [markersVersion, opportunities])
 
   useEffect(() => {
-    const unsubscribeFavorites = subscribeToFavoriteOpportunities(() => {
+    const unsubscribeSocial = subscribeToOpportunitySocialState(() => {
       setMarkersVersion((current) => current + 1)
     })
     const unsubscribeViewed = subscribeToViewedMapItems(() => {
@@ -219,7 +164,7 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
     })
 
     return () => {
-      unsubscribeFavorites()
+      unsubscribeSocial()
       unsubscribeViewed()
     }
   }, [])
@@ -371,7 +316,7 @@ export function MapBoard({ opportunities, total, isLoading, errorMessage, onRetr
 
           popup
             .setLngLat(marker.lngLat)
-            .setDOMContent(buildHoverCardNode(marker))
+            .setDOMContent(buildMapHoverCardNode(marker))
             .addTo(map)
         })
 

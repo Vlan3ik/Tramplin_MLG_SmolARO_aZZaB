@@ -70,6 +70,8 @@ type SeekerSettingsApiResponse = {
   resumeVisibility: SeekerSettings['resumeVisibility']
   openToWork: boolean
   showContactsInResume: boolean
+  showLinksInResume?: boolean
+  showSocialProofs?: boolean
 }
 
 export type MeApiResponse = {
@@ -225,6 +227,8 @@ export async function fetchSeekerSettings(signal?: AbortSignal): Promise<SeekerS
     resumeVisibility: response.resumeVisibility,
     openToWork: response.openToWork,
     showContactsInResume: response.showContactsInResume,
+    showLinksInResume: response.showLinksInResume ?? true,
+    showSocialProofs: response.showSocialProofs ?? true,
   }
 }
 
@@ -237,6 +241,8 @@ export async function updateSeekerSettings(payload: UpdateSeekerSettingsRequest)
     resumeVisibility: response.resumeVisibility,
     openToWork: response.openToWork,
     showContactsInResume: response.showContactsInResume,
+    showLinksInResume: response.showLinksInResume ?? payload.showLinksInResume,
+    showSocialProofs: response.showSocialProofs ?? payload.showSocialProofs,
   }
 }
 

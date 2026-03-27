@@ -290,6 +290,7 @@ export function CuratorDashboardPage() {
               <div className="admin-toolbar">
                 <Link className="btn btn--primary" to="/dashboard/curator/users/create">Создать пользователя</Link>
                 <Link className="btn btn--primary" to="/dashboard/curator/companies/create">Создать компанию</Link>
+                <Link className="btn btn--ghost" to="/dashboard/curator/moderation">Модерация</Link>
               </div>
             </div>
             <div className="seeker-profile-hero__meta">

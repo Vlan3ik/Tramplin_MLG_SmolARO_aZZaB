@@ -68,6 +68,7 @@ import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
 import { getSubscriptionActionLabel } from '../../utils/subscription-labels'
 import { getTagToneClass } from '../../utils/tag-tones'
 import { formatSkillLevelDisplay, SKILL_LEVEL_OPTIONS } from '../../utils/skill-levels'
+import { applySeekerPrivacySettings } from '../../utils/seeker-privacy-settings'
 
 type TabId = 'responses' | 'favorites' | 'resume' | 'profile'
 type SubscriptionTabId = 'seekers' | 'employers'
@@ -308,6 +309,18 @@ function resolveProfileVisibilityMode(settings: Pick<SeekerSettings, 'profileVis
 
 function toResumeAndProfileScope(mode: ProfileVisibilityMode) {
   return mode === 'private' ? PRIVACY_SCOPE_PRIVATE : PRIVACY_SCOPE_AUTHORIZED_USERS
+}
+
+function createDefaultSeekerSettings(userId: number): SeekerSettings {
+  return {
+    userId,
+    profileVisibility: PRIVACY_SCOPE_AUTHORIZED_USERS,
+    resumeVisibility: PRIVACY_SCOPE_AUTHORIZED_USERS,
+    openToWork: true,
+    showContactsInResume: false,
+    showLinksInResume: true,
+    showSocialProofs: true,
+  }
 }
 
 function resolveAvatarUrl(value: string | null | undefined) {
@@ -1275,6 +1288,7 @@ export function SeekerDashboardPage() {
 
       if (settingsResult.status === 'fulfilled') {
         setSeekerSettings(settingsResult.value)
+        applySeekerPrivacySettings(settingsResult.value)
         setProfileVisibility(resolveProfileVisibilityMode(settingsResult.value))
       } else if (!isAbortError(settingsResult.reason)) {
         setProfileError((current) => current || (settingsResult.reason instanceof Error ? settingsResult.reason.message : 'Ошибка загрузки настроек приватности.'))
@@ -1916,6 +1930,8 @@ export function SeekerDashboardPage() {
         }),
     [resume.links],
   )
+  const canShowResumeLinks = seekerSettings?.showLinksInResume ?? true
+  const visibleSocialLinks = canShowResumeLinks ? socialLinks : []
   const heroStyle = useMemo(
     () =>
       bannerUrl
@@ -2046,22 +2062,19 @@ export function SeekerDashboardPage() {
       setProfileForm(createProfileForm(updated))
 
       const nextProfileScope = toResumeAndProfileScope(profileVisibility)
-      const settingsToSave = seekerSettings ?? {
-        userId: updated.userId,
-        profileVisibility: PRIVACY_SCOPE_AUTHORIZED_USERS,
-        resumeVisibility: PRIVACY_SCOPE_AUTHORIZED_USERS,
-        openToWork: true,
-        showContactsInResume: false,
-      }
+      const settingsToSave = seekerSettings ?? createDefaultSeekerSettings(updated.userId)
 
       const updatedSettings = await updateSeekerSettings({
         profileVisibility: nextProfileScope,
         resumeVisibility: settingsToSave.resumeVisibility,
         openToWork: settingsToSave.openToWork,
         showContactsInResume: settingsToSave.showContactsInResume,
+        showLinksInResume: settingsToSave.showLinksInResume,
+        showSocialProofs: settingsToSave.showSocialProofs,
       })
 
       setSeekerSettings(updatedSettings)
+      applySeekerPrivacySettings(updatedSettings)
       setSuccess('Профиль сохранен.')
       setIsSettingsOpen(false)
       if (session.user) {
@@ -2903,8 +2916,8 @@ export function SeekerDashboardPage() {
                   )}
                 </div>
                 <div className="seeker-profile-hero-exact__socials">
-                  {socialLinks.length ? (
-                    socialLinks.map((link) => (
+                  {visibleSocialLinks.length ? (
+                    visibleSocialLinks.map((link) => (
                       <a
                         key={`hero-link-${link.id}`}
                         className="seeker-profile-hero-exact__social-link"
@@ -2918,7 +2931,9 @@ export function SeekerDashboardPage() {
                       </a>
                     ))
                   ) : (
-                    <span className="seeker-profile-hero-exact__social-empty">Ссылок пока нет</span>
+                    <span className="seeker-profile-hero-exact__social-empty">
+                      {canShowResumeLinks ? 'Ссылок пока нет' : 'Ссылки скрыты настройками приватности'}
+                    </span>
                   )}
                 </div>
               </div>
@@ -3390,17 +3405,27 @@ export function SeekerDashboardPage() {
                           <span>Контакты в резюме</span>
                           <strong>{seekerSettings?.showContactsInResume ? 'Показываются' : 'Скрыты'}</strong>
                         </p>
+                        <p>
+                          {canShowResumeLinks ? <Check size={16} /> : <CircleOff size={16} />}
+                          <span>Ссылки в резюме</span>
+                          <strong>{canShowResumeLinks ? 'Показываются' : 'Скрыты'}</strong>
+                        </p>
+                        <p>
+                          {seekerSettings?.showSocialProofs ? <Check size={16} /> : <CircleOff size={16} />}
+                          <span>Соцдоказательства в карточках</span>
+                          <strong>{seekerSettings?.showSocialProofs ? 'Показываются' : 'Скрыты'}</strong>
+                        </p>
                       </div>
                       <div className="seeker-profile-info-links">
-                        {socialLinks.length ? (
-                          socialLinks.map((link) => (
+                        {visibleSocialLinks.length ? (
+                          visibleSocialLinks.map((link) => (
                             <a key={`profile-link-${link.id}`} href={link.href} target="_blank" rel="noreferrer">
                               {renderSocialLinkIcon(link.kind, link.label)}
                               <span>{link.label}</span>
                             </a>
                           ))
                         ) : (
-                          <p>Ссылки из резюме пока не добавлены.</p>
+                          <p>{canShowResumeLinks ? 'Ссылки из резюме пока не добавлены.' : 'Ссылки из резюме скрыты настройками приватности.'}</p>
                         )}
                       </div>
                     </article>
@@ -3453,7 +3478,13 @@ export function SeekerDashboardPage() {
                       </article>
                       <article className="resume-output-block">
                         <h3>Ссылки на соцсети</h3>
-                        {resume.links.length ? resume.links.map((link) => <a key={link.id} href={link.url} target="_blank" rel="noreferrer">{link.label || link.kind}</a>) : <p>Ссылки не добавлены.</p>}
+                        {!canShowResumeLinks ? (
+                          <p>Ссылки скрыты настройками приватности профиля.</p>
+                        ) : resume.links.length ? (
+                          resume.links.map((link) => <a key={link.id} href={link.url} target="_blank" rel="noreferrer">{link.label || link.kind}</a>)
+                        ) : (
+                          <p>Ссылки не добавлены.</p>
+                        )}
                       </article>
                     </div>
                   ) : null}
@@ -3622,11 +3653,9 @@ export function SeekerDashboardPage() {
                     checked={Boolean(seekerSettings?.openToWork)}
                     onChange={(event) =>
                       setSeekerSettings((current) => ({
+                        ...(current ?? createDefaultSeekerSettings(profile?.userId ?? 0)),
                         userId: current?.userId ?? profile?.userId ?? 0,
-                        profileVisibility: current?.profileVisibility ?? PRIVACY_SCOPE_AUTHORIZED_USERS,
-                        resumeVisibility: current?.resumeVisibility ?? PRIVACY_SCOPE_AUTHORIZED_USERS,
                         openToWork: event.target.checked,
-                        showContactsInResume: current?.showContactsInResume ?? false,
                       }))
                     }
                   />
@@ -3638,16 +3667,44 @@ export function SeekerDashboardPage() {
                     checked={Boolean(seekerSettings?.showContactsInResume)}
                     onChange={(event) =>
                       setSeekerSettings((current) => ({
+                        ...(current ?? createDefaultSeekerSettings(profile?.userId ?? 0)),
                         userId: current?.userId ?? profile?.userId ?? 0,
-                        profileVisibility: current?.profileVisibility ?? PRIVACY_SCOPE_AUTHORIZED_USERS,
-                        resumeVisibility: current?.resumeVisibility ?? PRIVACY_SCOPE_AUTHORIZED_USERS,
-                        openToWork: current?.openToWork ?? true,
                         showContactsInResume: event.target.checked,
                       }))
                     }
                   />
                   <span>Показывать контакты в резюме</span>
                 </label>
+                <label className="profile-settings-modal__toggle">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(seekerSettings?.showLinksInResume ?? true)}
+                    onChange={(event) =>
+                      setSeekerSettings((current) => ({
+                        ...(current ?? createDefaultSeekerSettings(profile?.userId ?? 0)),
+                        userId: current?.userId ?? profile?.userId ?? 0,
+                        showLinksInResume: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>Показывать ссылки в резюме</span>
+                </label>
+                <label className="profile-settings-modal__toggle">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(seekerSettings?.showSocialProofs ?? true)}
+                    onChange={(event) =>
+                      setSeekerSettings((current) => ({
+                        ...(current ?? createDefaultSeekerSettings(profile?.userId ?? 0)),
+                        userId: current?.userId ?? profile?.userId ?? 0,
+                        showSocialProofs: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>Показывать соцдоказательства в карточках</span>
+                </label>
+                <p>Если выключить «ссылки», в профиле и резюме не будут показаны ссылки из блока «Ссылки на соцсети».</p>
+                <p>Если выключить «соцдоказательства», карточки вакансий и мероприятий скроют плашки «у друзей в избранном» и «откликнулись N друзей».</p>
                 <p>Скрытый профиль не отображается в разделе «Резюме».</p>
               </section>
               <div className="profile-settings-modal__actions">

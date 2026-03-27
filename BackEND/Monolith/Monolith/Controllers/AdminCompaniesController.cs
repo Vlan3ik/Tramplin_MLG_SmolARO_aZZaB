@@ -177,6 +177,24 @@ public class AdminCompaniesController(AppDbContext dbContext) : ControllerBase
         return NoContent();
     }
 
+    [HttpPatch("{id:long}/status")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> UpdateStatus(long id, AdminCompanyStatusUpdateRequest request, CancellationToken cancellationToken)
+    {
+        var company = await dbContext.Companies.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (company is null)
+        {
+            return this.ToNotFoundError("admin.companies.not_found", "Компания не найдена.");
+        }
+
+        company.Status = request.Status;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     private static void Apply(Company company, AdminCompanyUpsertRequest request)
     {
         company.LegalName = request.LegalName.Trim();
