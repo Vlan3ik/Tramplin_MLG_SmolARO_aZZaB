@@ -7,7 +7,7 @@ import { typeLabel } from '../../types/opportunity'
 import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
 import { getTagDisplayLabel } from '../../utils/tag-labels'
 import { getTagToneClass } from '../../utils/tag-tones'
-import { isFavoriteOpportunity, toggleFavoriteOpportunity } from '../../utils/favorites'
+import { getFavoriteEntityType, isFavoriteEntity, toggleFavoriteEntity } from '../../utils/favorites'
 import { OpportunityStateBadges } from './OpportunityStateBadges'
 
 type OpportunityCardProps = {
@@ -40,14 +40,17 @@ function getInitials(name: string) {
 
 export function OpportunityCard({ opportunity, compact = false, isApplying = false, isApplied = false, onApply, onToggleFavorite }: OpportunityCardProps) {
   const navigate = useNavigate()
-  const [isFavorite, setIsFavorite] = useState(() => (opportunity.isFavoriteByMe ? true : isFavoriteOpportunity(opportunity.id)))
+  const favoriteEntityType = getFavoriteEntityType(opportunity)
+  const [isFavorite, setIsFavorite] = useState(() =>
+    opportunity.isFavoriteByMe ? true : isFavoriteEntity(favoriteEntityType, opportunity.id),
+  )
   const favoriteLabel = useMemo(() => (isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'), [isFavorite])
   const detailsPath = useMemo(() => buildOpportunityDetailsPath(opportunity), [opportunity])
   const isClosed = opportunity.status >= 4
 
   useEffect(() => {
-    setIsFavorite(opportunity.isFavoriteByMe)
-  }, [opportunity.isFavoriteByMe])
+    setIsFavorite(opportunity.isFavoriteByMe ? true : isFavoriteEntity(favoriteEntityType, opportunity.id))
+  }, [favoriteEntityType, opportunity.id, opportunity.isFavoriteByMe])
 
   function handleOpenDetails() {
     navigate(detailsPath)
@@ -62,7 +65,7 @@ export function OpportunityCard({ opportunity, compact = false, isApplying = fal
 
   async function handleFavoriteToggle(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation()
-    const nextValue = onToggleFavorite ? !isFavorite : toggleFavoriteOpportunity(opportunity.id)
+    const nextValue = onToggleFavorite ? !isFavorite : toggleFavoriteEntity(favoriteEntityType, opportunity.id)
     if (onToggleFavorite) {
       const result = await onToggleFavorite(opportunity, nextValue)
       if (typeof result === 'boolean') {

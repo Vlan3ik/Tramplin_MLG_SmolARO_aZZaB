@@ -2,9 +2,11 @@ import { Building2, Eye, EyeOff, UserCircle2 } from 'lucide-react'
 import { type ChangeEvent, type FormEvent, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { registerUser } from '../api/auth'
+import { syncFavorites } from '../api/favorites'
 import { useAuth } from '../hooks/useAuth'
 import { PlatformRole } from '../types/auth'
 import { createAuthSession, getPostRegisterRoute } from '../utils/auth'
+import { clearGuestFavoriteSnapshot, getGuestFavoriteSnapshot, hasGuestFavorites } from '../utils/favorites'
 
 type RegisterFormState = {
   fullName: string
@@ -46,6 +48,23 @@ export function RegisterPage() {
 
   const activeRole = useMemo(() => roleOptions.find((option) => option.role === selectedRole) ?? roleOptions[0], [selectedRole])
 
+  async function syncGuestFavoritesAfterAuth() {
+    if (!hasGuestFavorites()) {
+      return
+    }
+
+    try {
+      const snapshot = getGuestFavoriteSnapshot()
+      await syncFavorites({
+        vacancyIds: snapshot.vacancyIds,
+        opportunityIds: snapshot.opportunityIds,
+      })
+      clearGuestFavoriteSnapshot()
+    } catch {
+      // Сессию не блокируем: оставляем локальные избранные для следующей попытки синхронизации.
+    }
+  }
+
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const field = event.target.name as keyof RegisterFormState
     const { value } = event.target
@@ -81,6 +100,7 @@ export function RegisterPage() {
 
       const session = createAuthSession(response, selectedRole)
       signIn(session)
+      await syncGuestFavoritesAfterAuth()
 
       navigate(getPostRegisterRoute(selectedRole), { replace: true })
     } catch (error) {

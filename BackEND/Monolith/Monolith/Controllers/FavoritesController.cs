@@ -20,6 +20,96 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
     public async Task<ActionResult<MyFavoritesDto>> GetMyFavorites(CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
+        return Ok(await BuildMyFavoritesDto(userId, cancellationToken));
+    }
+
+    [HttpPost("sync")]
+    [ProducesResponseType(typeof(MyFavoritesDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<MyFavoritesDto>> SyncMyFavorites(
+        SyncFavoritesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var vacancyIds = (request.VacancyIds ?? [])
+            .Where(x => x > 0)
+            .Distinct()
+            .ToArray();
+        var opportunityIds = (request.OpportunityIds ?? [])
+            .Where(x => x > 0)
+            .Distinct()
+            .ToArray();
+
+        if (vacancyIds.Length > 0 || opportunityIds.Length > 0)
+        {
+            var validVacancyIds = vacancyIds.Length == 0
+                ? []
+                : await dbContext.Vacancies
+                    .AsNoTracking()
+                    .Where(x => vacancyIds.Contains(x.Id))
+                    .Select(x => x.Id)
+                    .ToArrayAsync(cancellationToken);
+            var validOpportunityIds = opportunityIds.Length == 0
+                ? []
+                : await dbContext.Opportunities
+                    .AsNoTracking()
+                    .Where(x => opportunityIds.Contains(x.Id))
+                    .Select(x => x.Id)
+                    .ToArrayAsync(cancellationToken);
+
+            var existingRows = await dbContext.UserOpportunityFavorites
+                .AsNoTracking()
+                .Where(x => x.UserId == userId)
+                .Select(x => new { x.VacancyId, x.OpportunityId })
+                .ToListAsync(cancellationToken);
+
+            var existingVacancyIds = existingRows
+                .Where(x => x.VacancyId is not null)
+                .Select(x => x.VacancyId!.Value)
+                .ToHashSet();
+            var existingOpportunityIds = existingRows
+                .Where(x => x.OpportunityId is not null)
+                .Select(x => x.OpportunityId!.Value)
+                .ToHashSet();
+
+            foreach (var vacancyId in validVacancyIds)
+            {
+                if (!existingVacancyIds.Add(vacancyId))
+                {
+                    continue;
+                }
+
+                dbContext.UserOpportunityFavorites.Add(new UserOpportunityFavorite
+                {
+                    UserId = userId,
+                    VacancyId = vacancyId
+                });
+            }
+
+            foreach (var opportunityId in validOpportunityIds)
+            {
+                if (!existingOpportunityIds.Add(opportunityId))
+                {
+                    continue;
+                }
+
+                dbContext.UserOpportunityFavorites.Add(new UserOpportunityFavorite
+                {
+                    UserId = userId,
+                    OpportunityId = opportunityId
+                });
+            }
+
+            if (dbContext.ChangeTracker.HasChanges())
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        return Ok(await BuildMyFavoritesDto(userId, cancellationToken));
+    }
+
+    private async Task<MyFavoritesDto> BuildMyFavoritesDto(long userId, CancellationToken cancellationToken)
+    {
         var rows = await dbContext.UserOpportunityFavorites
             .AsNoTracking()
             .Where(x => x.UserId == userId)
@@ -37,7 +127,7 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
             .OrderBy(x => x)
             .ToArray();
 
-        return Ok(new MyFavoritesDto(vacancyIds, opportunityIds));
+        return new MyFavoritesDto(vacancyIds, opportunityIds);
     }
 
     [HttpPost("vacancies/{id:long}")]

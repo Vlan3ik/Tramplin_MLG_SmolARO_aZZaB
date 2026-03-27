@@ -21,6 +21,7 @@ import { CommunityTabsSection } from '../components/layout/community-tabs/Commun
 import { EventsCarouselSection } from '../components/layout/events-carousel/EventsCarouselSection'
 import { useSearchParams } from 'react-router-dom'
 import { useCity } from '../contexts/CityContext'
+import { getFavoriteEntityType, toggleFavoriteEntity } from '../utils/favorites'
 
 const defaultFilters: OpportunityFilters = {
   types: [],
@@ -278,6 +279,17 @@ export function HomePage() {
   }
 
   async function handleToggleFavorite(opportunity: Opportunity, nextValue: boolean) {
+    if (!session?.accessToken) {
+      const actualValue = toggleFavoriteEntity(getFavoriteEntityType(opportunity), opportunity.id)
+      setListItems((current) =>
+        current.map((item) => (item.id === opportunity.id && item.entityType === opportunity.entityType ? { ...item, isFavoriteByMe: actualValue } : item)),
+      )
+      setMapItems((current) =>
+        current.map((item) => (item.id === opportunity.id && item.entityType === opportunity.entityType ? { ...item, isFavoriteByMe: actualValue } : item)),
+      )
+      return actualValue
+    }
+
     try {
       if (opportunity.entityType === 'vacancy') {
         if (nextValue) {

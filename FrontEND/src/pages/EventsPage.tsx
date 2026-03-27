@@ -7,6 +7,7 @@ import { OpportunityCard } from '../components/home/OpportunityCard'
 import { useAuth } from '../hooks/useAuth'
 import { useCity } from '../contexts/CityContext'
 import type { Opportunity, OpportunityFilters, OpportunityType } from '../types/opportunity'
+import { getFavoriteEntityType, toggleFavoriteEntity } from '../utils/favorites'
 
 const defaultFilters: OpportunityFilters = {
   types: ['event'],
@@ -128,6 +129,12 @@ export function EventsPage() {
   }
 
   async function handleToggleFavorite(opportunity: Opportunity, nextValue: boolean) {
+    if (!session?.accessToken) {
+      const actualValue = toggleFavoriteEntity(getFavoriteEntityType(opportunity), opportunity.id)
+      setItems((current) => current.map((item) => (item.id === opportunity.id ? { ...item, isFavoriteByMe: actualValue } : item)))
+      return actualValue
+    }
+
     try {
       if (nextValue) {
         await addOpportunityToFavorites(opportunity.id)

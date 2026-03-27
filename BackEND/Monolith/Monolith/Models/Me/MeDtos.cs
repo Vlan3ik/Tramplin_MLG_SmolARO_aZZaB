@@ -43,11 +43,15 @@ public record UsernameResponse(string Username);
 /// </param>
 /// <param name="OpenToWork">Флаг готовности к предложениям.</param>
 /// <param name="ShowContactsInResume">Показывать ли контакты в резюме.</param>
+/// <param name="ShowInFriendsFavorites">Показывать ли действия пользователя в блоке "у друзей в избранном".</param>
+/// <param name="ShowInFriendsApplications">Показывать ли действия пользователя в блоке "откликнулись N друзей".</param>
 public record UpdateSettingsRequest(
     PrivacyScope ProfileVisibility,
     PrivacyScope ResumeVisibility,
     bool OpenToWork,
-    bool ShowContactsInResume);
+    bool ShowContactsInResume,
+    bool ShowInFriendsFavorites = true,
+    bool ShowInFriendsApplications = true);
 
 /// <summary>
 /// Текущие настройки приватности профиля соискателя.
@@ -63,12 +67,16 @@ public record UpdateSettingsRequest(
 /// </param>
 /// <param name="OpenToWork">Флаг готовности к предложениям.</param>
 /// <param name="ShowContactsInResume">Показывать ли контакты в резюме.</param>
+/// <param name="ShowInFriendsFavorites">Показывать ли действия пользователя в блоке "у друзей в избранном".</param>
+/// <param name="ShowInFriendsApplications">Показывать ли действия пользователя в блоке "откликнулись N друзей".</param>
 public record SettingsResponse(
     long UserId,
     PrivacyScope ProfileVisibility,
     PrivacyScope ResumeVisibility,
     bool OpenToWork,
-    bool ShowContactsInResume);
+    bool ShowContactsInResume,
+    bool ShowInFriendsFavorites,
+    bool ShowInFriendsApplications);
 
 public record UpdateResumeRequest(
     string? Headline,

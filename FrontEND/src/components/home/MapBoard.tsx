@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import type { Opportunity } from '../../types/opportunity'
 import { getOpportunityStateBadges } from '../../utils/opportunity-state'
 import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
-import { isFavoriteOpportunity, subscribeToFavoriteOpportunities } from '../../utils/favorites'
+import { getFavoriteEntityType, isFavoriteEntity, subscribeToFavoriteOpportunities } from '../../utils/favorites'
 import { OpportunityStateBadges } from './OpportunityStateBadges'
 import {
   isMapItemViewed,
@@ -51,7 +51,7 @@ function resolveEntityType(item: Opportunity): ViewedMapEntityType {
 }
 
 function resolveIsFavorite(item: Opportunity) {
-  return Boolean(item.isFavoriteByMe) || isFavoriteOpportunity(item.id)
+  return Boolean(item.isFavoriteByMe) || isFavoriteEntity(getFavoriteEntityType(item), item.id)
 }
 
 function buildHoverCardNode(marker: OpportunityMarker) {

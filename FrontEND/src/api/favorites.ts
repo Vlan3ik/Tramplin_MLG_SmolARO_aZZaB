@@ -10,8 +10,21 @@ export type MyFavorites = {
   opportunityIds: number[]
 }
 
+type SyncFavoritesPayload = {
+  vacancyIds: number[]
+  opportunityIds: number[]
+}
+
 export async function fetchMyFavorites(signal?: AbortSignal): Promise<MyFavorites> {
   const response = await getJson<MyFavoritesApi>('/favorites/me', { signal })
+  return {
+    vacancyIds: response.vacancyIds ?? [],
+    opportunityIds: response.opportunityIds ?? [],
+  }
+}
+
+export async function syncFavorites(payload: SyncFavoritesPayload): Promise<MyFavorites> {
+  const response = await postJson<MyFavoritesApi, SyncFavoritesPayload>('/favorites/sync', payload)
   return {
     vacancyIds: response.vacancyIds ?? [],
     opportunityIds: response.opportunityIds ?? [],

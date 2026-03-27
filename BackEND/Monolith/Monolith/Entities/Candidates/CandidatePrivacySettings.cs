@@ -7,6 +7,8 @@ public class CandidatePrivacySettings
     public PrivacyScope ResumeVisibility { get; set; } = PrivacyScope.AuthorizedUsers;
     public bool OpenToWork { get; set; } = true;
     public bool ShowContactsInResume { get; set; }
+    public bool ShowInFriendsFavorites { get; set; } = true;
+    public bool ShowInFriendsApplications { get; set; } = true;
     public DateTimeOffset UpdatedAt { get; set; }
     public CandidateProfile CandidateProfile { get; set; } = null!;
 }
