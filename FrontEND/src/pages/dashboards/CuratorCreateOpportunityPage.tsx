@@ -107,7 +107,7 @@ export function CuratorCreateOpportunityPage() {
         if (!active) return
         setForm({
           companyId: String(opportunity.companyId),
-          createdByUserId: String(opportunity.createdByUserId),
+          createdByUserId: opportunity.createdByUserId > 0 ? String(opportunity.createdByUserId) : '',
           title: opportunity.title,
           shortDescription: opportunity.shortDescription,
           fullDescription: opportunity.fullDescription,

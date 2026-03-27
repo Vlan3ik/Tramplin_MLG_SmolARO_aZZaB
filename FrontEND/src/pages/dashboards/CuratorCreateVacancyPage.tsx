@@ -109,7 +109,7 @@ export function CuratorCreateVacancyPage() {
         if (!active) return
         setForm({
           companyId: String(vacancy.companyId),
-          createdByUserId: String(vacancy.createdByUserId),
+          createdByUserId: vacancy.createdByUserId > 0 ? String(vacancy.createdByUserId) : '',
           title: vacancy.title,
           shortDescription: vacancy.shortDescription,
           fullDescription: vacancy.fullDescription,
