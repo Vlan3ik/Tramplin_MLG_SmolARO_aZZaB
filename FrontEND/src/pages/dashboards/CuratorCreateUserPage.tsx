@@ -1,4 +1,4 @@
-﻿import { ArrowLeft, Copy, KeyRound, RefreshCcw, Save, UserPlus } from 'lucide-react'
+import { ArrowLeft, Copy, KeyRound, Paperclip, RefreshCcw, Save, UserPlus } from 'lucide-react'
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { createAdminUser, updateAdminUser, type AdminUser, type AdminUserUpsertRequest } from '../../api/admin'
@@ -13,7 +13,6 @@ type UserEditorForm = {
   email: string
   username: string
   avatarUrl: string
-  displayName: string
   firstName: string
   lastName: string
   status: number
@@ -73,7 +72,6 @@ function getInitialForm(): UserEditorForm {
     email: '',
     username: '',
     avatarUrl: '',
-    displayName: '',
     firstName: '',
     lastName: '',
     status: 1,
@@ -94,7 +92,6 @@ function mapUserToForm(user: AdminUser): UserEditorForm {
     email: user.email,
     username: user.username,
     avatarUrl: user.avatarUrl ?? '',
-    displayName: user.displayName || `${firstName} ${lastName}`.trim(),
     firstName,
     lastName,
     status: user.status,
@@ -120,6 +117,7 @@ export function CuratorCreateUserPage() {
   const isSuperCurator = useMemo(() => isSuperCuratorRole(currentRoles), [currentRoles])
 
   const [form, setForm] = useState<UserEditorForm>(getInitialForm)
+  const [avatarFileName, setAvatarFileName] = useState('')
   const [generatedPassword, setGeneratedPassword] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isPreparing, setIsPreparing] = useState(true)
@@ -135,6 +133,7 @@ export function CuratorCreateUserPage() {
   useEffect(() => {
     setIsPreparing(true)
     setGeneratedPassword('')
+    setAvatarFileName('')
 
     if (!isEditMode) {
       setForm(getInitialForm())
@@ -166,7 +165,7 @@ export function CuratorCreateUserPage() {
     }))
   }, [isSuperCurator])
 
-  const previewTitle = form.displayName.trim() || `${form.firstName} ${form.lastName}`.trim() || form.username.trim() || 'Новый пользователь'
+  const previewTitle = `${form.firstName} ${form.lastName}`.trim() || form.username.trim() || 'Новый пользователь'
 
   function clearMessages() {
     setError('')
@@ -181,6 +180,38 @@ export function CuratorCreateUserPage() {
       ...state,
       [name]: type === 'checkbox' ? checked : name === 'status' ? Number(value) : value,
     }))
+  }
+
+  async function onAvatarFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    setAvatarFileName(file.name)
+    clearMessages()
+
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+        reader.onerror = () => reject(new Error('Не удалось прочитать файл аватара.'))
+        reader.readAsDataURL(file)
+      })
+
+      if (!dataUrl) {
+        throw new Error('Не удалось прочитать файл аватара.')
+      }
+
+      setForm((state) => ({
+        ...state,
+        avatarUrl: dataUrl,
+      }))
+    } catch (readError) {
+      setError(readError instanceof Error ? readError.message : 'Не удалось загрузить файл аватара.')
+    } finally {
+      event.target.value = ''
+    }
   }
 
   function onGeneratePassword() {
@@ -246,7 +277,7 @@ export function CuratorCreateUserPage() {
       email: form.email,
       username: form.username,
       avatarUrl: form.avatarUrl,
-      displayName: form.displayName,
+      displayName: `${form.firstName} ${form.lastName}`.trim(),
       firstName: form.firstName,
       lastName: form.lastName,
       status: form.status,
@@ -281,6 +312,7 @@ export function CuratorCreateUserPage() {
           ...getInitialForm(),
           passwordScenario: state.passwordScenario,
         }))
+        setAvatarFileName('')
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : isEditMode ? 'Не удалось обновить пользователя.' : 'Не удалось создать пользователя.')
@@ -322,14 +354,15 @@ export function CuratorCreateUserPage() {
                   <input type="text" name="username" value={form.username} onChange={onInputChange} required />
                 </label>
 
-                <label>
-                  Display name / ФИО
-                  <input type="text" name="displayName" value={form.displayName} onChange={onInputChange} placeholder="Иван Иванов" />
-                </label>
-                <label>
-                  Avatar URL
-                  <input type="url" name="avatarUrl" value={form.avatarUrl} onChange={onInputChange} placeholder="https://..." />
-                </label>
+                <div className="curator-user-editor__field">
+                  <span>Аватар (файл)</span>
+                  <label className="curator-user-editor__file-button">
+                    <Paperclip size={14} />
+                    Выберите файл
+                    <input type="file" accept="image/*" onChange={onAvatarFileChange} />
+                  </label>
+                  {avatarFileName ? <small>{avatarFileName}</small> : null}
+                </div>
 
                 <label>
                   Имя
