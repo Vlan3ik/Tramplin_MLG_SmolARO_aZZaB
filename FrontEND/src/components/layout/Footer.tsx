@@ -44,7 +44,7 @@ function SocialIcon({ src, alt }: { src: string; alt: string }) {
   )
 }
 
-export function Footer() {
+function Footer() {
   return (
     <footer className="platform-footer">
       <div className="platform-footer__inner">
@@ -99,3 +99,6 @@ export function Footer() {
     </footer>
   )
 }
+
+export { Footer }
+export default Footer
