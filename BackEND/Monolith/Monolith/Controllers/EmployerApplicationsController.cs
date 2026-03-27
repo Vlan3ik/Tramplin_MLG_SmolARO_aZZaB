@@ -1,11 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Monolith.Contexts;
 using Monolith.Entities;
+using Monolith.Hubs;
+using Monolith.Models.Chat;
 using Monolith.Models.Common;
 using Monolith.Models.Employer;
 using Monolith.Models.Resumes;
+using Monolith.Services.Chats;
 using Monolith.Services.Common;
 
 namespace Monolith.Controllers;
@@ -14,7 +18,10 @@ namespace Monolith.Controllers;
 [Authorize(Roles = "employer")]
 [Route("employer/applications")]
 [Produces("application/json")]
-public class EmployerApplicationsController(AppDbContext dbContext) : ControllerBase
+public class EmployerApplicationsController(
+    AppDbContext dbContext,
+    IHubContext<ChatHub> hubContext,
+    IChatCacheService chatCache) : ControllerBase
 {
     /// <summary>
     /// Возвращает отклики компании с фильтрами и пагинацией.
@@ -270,7 +277,9 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
             return this.ToNotFoundError("employer.company.not_found", "Employer company not found.");
         }
 
-        var application = await dbContext.Applications.FirstOrDefaultAsync(x => x.Id == id && x.CompanyId == membership.CompanyId, cancellationToken);
+        var application = await dbContext.Applications
+            .Include(x => x.Chat)
+            .FirstOrDefaultAsync(x => x.Id == id && x.CompanyId == membership.CompanyId, cancellationToken);
         if (application is null)
         {
             return this.ToNotFoundError("employer.applications.not_found", "Application not found.");
@@ -283,9 +292,62 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
                 $"Invalid status transition from {application.Status} to {request.Status}.");
         }
 
+        var previousStatus = application.Status;
         application.Status = request.Status;
+
+        if (application.Chat is not null)
+        {
+            var actor = await dbContext.Users
+                .AsNoTracking()
+                .Where(x => x.Id == membership.UserId)
+                .Select(x => new { x.Fio, x.Username, x.AvatarUrl })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var statusMessage = new ChatMessage
+            {
+                ChatId = application.Chat.Id,
+                SenderUserId = membership.UserId,
+                Text = $"Статус отклика изменён: {ToRussianStatusLabel(previousStatus)} -> {ToRussianStatusLabel(request.Status)}.",
+                IsSystem = true
+            };
+
+            dbContext.ChatMessages.Add(statusMessage);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            await chatCache.InvalidateChatHistoryAsync(application.Chat.Id, cancellationToken);
+            await InvalidateChatListForParticipants(application.Chat.Id, cancellationToken);
+
+            await hubContext.Clients.Group(ChatHub.GroupName(application.Chat.Id)).SendAsync(
+                "new",
+                new ChatMessageDto(
+                    statusMessage.Id,
+                    statusMessage.ChatId,
+                    statusMessage.SenderUserId,
+                    actor?.Fio ?? actor?.Username ?? "System",
+                    actor?.Username,
+                    actor?.AvatarUrl,
+                    statusMessage.Text,
+                    statusMessage.IsSystem,
+                    statusMessage.CreatedAt,
+                    []),
+                cancellationToken);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    private async Task InvalidateChatListForParticipants(long chatId, CancellationToken cancellationToken)
+    {
+        var participantIds = await dbContext.ChatParticipants
+            .Where(x => x.ChatId == chatId)
+            .Select(x => x.UserId)
+            .ToArrayAsync(cancellationToken);
+
+        foreach (var participantId in participantIds)
+        {
+            await chatCache.InvalidateUserListAsync(participantId, cancellationToken);
+        }
     }
 
     private async Task<CompanyMember?> GetManagementMembership(CancellationToken cancellationToken)
@@ -315,4 +377,17 @@ public class EmployerApplicationsController(AppDbContext dbContext) : Controller
             _ => false
         };
     }
+
+    private static string ToRussianStatusLabel(ApplicationStatus status)
+        => status switch
+        {
+            ApplicationStatus.New => "Новый",
+            ApplicationStatus.InReview => "На рассмотрении",
+            ApplicationStatus.Interview => "Интервью",
+            ApplicationStatus.Offer => "Оффер",
+            ApplicationStatus.Hired => "Нанят",
+            ApplicationStatus.Rejected => "Отклонен",
+            ApplicationStatus.Canceled => "Отменен",
+            _ => status.ToString()
+        };
 }

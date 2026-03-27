@@ -77,7 +77,24 @@ const applicationStatusLabel: Record<number, string> = {
   7: 'Отменен',
 }
 
-const applicationStatusUpdateOptions = [2, 3, 4, 5, 6, 7]
+const applicationStatusTone: Record<number, 'warning' | 'success' | 'danger'> = {
+  1: 'warning',
+  2: 'warning',
+  3: 'warning',
+  4: 'success',
+  5: 'success',
+  6: 'danger',
+  7: 'danger',
+}
+const applicationStatusTransitions: Record<number, number[]> = {
+  1: [2, 6, 7],
+  2: [3, 4, 6, 7],
+  3: [4, 6, 7],
+  4: [5, 6, 7],
+  5: [],
+  6: [],
+  7: [],
+}
 const publishStatusGroupValues = {
   planned: [1, 2],
   active: [3],
@@ -299,7 +316,6 @@ export function EmployerDashboardPage() {
   const [opportunities, setOpportunities] = useState<EmployerOpportunity[]>([])
   const [applications, setApplications] = useState<EmployerApplication[]>([])
   const [companyLinks, setCompanyLinks] = useState<EmployerCompanyLink[]>([])
-  const [applicationStatusDrafts, setApplicationStatusDrafts] = useState<Record<number, number>>({})
   const [applicationChats, setApplicationChats] = useState<Array<{ id: number; title: string; lastMessageText: string; lastMessageAt: string }>>([])
 
   const [loading, setLoading] = useState(true)
@@ -433,9 +449,6 @@ export function EmployerDashboardPage() {
 
       if (applicationsResult.status === 'fulfilled') {
         setApplications(applicationsResult.value)
-        setApplicationStatusDrafts(
-          Object.fromEntries(applicationsResult.value.map((application) => [application.id, application.status])),
-        )
       }
 
       const employerCompany = await fetchEmployerCompany()
@@ -1130,15 +1143,7 @@ export function EmployerDashboardPage() {
     }
   }
 
-  function onApplicationStatusDraftChange(applicationId: number, nextStatus: number) {
-    setApplicationStatusDrafts((state) => ({
-      ...state,
-      [applicationId]: nextStatus,
-    }))
-  }
-
-  async function onUpdateApplicationStatus(application: EmployerApplication) {
-    const nextStatus = applicationStatusDrafts[application.id] ?? application.status
+  async function onUpdateApplicationStatus(application: EmployerApplication, nextStatus: number) {
     if (nextStatus === application.status) {
       return
     }
@@ -1160,6 +1165,26 @@ export function EmployerDashboardPage() {
       setError(updateError instanceof Error ? updateError.message : 'Не удалось обновить статус отклика.')
     } finally {
       setUpdatingApplicationId(null)
+    }
+  }
+
+  async function onGoToCandidateProfile(applicationId: number) {
+    setError('')
+    setLoadingApplicationDetailId(applicationId)
+
+    try {
+      const detail = await fetchEmployerApplicationDetail(applicationId)
+      const username = detail.candidateResume?.username?.trim()
+      if (!username) {
+        setError('Переход в профиль недоступен: не найден username кандидата.')
+        return
+      }
+
+      navigate(`/dashboard/seeker/${encodeURIComponent(username)}`)
+    } catch (detailError) {
+      setError(detailError instanceof Error ? detailError.message : 'Не удалось открыть профиль кандидата.')
+    } finally {
+      setLoadingApplicationDetailId(null)
     }
   }
 
@@ -1945,39 +1970,41 @@ export function EmployerDashboardPage() {
               <article key={application.id} className="employer-application-card">
                 <div className="employer-application-card__head">
                   <h3>{application.vacancyTitle}</h3>
-                  <span className="status-chip">{applicationStatusLabel[application.status] ?? `Статус ${application.status}`}</span>
+                  <span className={`status-chip status-chip--${applicationStatusTone[application.status] ?? 'warning'}`}>
+                    {applicationStatusLabel[application.status] ?? `Статус ${application.status}`}
+                  </span>
                 </div>
                 <div className="employer-application-card__meta">
                   <MessageSquare size={14} />
-                  <span>{application.candidateName}</span>
+                  <button
+                    type="button"
+                    className="employer-application-card__candidate-link"
+                    onClick={() => void onGoToCandidateProfile(application.id)}
+                    disabled={loadingApplicationDetailId === application.id}
+                  >
+                    {application.candidateName}
+                  </button>
                   <span>Отклик: {formatDate(application.createdAt)}</span>
                   <span>Обновлено: {formatDate(application.updatedAt)}</span>
                 </div>
                 <div className="employer-application-actions">
-                  <select
-                    value={String(applicationStatusDrafts[application.id] ?? application.status)}
-                    onChange={(event) => onApplicationStatusDraftChange(application.id, Number(event.target.value))}
-                    disabled={updatingApplicationId === application.id}
-                  >
-                    <option value={String(application.status)}>
-                      Текущий: {applicationStatusLabel[application.status] ?? `Статус ${application.status}`}
-                    </option>
-                    {applicationStatusUpdateOptions
-                      .filter((status) => status !== application.status)
-                      .map((status) => (
-                        <option key={status} value={String(status)}>
-                          {applicationStatusLabel[status]}
-                        </option>
-                      ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    disabled={(applicationStatusDrafts[application.id] ?? application.status) === application.status || updatingApplicationId === application.id}
-                    onClick={() => void onUpdateApplicationStatus(application)}
-                  >
-                    {updatingApplicationId === application.id ? 'Сохраняем...' : 'Обновить статус'}
-                  </button>
+                  <div className="employer-application-actions__steps">
+                    {applicationStatusTransitions[application.status]?.length ? (
+                      applicationStatusTransitions[application.status].map((status) => (
+                        <button
+                          key={`application-${application.id}-status-${status}`}
+                          type="button"
+                          className="btn btn--secondary"
+                          disabled={updatingApplicationId === application.id}
+                          onClick={() => void onUpdateApplicationStatus(application, status)}
+                        >
+                          {updatingApplicationId === application.id ? 'Сохраняем...' : applicationStatusLabel[status]}
+                        </button>
+                      ))
+                    ) : (
+                      <span className="employer-application-actions__hint">Статус финальный</span>
+                    )}
+                  </div>
                   <button
                     type="button"
                     className="btn btn--ghost"
@@ -1993,13 +2020,22 @@ export function EmployerDashboardPage() {
         )}
 
         {selectedApplicationDetail ? (
-          <article className="card employer-candidate-profile">
+          <div className="employer-candidate-profile-modal" role="dialog" aria-modal="true" aria-label="Профиль кандидата">
+            <button
+              type="button"
+              className="employer-candidate-profile-modal__backdrop"
+              aria-label="Закрыть профиль кандидата"
+              onClick={() => setSelectedApplicationDetail(null)}
+            />
+            <article className="card employer-candidate-profile employer-candidate-profile-modal__dialog">
             <div className="employer-candidate-profile__head">
               <div>
                 <h3>{selectedApplicationDetail.candidateName}</h3>
                 <p className="employer-candidate-profile__subtitle">Отклик на: {selectedApplicationDetail.vacancyTitle}</p>
               </div>
-              <span className="status-chip">{applicationStatusLabel[selectedApplicationDetail.status] ?? `Статус ${selectedApplicationDetail.status}`}</span>
+              <span className={`status-chip status-chip--${applicationStatusTone[selectedApplicationDetail.status] ?? 'warning'}`}>
+                {applicationStatusLabel[selectedApplicationDetail.status] ?? `Статус ${selectedApplicationDetail.status}`}
+              </span>
             </div>
 
             {selectedCandidateResume ? (
@@ -2210,7 +2246,8 @@ export function EmployerDashboardPage() {
                 Закрыть профиль
               </button>
             </div>
-          </article>
+            </article>
+          </div>
         ) : null}
       </section> : null}
 
