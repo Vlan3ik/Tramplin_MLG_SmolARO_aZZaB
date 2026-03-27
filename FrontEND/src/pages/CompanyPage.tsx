@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { fetchCompanyById } from '../api/companies'
 import { fetchMyFollowerSubscriptions, fetchMyFollowingSubscriptions, followUser, type SubscriptionUser, unfollowUser } from '../api/subscriptions'
+import { CompanyMediaGallery } from '../components/company/CompanyMediaGallery'
 import { useAuth } from '../hooks/useAuth'
 import type { CompanyDetail, CompanyOpportunity } from '../types/company'
 import { buildOpportunityDetailsPath } from '../utils/opportunity-routing'
@@ -337,7 +338,7 @@ export function CompanyPage() {
                 )}
               </div>
             </aside>
-          </section>
+        </section>
         ) : (
           <section className="company-profile-card company-profile-card--opportunities">
             <div className="company-profile-opportunity-head">
@@ -355,6 +356,12 @@ export function CompanyPage() {
             )}
           </section>
         )}
+
+        <CompanyMediaGallery
+          items={companyDetail.media}
+          title="Галерея компании"
+          emptyText="Компания пока не добавила фото и видео."
+        />
 
         <section className="company-profile-meta">
           <div>

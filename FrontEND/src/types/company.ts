@@ -12,6 +12,16 @@ export type Company = {
   activeOpportunitiesCount: number
 }
 
+export type CompanyMediaType = 'photo' | 'video'
+
+export type CompanyMedia = {
+  id: number
+  type: CompanyMediaType
+  url: string
+  mimeType: string | null
+  sortOrder: number
+}
+
 export type CompanyLink = {
   kind: string | null
   url: string | null
@@ -42,6 +52,7 @@ export type CompanyDetail = {
   websiteUrl: string | null
   publicEmail: string | null
   publicPhone: string | null
+  media: CompanyMedia[]
   links: CompanyLink[]
   activeOpportunities: CompanyOpportunity[]
 }

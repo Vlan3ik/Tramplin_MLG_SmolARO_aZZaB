@@ -1,6 +1,6 @@
 import { getJson } from './client'
 import type { PagedResponse } from '../types/catalog'
-import type { Company, CompanyDetail, CompanyOpportunity, CompanyLink } from '../types/company'
+import type { Company, CompanyDetail, CompanyMedia, CompanyMediaType, CompanyOpportunity, CompanyLink } from '../types/company'
 import type { OpportunityType } from '../types/opportunity'
 import { formatLabel, typeLabel } from '../types/opportunity'
 
@@ -43,8 +43,17 @@ type CompanyDetailApi = {
   websiteUrl: string | null
   publicEmail: string | null
   publicPhone: string | null
+  media: CompanyMediaApi[] | null
   links: CompanyLinkApi[] | null
   activeOpportunities: CompanyOpportunityApi[] | null
+}
+
+type CompanyMediaApi = {
+  id: number
+  type: string | number | null
+  url: string | null
+  mimeType: string | null
+  sortOrder: number | null
 }
 
 export type CompaniesQuery = {
@@ -140,6 +149,45 @@ function toCompanyLink(link: CompanyLinkApi): CompanyLink {
   }
 }
 
+function parseCompanyMediaType(value: CompanyMediaApi['type'], mimeType: string | null): CompanyMediaType | null {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+
+    if (normalized === 'photo' || normalized === 'image') return 'photo'
+    if (normalized === 'video') return 'video'
+  }
+
+  if (typeof value === 'number') {
+    if (value === 1) return 'photo'
+    if (value === 2) return 'video'
+  }
+
+  if (mimeType?.toLowerCase().startsWith('video/')) return 'video'
+  if (mimeType?.toLowerCase().startsWith('image/')) return 'photo'
+
+  return null
+}
+
+function toCompanyMedia(item: CompanyMediaApi): CompanyMedia | null {
+  if (!item.url) {
+    return null
+  }
+
+  const mediaType = parseCompanyMediaType(item.type, item.mimeType)
+
+  if (!mediaType) {
+    return null
+  }
+
+  return {
+    id: item.id,
+    type: mediaType,
+    url: item.url,
+    mimeType: item.mimeType,
+    sortOrder: item.sortOrder ?? 0,
+  }
+}
+
 function toCompany(item: CompanyListItemApi): Company {
   return {
     id: item.id,
@@ -207,6 +255,10 @@ export async function fetchCompanyById(id: number, signal?: AbortSignal): Promis
     websiteUrl: response.websiteUrl,
     publicEmail: response.publicEmail,
     publicPhone: response.publicPhone,
+    media: (response.media ?? [])
+      .map(toCompanyMedia)
+      .filter((item): item is CompanyMedia => item != null)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
     links: (response.links ?? []).map(toCompanyLink),
     activeOpportunities: (response.activeOpportunities ?? []).map(toCompanyOpportunity),
   }
