@@ -55,7 +55,7 @@ type EventForm = BaseForm & {
   eventDate: string
 }
 
-const steps = ['Р’С‹Р±РѕСЂ', 'РћСЃРЅРѕРІРЅС‹Рµ', 'РћРїРёСЃР°РЅРёРµ', 'РЎС‚РѕРёРјРѕСЃС‚СЊ Рё РѕРїС†РёРё', 'РџСѓР±Р»РёРєР°С†РёСЏ']
+const steps = ['Выбор', 'Основные', 'Описание', 'Стоимость и опции', 'Публикация']
 const validSteps = new Set(['1', '2', '3', '4', '5'])
 
 const toNumberOrNull = (value: string) => {
@@ -81,7 +81,7 @@ const citySuggestionLabel = (city: EmployerAddressCitySuggestion) => {
 
 function Stepper({ activeStep }: { activeStep: Step }) {
   return (
-    <div className="vf-stepper" aria-label="РџСЂРѕРіСЂРµСЃСЃ СЃРѕР·РґР°РЅРёСЏ">
+    <div className="vf-stepper" aria-label="Прогресс создания">
       {steps.map((label, index) => {
         const stepNumber = (index + 1) as Step
         return (
