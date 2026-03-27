@@ -21,6 +21,12 @@ import { CommunityTabsSection } from '../components/layout/community-tabs/Commun
 import { EventsCarouselSection } from '../components/layout/events-carousel/EventsCarouselSection'
 import { useSearchParams } from 'react-router-dom'
 import { useCity } from '../contexts/CityContext'
+import {
+  resolveOpportunitySocialEntityType,
+  setOpportunityFavoriteState,
+  upsertOpportunitySocialState,
+  upsertOpportunitySocialStates,
+} from '../utils/opportunity-social-state'
 
 const defaultFilters: OpportunityFilters = {
   types: [],
@@ -89,6 +95,7 @@ export function HomePage() {
         const response = await fetchHomeListOpportunities(listQuery, signal)
         setListItems(response.items)
         setListTotal(response.total)
+        upsertOpportunitySocialStates(response.items)
       } catch (error) {
         if (signal?.aborted) {
           return
@@ -117,6 +124,7 @@ export function HomePage() {
         const response = await fetchMapOpportunities(mapQuery, signal)
         setMapItems(response.items)
         setMapTotal(response.total)
+        upsertOpportunitySocialStates(response.items)
       } catch (error) {
         if (signal?.aborted) {
           return
@@ -244,6 +252,7 @@ export function HomePage() {
 
     try {
       const detail = await fetchOpportunityDetailById(opportunity.id)
+      upsertOpportunitySocialState(detail)
 
       if (detail.type !== 'vacancy' && detail.type !== 'internship') {
         await participateInOpportunity(detail.id)
@@ -278,8 +287,10 @@ export function HomePage() {
   }
 
   async function handleToggleFavorite(opportunity: Opportunity, nextValue: boolean) {
+    const entityType = resolveOpportunitySocialEntityType(opportunity)
+
     try {
-      if (opportunity.entityType === 'vacancy') {
+      if (entityType === 'vacancy') {
         if (nextValue) {
           await addVacancyToFavorites(opportunity.id)
         } else {
@@ -294,11 +305,16 @@ export function HomePage() {
       }
 
       setListItems((current) =>
-        current.map((item) => (item.id === opportunity.id && item.entityType === opportunity.entityType ? { ...item, isFavoriteByMe: nextValue } : item)),
+        current.map((item) =>
+          item.id === opportunity.id && resolveOpportunitySocialEntityType(item) === entityType ? { ...item, isFavoriteByMe: nextValue } : item,
+        ),
       )
       setMapItems((current) =>
-        current.map((item) => (item.id === opportunity.id && item.entityType === opportunity.entityType ? { ...item, isFavoriteByMe: nextValue } : item)),
+        current.map((item) =>
+          item.id === opportunity.id && resolveOpportunitySocialEntityType(item) === entityType ? { ...item, isFavoriteByMe: nextValue } : item,
+        ),
       )
+      setOpportunityFavoriteState(entityType, opportunity.id, nextValue)
 
       return nextValue
     } catch (error) {

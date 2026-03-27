@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { useOpportunitySocialState } from '../../hooks/useOpportunitySocialState'
 import type { Opportunity } from '../../types/opportunity'
 import { getOpportunityStateBadges } from '../../utils/opportunity-state'
 
@@ -10,7 +11,16 @@ type OpportunityStateBadgesProps = {
 }
 
 export function OpportunityStateBadges({ opportunity, isFavorite, compact = false, className }: OpportunityStateBadgesProps) {
-  const badges = getOpportunityStateBadges(opportunity, isFavorite)
+  const socialState = useOpportunitySocialState(opportunity)
+  const badges = getOpportunityStateBadges(
+    {
+      ...opportunity,
+      isFavoriteByMe: socialState.isFavoriteByMe,
+      friendFavoritesCount: socialState.friendFavoritesCount,
+      friendsAppliedCount: socialState.friendsAppliedCount,
+    },
+    isFavorite,
+  )
   if (!badges.length) {
     return null
   }

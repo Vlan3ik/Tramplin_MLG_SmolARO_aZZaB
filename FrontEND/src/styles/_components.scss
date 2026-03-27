@@ -1326,6 +1326,23 @@
   }
 }
 
+.map-marker--cluster.map-marker--favorite {
+  .map-marker__circle {
+    background: #facc15;
+    border-color: #fff6cc;
+    box-shadow:
+      0 0 0 2px rgba(124, 89, 0, 0.2),
+      0 8px 14px rgba(124, 89, 0, 0.22);
+  }
+}
+
+.map-marker--cluster.map-marker--favorite.map-marker--friends-favorite {
+  .map-marker__circle {
+    background: linear-gradient(140deg, #facc15 0 52%, #60a5fa 52% 100%);
+    border-color: #fff7d8;
+  }
+}
+
 .map-marker__count {
   position: absolute;
   right: 2px;

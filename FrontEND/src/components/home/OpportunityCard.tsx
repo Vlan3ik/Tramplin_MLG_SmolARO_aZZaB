@@ -1,13 +1,15 @@
 ﻿import { Bookmark, Send, ShieldAlert, ShieldCheck } from 'lucide-react'
 import clsx from 'clsx'
-import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useMemo, type KeyboardEvent, type MouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpportunitySocialState } from '../../hooks/useOpportunitySocialState'
 import type { Opportunity } from '../../types/opportunity'
 import { typeLabel } from '../../types/opportunity'
 import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
 import { getTagDisplayLabel } from '../../utils/tag-labels'
 import { getTagToneClass } from '../../utils/tag-tones'
 import { isFavoriteOpportunity, toggleFavoriteOpportunity } from '../../utils/favorites'
+import { resolveOpportunitySocialEntityType, setOpportunityFavoriteState } from '../../utils/opportunity-social-state'
 import { OpportunityStateBadges } from './OpportunityStateBadges'
 
 type OpportunityCardProps = {
@@ -40,14 +42,11 @@ function getInitials(name: string) {
 
 export function OpportunityCard({ opportunity, compact = false, isApplying = false, isApplied = false, onApply, onToggleFavorite }: OpportunityCardProps) {
   const navigate = useNavigate()
-  const [isFavorite, setIsFavorite] = useState(() => (opportunity.isFavoriteByMe ? true : isFavoriteOpportunity(opportunity.id)))
+  const socialState = useOpportunitySocialState(opportunity)
+  const isFavorite = socialState.isFavoriteByMe || isFavoriteOpportunity(opportunity.id)
   const favoriteLabel = useMemo(() => (isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'), [isFavorite])
   const detailsPath = useMemo(() => buildOpportunityDetailsPath(opportunity), [opportunity])
   const isClosed = opportunity.status >= 4
-
-  useEffect(() => {
-    setIsFavorite(opportunity.isFavoriteByMe)
-  }, [opportunity.isFavoriteByMe])
 
   function handleOpenDetails() {
     navigate(detailsPath)
@@ -62,15 +61,16 @@ export function OpportunityCard({ opportunity, compact = false, isApplying = fal
 
   async function handleFavoriteToggle(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation()
+    const entityType = resolveOpportunitySocialEntityType(opportunity)
     const nextValue = onToggleFavorite ? !isFavorite : toggleFavoriteOpportunity(opportunity.id)
     if (onToggleFavorite) {
       const result = await onToggleFavorite(opportunity, nextValue)
       if (typeof result === 'boolean') {
-        setIsFavorite(result)
+        setOpportunityFavoriteState(entityType, opportunity.id, result)
         return
       }
     }
-    setIsFavorite(nextValue)
+    setOpportunityFavoriteState(entityType, opportunity.id, nextValue)
   }
 
   function handleCompanyClick(event: MouseEvent<HTMLButtonElement>) {
