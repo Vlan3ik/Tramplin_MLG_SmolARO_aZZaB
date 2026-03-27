@@ -15,6 +15,10 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class FavoritesController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает текущие избранные вакансии и возможности пользователя.
+    /// </summary>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpGet("me")]
     [ProducesResponseType(typeof(MyFavoritesDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<MyFavoritesDto>> GetMyFavorites(CancellationToken cancellationToken)
@@ -23,6 +27,11 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
         return Ok(await BuildMyFavoritesDto(userId, cancellationToken));
     }
 
+    /// <summary>
+    /// Синхронизирует избранное пользователя со списками id из клиента.
+    /// </summary>
+    /// <param name="request">Набор id вакансий и возможностей, которые нужно добавить в избранное.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpPost("sync")]
     [ProducesResponseType(typeof(MyFavoritesDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<MyFavoritesDto>> SyncMyFavorites(
@@ -130,6 +139,11 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
         return new MyFavoritesDto(vacancyIds, opportunityIds);
     }
 
+    /// <summary>
+    /// Добавляет вакансию в избранное текущего пользователя.
+    /// </summary>
+    /// <param name="id">Идентификатор вакансии.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpPost("vacancies/{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -156,6 +170,11 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Удаляет вакансию из избранного текущего пользователя.
+    /// </summary>
+    /// <param name="id">Идентификатор вакансии.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpDelete("vacancies/{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> RemoveVacancy(long id, CancellationToken cancellationToken)
@@ -167,6 +186,11 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Добавляет возможность в избранное текущего пользователя.
+    /// </summary>
+    /// <param name="id">Идентификатор возможности.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpPost("opportunities/{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -193,6 +217,11 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Удаляет возможность из избранного текущего пользователя.
+    /// </summary>
+    /// <param name="id">Идентификатор возможности.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpDelete("opportunities/{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> RemoveOpportunity(long id, CancellationToken cancellationToken)

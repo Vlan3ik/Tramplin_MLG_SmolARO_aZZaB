@@ -13,6 +13,13 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class MapController(AppDbContext dbContext, IEmployerLocationService employerLocationService) : ControllerBase
 {
+    /// <summary>
+    /// Определяет адрес по координатам.
+    /// </summary>
+    /// <param name="latitude">Широта точки.</param>
+    /// <param name="longitude">Долгота точки.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Нормализованный адрес для переданных координат.</returns>
     [HttpGet("reverse-geocode")]
     [ProducesResponseType(typeof(MapReverseGeocodeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

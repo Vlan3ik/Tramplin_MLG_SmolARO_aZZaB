@@ -14,6 +14,12 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class EmployerLocationsController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает подсказки по городам для адреса работодателя.
+    /// </summary>
+    /// <param name="query">Поисковая строка по названию города.</param>
+    /// <param name="limit">Максимальное количество элементов в ответе.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpGet("cities")]
     [ProducesResponseType(typeof(IReadOnlyCollection<EmployerAddressCitySuggestionDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<EmployerAddressCitySuggestionDto>>> GetCities(
@@ -39,6 +45,13 @@ public class EmployerLocationsController(AppDbContext dbContext) : ControllerBas
         return Ok(items);
     }
 
+    /// <summary>
+    /// Возвращает подсказки по улицам внутри выбранного города.
+    /// </summary>
+    /// <param name="cityId">Идентификатор города.</param>
+    /// <param name="query">Поисковая строка по названию улицы.</param>
+    /// <param name="limit">Максимальное количество элементов в ответе.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpGet("streets")]
     [ProducesResponseType(typeof(IReadOnlyCollection<EmployerAddressStreetSuggestionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -73,6 +86,14 @@ public class EmployerLocationsController(AppDbContext dbContext) : ControllerBas
         return Ok(items);
     }
 
+    /// <summary>
+    /// Возвращает подсказки по номерам домов на выбранной улице.
+    /// </summary>
+    /// <param name="cityId">Идентификатор города.</param>
+    /// <param name="streetName">Точное название улицы.</param>
+    /// <param name="query">Необязательный фильтр по номеру дома.</param>
+    /// <param name="limit">Максимальное количество элементов в ответе.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpGet("houses")]
     [ProducesResponseType(typeof(IReadOnlyCollection<EmployerAddressHouseSuggestionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]

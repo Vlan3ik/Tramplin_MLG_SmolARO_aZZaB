@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e": "node ./e2e/run-all.mjs",
+    "e2e:headed": "node ./e2e/run-all.mjs --headed",
+    "e2e:card": "node ./e2e/run-card.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -26,10 +29,12 @@
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.183.1",
     "@vitejs/plugin-react": "^6.0.0",
+    "chromedriver": "^138.0.0",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "selenium-webdriver": "^4.33.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.0.0"

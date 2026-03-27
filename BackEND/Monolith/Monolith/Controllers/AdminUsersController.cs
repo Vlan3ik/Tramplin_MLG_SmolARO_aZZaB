@@ -32,6 +32,13 @@ public class AdminUsersController(
         "image/svg+xml"
     ];
 
+    /// <summary>
+    /// Возвращает список пользователей административного раздела.
+    /// </summary>
+    /// <param name="page">Номер страницы, начиная с 1.</param>
+    /// <param name="pageSize">Размер страницы, максимум 100.</param>
+    /// <param name="search">Поисковая строка по email, username и ФИО.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<AdminUserListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<AdminUserListItemDto>>> GetList(

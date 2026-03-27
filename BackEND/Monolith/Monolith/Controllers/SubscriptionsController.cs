@@ -22,6 +22,9 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
         string? AvatarUrl,
         DateTimeOffset CreatedAt);
 
+    /// <summary>
+    /// Возвращает пользователей, на которых подписан текущий пользователь.
+    /// </summary>
     [HttpGet("me/following")]
     [ProducesResponseType(typeof(IReadOnlyCollection<SubscriptionUserDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<SubscriptionUserDto>>> GetFollowing(CancellationToken cancellationToken)
@@ -43,6 +46,9 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
         return Ok(items);
     }
 
+    /// <summary>
+    /// Возвращает пользователей, подписанных на текущий аккаунт.
+    /// </summary>
     [HttpGet("me/followers")]
     [ProducesResponseType(typeof(IReadOnlyCollection<SubscriptionUserDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<SubscriptionUserDto>>> GetFollowers(CancellationToken cancellationToken)
@@ -64,6 +70,9 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
         return Ok(items);
     }
 
+    /// <summary>
+    /// Возвращает количество подписок и подписчиков текущего пользователя.
+    /// </summary>
     [HttpGet("me/stats")]
     [ProducesResponseType(typeof(SubscriptionStatsDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<SubscriptionStatsDto>> GetMyStats(CancellationToken cancellationToken)
@@ -79,6 +88,11 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
         return Ok(new SubscriptionStatsDto(followingCount, followersCount));
     }
 
+    /// <summary>
+    /// Подписывает текущего пользователя на другого пользователя.
+    /// </summary>
+    /// <param name="targetUserId">Идентификатор пользователя, на которого нужно подписаться.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpPost("{targetUserId:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -122,6 +136,11 @@ public class SubscriptionsController(AppDbContext dbContext) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Отписывает текущего пользователя от выбранного пользователя.
+    /// </summary>
+    /// <param name="targetUserId">Идентификатор пользователя, от которого нужно отписаться.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpDelete("{targetUserId:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]

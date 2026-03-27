@@ -111,6 +111,11 @@ public class AuthController(
         return Ok(roles);
     }
 
+    /// <summary>
+    /// Возвращает URL для начала авторизации через VK ID.
+    /// </summary>
+    /// <param name="state">Произвольная строка состояния, которая будет возвращена после авторизации.</param>
+    /// <returns>URL, на который нужно перенаправить пользователя для входа через VK.</returns>
     [AllowAnonymous]
     [HttpGet("vk/url")]
     [ProducesResponseType(typeof(VkLoginUrlResponse), StatusCodes.Status200OK)]
@@ -140,6 +145,12 @@ public class AuthController(
         return Ok(new VkLoginUrlResponse(url));
     }
 
+    /// <summary>
+    /// Выполняет вход или регистрацию пользователя по коду авторизации VK.
+    /// </summary>
+    /// <param name="request">Код авторизации, полученный от VK.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>JWT access token, refresh token и профиль пользователя.</returns>
     [AllowAnonymous]
     [HttpPost("vk/login")]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
