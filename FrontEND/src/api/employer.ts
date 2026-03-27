@@ -196,6 +196,20 @@ type UpdateEmployerCompanyChatSettingsApiRequest = {
   workingHoursTo: string | null
 }
 
+type EmployerCompanyLinkApi = {
+  id: number
+  linkKind: number
+  url: string | null
+  label: string | null
+  createdAt: string
+}
+
+type UpsertEmployerCompanyLinkApiRequest = {
+  linkKind: number
+  url: string | null
+  label: string | null
+}
+
 type EmployerVacancyUpsertRequest = {
   title: string
   shortDescription: string
@@ -336,6 +350,20 @@ export type UpdateEmployerCompanyChatSettingsRequest = {
   workingHoursTimezone: string
   workingHoursFrom: string
   workingHoursTo: string
+}
+
+export type EmployerCompanyLink = {
+  id: number
+  linkKind: number
+  url: string
+  label: string
+  createdAt: string
+}
+
+export type UpsertEmployerCompanyLinkRequest = {
+  linkKind: number
+  url: string
+  label: string
 }
 
 export type EmployerOpportunity = {
@@ -625,6 +653,16 @@ function mapEmployerCompany(response: EmployerCompanyApi): EmployerCompany {
   }
 }
 
+function mapEmployerCompanyLink(response: EmployerCompanyLinkApi): EmployerCompanyLink {
+  return {
+    id: response.id,
+    linkKind: response.linkKind ?? 7,
+    url: response.url ?? '',
+    label: response.label ?? '',
+    createdAt: response.createdAt ?? '',
+  }
+}
+
 function toIsoDateOrNow(value?: string) {
   if (value && value.trim()) {
     return value
@@ -790,6 +828,36 @@ export function updateEmployerCompanyChatSettings(payload: UpdateEmployerCompany
 
 export function submitEmployerCompanyVerification() {
   return postJson<unknown, Record<string, never>>('/employer/company/submit-verification', {})
+}
+
+export async function fetchEmployerCompanyLinks(signal?: AbortSignal) {
+  const response = await getJson<EmployerCompanyLinkApi[]>('/employer/company/links', { signal })
+  return Array.isArray(response) ? response.map((item) => mapEmployerCompanyLink(item)) : []
+}
+
+export async function createEmployerCompanyLink(payload: UpsertEmployerCompanyLinkRequest) {
+  const request: UpsertEmployerCompanyLinkApiRequest = {
+    linkKind: payload.linkKind,
+    url: toNullableString(payload.url),
+    label: toNullableString(payload.label),
+  }
+
+  const response = await postJson<EmployerCompanyLinkApi, UpsertEmployerCompanyLinkApiRequest>('/employer/company/links', request)
+  return mapEmployerCompanyLink(response)
+}
+
+export function updateEmployerCompanyLink(linkId: number, payload: UpsertEmployerCompanyLinkRequest) {
+  const request: UpsertEmployerCompanyLinkApiRequest = {
+    linkKind: payload.linkKind,
+    url: toNullableString(payload.url),
+    label: toNullableString(payload.label),
+  }
+
+  return patchJson<unknown, UpsertEmployerCompanyLinkApiRequest>(`/employer/company/links/${linkId}`, request)
+}
+
+export function deleteEmployerCompanyLink(linkId: number) {
+  return deleteJson<unknown>(`/employer/company/links/${linkId}`)
 }
 
 export async function fetchEmployerVacancies(signal?: AbortSignal) {

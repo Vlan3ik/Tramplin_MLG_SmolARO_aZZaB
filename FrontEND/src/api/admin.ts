@@ -11,6 +11,10 @@ type AdminUserApi = {
   id: number
   email: string
   username: string
+  firstName: string | null
+  lastName: string | null
+  displayName: string | null
+  avatarUrl: string | null
   status: number | string
   roles: string[] | null
   createdAt: string
@@ -48,8 +52,14 @@ type AdminOpportunityApi = {
 
 type AdminUserUpsertApiRequest = {
   email: string
-  firstName: string
-  lastName: string
+  firstName: string | null
+  lastName: string | null
+  username?: string | null
+  displayName?: string | null
+  avatarUrl?: string | null
+  password?: string | null
+  adminAccess?: boolean
+  curatorAccess?: boolean
   status: number
   roles: number[]
 }
@@ -111,6 +121,10 @@ export type AdminUser = {
   id: number
   email: string
   username: string
+  firstName: string
+  lastName: string
+  displayName: string
+  avatarUrl: string | null
   status: number
   roles: string[]
   createdAt: string
@@ -150,8 +164,19 @@ export type AdminUserUpsertRequest = {
   email: string
   firstName: string
   lastName: string
+  username?: string
+  displayName?: string
+  avatarUrl?: string
+  password?: string
+  adminAccess?: boolean
+  curatorAccess?: boolean
   status: number
   roles: number[]
+}
+
+export type AdminUserMutationResult = {
+  user: AdminUser
+  generatedPassword: string | null
 }
 
 export type AdminCompanyUpsertRequest = {
@@ -226,6 +251,10 @@ function mapUser(item: AdminUserApi): AdminUser {
     id: item.id,
     email: item.email ?? '',
     username: item.username ?? '',
+    firstName: item.firstName ?? '',
+    lastName: item.lastName ?? '',
+    displayName: item.displayName ?? '',
+    avatarUrl: item.avatarUrl ?? null,
     status: parseEnum(item.status),
     roles: item.roles ?? [],
     createdAt: item.createdAt,
@@ -271,11 +300,35 @@ function mapOpportunity(item: AdminOpportunityApi): AdminOpportunity {
 function mapUserUpsertRequest(payload: AdminUserUpsertRequest): AdminUserUpsertApiRequest {
   return {
     email: payload.email.trim(),
-    firstName: payload.firstName.trim(),
-    lastName: payload.lastName.trim(),
+    firstName: toNullableString(payload.firstName),
+    lastName: toNullableString(payload.lastName),
+    username: toNullableString(payload.username ?? ''),
+    displayName: toNullableString(payload.displayName ?? ''),
+    avatarUrl: toNullableString(payload.avatarUrl ?? ''),
+    password: toNullableString(payload.password ?? ''),
+    adminAccess: Boolean(payload.adminAccess),
+    curatorAccess: Boolean(payload.curatorAccess),
     status: payload.status,
     roles: payload.roles,
   }
+}
+
+function extractGeneratedPassword(response: unknown) {
+  if (!response || typeof response !== 'object') {
+    return null
+  }
+
+  const candidate = response as Record<string, unknown>
+  const possibleKeys = ['generatedPassword', 'temporaryPassword', 'tempPassword', 'newPassword', 'password']
+
+  for (const key of possibleKeys) {
+    const value = candidate[key]
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim()
+    }
+  }
+
+  return null
 }
 
 function mapCompanyUpsertRequest(payload: AdminCompanyUpsertRequest): AdminCompanyUpsertApiRequest {
@@ -363,11 +416,17 @@ export async function fetchAdminUsers(options: FetchListOptions = {}) {
 }
 
 export function createAdminUser(payload: AdminUserUpsertRequest) {
-  return postJson<AdminUserApi, AdminUserUpsertApiRequest>('/admin/users', mapUserUpsertRequest(payload))
+  return postJson<AdminUserApi | (AdminUserApi & Record<string, unknown>), AdminUserUpsertApiRequest>('/admin/users', mapUserUpsertRequest(payload)).then((response) => ({
+    user: mapUser(response as AdminUserApi),
+    generatedPassword: extractGeneratedPassword(response),
+  }))
 }
 
 export function updateAdminUser(id: number, payload: AdminUserUpsertRequest) {
-  return putJson<AdminUserApi, AdminUserUpsertApiRequest>(`/admin/users/${id}`, mapUserUpsertRequest(payload))
+  return putJson<AdminUserApi | (AdminUserApi & Record<string, unknown>), AdminUserUpsertApiRequest>(`/admin/users/${id}`, mapUserUpsertRequest(payload)).then((response) => ({
+    user: mapUser(response as AdminUserApi),
+    generatedPassword: extractGeneratedPassword(response),
+  }))
 }
 
 export function deleteAdminUser(id: number) {

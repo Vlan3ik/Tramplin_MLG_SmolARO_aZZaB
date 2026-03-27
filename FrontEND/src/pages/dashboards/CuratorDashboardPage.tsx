@@ -136,7 +136,7 @@ export function CuratorDashboardPage() {
 
         const failed = results.find((item) => item.status === 'rejected')
         if (failed?.status === 'rejected') {
-          setError(failed.reason instanceof Error ? failed.reason.message : 'Не удалось загрузить кабинет администратора.')
+          setError(failed.reason instanceof Error ? failed.reason.message : 'Не удалось загрузить кабинет куратора.')
         }
       })
       .finally(() => {
@@ -282,11 +282,11 @@ export function CuratorDashboardPage() {
       <main className="container seeker-profile-page">
         <section className="dashboard-section card seeker-profile-hero admin-profile-hero">
           <div className="seeker-profile-hero__avatar admin-profile-hero__avatar">
-            <span>ADM</span>
+            <span>CUR</span>
           </div>
           <div className="seeker-profile-hero__content">
             <div className="seeker-profile-panel__head">
-              <h1>Кабинет администратора</h1>
+              <h1>Кабинет куратора</h1>
               <div className="admin-toolbar">
                 <Link className="btn btn--primary" to="/dashboard/curator/users/create">Создать пользователя</Link>
                 <Link className="btn btn--primary" to="/dashboard/curator/companies/create">Создать компанию</Link>

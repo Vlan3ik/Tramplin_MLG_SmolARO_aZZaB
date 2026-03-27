@@ -558,7 +558,7 @@ export function VacancyFlowPage() {
                 <h1 className="vf-title">Выберите, что хотите создать</h1>
                 <div className="vf-choice-grid">
                   <article className="vf-choice-card">
-                    <img src="/чел сидит на цветке.svg" alt="Иллюстрация создания вакансии" />
+            <img src="/person-sits-on-flower.svg" alt="Иллюстрация создания вакансии" />
                     <h2>Я хочу создать вакансию/стажировку</h2>
                     <p>Разместите предложение о работе или стажировке, чтобы найти кандидатов в свою команду.</p>
                     <button type="button" className="vf-btn vf-btn--primary" onClick={() => goStep(2, 'vacancy')}>
@@ -567,7 +567,7 @@ export function VacancyFlowPage() {
                   </article>
 
                   <article className="vf-choice-card">
-                    <img src="/чел стоит рядом цветок.svg" alt="Иллюстрация создания мероприятия" />
+            <img src="/person-stands-near-flower.svg" alt="Иллюстрация создания мероприятия" />
                     <h2>Я хочу создать мероприятие</h2>
                     <p>Создайте страницу события и приглашайте участников на встречи, вебинары и мастер-классы.</p>
                     <button type="button" className="vf-btn vf-btn--primary" onClick={() => goStep(2, 'event')}>
@@ -826,7 +826,7 @@ export function VacancyFlowPage() {
                     </select>
                   </label>
                 </div>
-                <img className="vf-congrats__image" src="/гордый чел стоит.svg" alt="Иллюстрация публикации" />
+            <img className="vf-congrats__image" src="/proud-person-stands.svg" alt="Иллюстрация публикации" />
                 <div className="vf-actions">
                   <button type="button" className="vf-btn vf-btn--secondary" onClick={prevStep} disabled={isSubmitting}>
                     Назад

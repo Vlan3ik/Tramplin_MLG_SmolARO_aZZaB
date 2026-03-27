@@ -4,18 +4,22 @@ import { useNavigate } from 'react-router-dom'
 import { fetchCities, fetchLocations, fetchTags } from '../../api/catalog'
 import { fetchEmployerChats } from '../../api/chats'
 import {
+  createEmployerCompanyLink,
   createEmployerCompany,
   createEmployerOpportunity,
   createEmployerVacancy,
+  deleteEmployerCompanyLink,
   deleteEmployerOpportunity,
   deleteEmployerVacancy,
   fetchEmployerApplicationDetail,
   fetchEmployerApplications,
   fetchEmployerCompany,
+  fetchEmployerCompanyLinks,
   fetchEmployerCompanyOpportunities,
   fetchEmployerOpportunityDetail,
   fetchEmployerVacancyDetail,
   submitEmployerCompanyVerification,
+  updateEmployerCompanyLink,
   updateEmployerOpportunity,
   updateEmployerApplicationStatus,
   updateEmployerCompanyChatSettings,
@@ -24,6 +28,7 @@ import {
   type EmployerApplication,
   type EmployerApplicationDetail,
   type EmployerCompany,
+  type EmployerCompanyLink,
   type EmployerOpportunity,
 } from '../../api/employer'
 import { uploadCompanyLogo } from '../../api/media'
@@ -35,7 +40,7 @@ import { TagPicker } from '../../components/forms/TagPicker'
 import type { City, Location, TagListItem } from '../../types/catalog'
 import { formatSkillLevelDisplay } from '../../utils/skill-levels'
 
-type EmployerTabId = 'overview' | 'company' | 'create' | 'opportunities' | 'applications' | 'verification'
+type EmployerTabId = 'overview' | 'company' | 'create' | 'opportunities' | 'applications' | 'verification' | 'settings'
 
 const employerTabs: Array<{ id: EmployerTabId; label: string }> = [
   { id: 'overview', label: 'Обзор' },
@@ -43,6 +48,7 @@ const employerTabs: Array<{ id: EmployerTabId; label: string }> = [
   { id: 'opportunities', label: 'Мои возможности' },
   { id: 'applications', label: 'Отклики' },
   { id: 'verification', label: 'Верификация' },
+  { id: 'settings', label: 'Настройки чата' },
 ]
 
 const companyStatusLabel: Record<string, string> = {
@@ -92,6 +98,18 @@ const employerOpportunityStatusLabel: Record<number, string> = {
   6: 'Отклонено',
   7: 'В архиве',
 }
+
+const companyLinkKindOptions: Array<{ value: number; label: string }> = [
+  { value: 1, label: 'Website' },
+  { value: 2, label: 'Telegram' },
+  { value: 3, label: 'VK' },
+  { value: 4, label: 'Github' },
+  { value: 5, label: 'LinkedIn' },
+  { value: 6, label: 'HH' },
+  { value: 7, label: 'Other' },
+]
+
+const companyLinkKindLabel = Object.fromEntries(companyLinkKindOptions.map((item) => [item.value, item.label])) as Record<number, string>
 
 function isAbortError(error: unknown) {
   if (error instanceof DOMException && error.name === 'AbortError') {
@@ -280,12 +298,14 @@ export function EmployerDashboardPage() {
   const [opportunityLocations, setOpportunityLocations] = useState<Location[]>([])
   const [opportunities, setOpportunities] = useState<EmployerOpportunity[]>([])
   const [applications, setApplications] = useState<EmployerApplication[]>([])
+  const [companyLinks, setCompanyLinks] = useState<EmployerCompanyLink[]>([])
   const [applicationStatusDrafts, setApplicationStatusDrafts] = useState<Record<number, number>>({})
   const [applicationChats, setApplicationChats] = useState<Array<{ id: number; title: string; lastMessageText: string; lastMessageAt: string }>>([])
 
   const [loading, setLoading] = useState(true)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingChatSettings, setSavingChatSettings] = useState(false)
+  const [savingCompanyLink, setSavingCompanyLink] = useState(false)
   const [submittingVerification, setSubmittingVerification] = useState(false)
   const [creatingCompany, setCreatingCompany] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -298,6 +318,8 @@ export function EmployerDashboardPage() {
   const [editingOpportunityId, setEditingOpportunityId] = useState<number | null>(null)
   const [loadingOpportunityEditorKey, setLoadingOpportunityEditorKey] = useState<string | null>(null)
   const [deletingOpportunityKey, setDeletingOpportunityKey] = useState<string | null>(null)
+  const [deletingCompanyLinkId, setDeletingCompanyLinkId] = useState<number | null>(null)
+  const [editingCompanyLinkId, setEditingCompanyLinkId] = useState<number | null>(null)
   const [opportunitySearch, setOpportunitySearch] = useState('')
   const [opportunitySourceFilter, setOpportunitySourceFilter] = useState<'all' | 'vacancy' | 'opportunity'>('all')
   const [opportunityStatusesFilter, setOpportunityStatusesFilter] = useState<number[]>([])
@@ -372,6 +394,12 @@ export function EmployerDashboardPage() {
     workingHoursTo: '',
   })
 
+  const [companyLinkForm, setCompanyLinkForm] = useState({
+    linkKind: 1,
+    url: '',
+    label: '',
+  })
+
   const loadDashboard = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -438,8 +466,27 @@ export function EmployerDashboardPage() {
         workingHoursTo: toTimeInputValue(employerCompany.chatSettings.workingHoursTo),
       })
 
-      const companyOpportunities = await fetchEmployerCompanyOpportunities()
-      setOpportunities(companyOpportunities)
+      const [companyOpportunitiesResult, companyLinksResult] = await Promise.allSettled([
+        fetchEmployerCompanyOpportunities(),
+        fetchEmployerCompanyLinks(),
+      ])
+
+      if (companyOpportunitiesResult.status === 'fulfilled') {
+        setOpportunities(companyOpportunitiesResult.value)
+      }
+
+      if (companyLinksResult.status === 'fulfilled') {
+        setCompanyLinks(companyLinksResult.value)
+      } else {
+        setCompanyLinks([])
+      }
+
+      setEditingCompanyLinkId(null)
+      setCompanyLinkForm({
+        linkKind: 1,
+        url: '',
+        label: '',
+      })
     } catch (loadError) {
       if (isAbortError(loadError)) {
         return
@@ -452,6 +499,7 @@ export function EmployerDashboardPage() {
         setCompany(null)
         setCompanyMissing(true)
         setOpportunities([])
+        setCompanyLinks([])
       } else {
         setError(message)
       }
@@ -657,6 +705,32 @@ export function EmployerDashboardPage() {
       ...state,
       [name]: type === 'checkbox' ? checked : value,
     }))
+  }
+
+  function onCompanyLinkFormChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const { name, value } = event.target
+    setCompanyLinkForm((state) => ({
+      ...state,
+      [name]: name === 'linkKind' ? Number(value) || 7 : value,
+    }))
+  }
+
+  function onEditCompanyLink(link: EmployerCompanyLink) {
+    setEditingCompanyLinkId(link.id)
+    setCompanyLinkForm({
+      linkKind: link.linkKind,
+      url: link.url,
+      label: link.label,
+    })
+  }
+
+  function onCancelCompanyLinkEdit() {
+    setEditingCompanyLinkId(null)
+    setCompanyLinkForm({
+      linkKind: 1,
+      url: '',
+      label: '',
+    })
   }
 
   function onVacancyFormChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
@@ -1144,6 +1218,63 @@ export function EmployerDashboardPage() {
       setError(saveError instanceof Error ? saveError.message : 'Не удалось обновить чат-настройки.')
     } finally {
       setSavingChatSettings(false)
+    }
+  }
+
+  async function onSaveCompanyLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!company) {
+      return
+    }
+
+    if (!companyLinkForm.url.trim()) {
+      setError('Укажите URL ссылки компании.')
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setSavingCompanyLink(true)
+
+    try {
+      if (editingCompanyLinkId) {
+        await updateEmployerCompanyLink(editingCompanyLinkId, companyLinkForm)
+        setSuccess('Ссылка компании обновлена.')
+      } else {
+        await createEmployerCompanyLink(companyLinkForm)
+        setSuccess('Ссылка компании добавлена.')
+      }
+
+      await loadDashboard()
+    } catch (linkError) {
+      setError(linkError instanceof Error ? linkError.message : 'Не удалось сохранить ссылку компании.')
+    } finally {
+      setSavingCompanyLink(false)
+    }
+  }
+
+  async function onDeleteCompanyLink(linkId: number) {
+    if (!company) {
+      return
+    }
+
+    if (typeof window !== 'undefined' && !window.confirm('Удалить ссылку компании?')) {
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setDeletingCompanyLinkId(linkId)
+
+    try {
+      await deleteEmployerCompanyLink(linkId)
+      setSuccess('Ссылка компании удалена.')
+      await loadDashboard()
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Не удалось удалить ссылку компании.')
+    } finally {
+      setDeletingCompanyLinkId(null)
     }
   }
 
@@ -2114,36 +2245,53 @@ export function EmployerDashboardPage() {
               {submittingVerification ? 'Отправляем...' : 'Отправить на верификацию'}
             </button>
           </div>
+        </div>
+              </section> : null}
 
-          <form className="form-grid" onSubmit={onSaveChatSettings}>
-            <h3>Чат-настройки</h3>
-            <label className="employer-checkbox">
+              {tab === 'settings' ? <section className="dashboard-section card seeker-profile-panel">
+        <h2>Настройки</h2>
+        <div className="employer-verification">
+          <form className="form-grid employer-chat-settings" onSubmit={onSaveChatSettings}>
+            <div className="employer-chat-settings__head">
+              <h3>Чат-настройки</h3>
+              <p>Автоматические ответы и рабочий график компании.</p>
+            </div>
+
+            <label className="employer-chat-settings__switch">
               <input
                 type="checkbox"
                 name="autoGreetingEnabled"
                 checked={chatSettingsForm.autoGreetingEnabled}
                 onChange={onChatSettingsChange}
               />
-              Включить авто-приветствие
+              <span>
+                <strong>Включить авто-приветствие</strong>
+                <small>Кандидат сразу получает приветственное сообщение.</small>
+              </span>
             </label>
             <label>
               Текст авто-приветствия
-              <textarea name="autoGreetingText" rows={2} value={chatSettingsForm.autoGreetingText} onChange={onChatSettingsChange} />
+              <textarea name="autoGreetingText" rows={3} value={chatSettingsForm.autoGreetingText} onChange={onChatSettingsChange} />
             </label>
-            <label className="employer-checkbox">
+
+            <label className="employer-chat-settings__switch">
               <input
                 type="checkbox"
                 name="outsideHoursEnabled"
                 checked={chatSettingsForm.outsideHoursEnabled}
                 onChange={onChatSettingsChange}
               />
-              Отвечать вне рабочего времени
+              <span>
+                <strong>Отвечать вне рабочего времени</strong>
+                <small>Если офис закрыт, кандидату уйдет служебное сообщение.</small>
+              </span>
             </label>
             <label>
               Сообщение вне рабочего времени
-              <textarea name="outsideHoursText" rows={2} value={chatSettingsForm.outsideHoursText} onChange={onChatSettingsChange} />
+              <textarea name="outsideHoursText" rows={3} value={chatSettingsForm.outsideHoursText} onChange={onChatSettingsChange} />
             </label>
-            <div className="form-grid form-grid--two">
+
+            <div className="employer-chat-settings__hours">
               <label>
                 Таймзона
                 <input name="workingHoursTimezone" type="text" value={chatSettingsForm.workingHoursTimezone} onChange={onChatSettingsChange} />
@@ -2157,28 +2305,79 @@ export function EmployerDashboardPage() {
                 <input name="workingHoursTo" type="time" value={chatSettingsForm.workingHoursTo} onChange={onChatSettingsChange} />
               </label>
             </div>
-            <button type="submit" className="btn btn--secondary" disabled={savingChatSettings || !company}>
+
+            <button type="submit" className="btn btn--secondary employer-chat-settings__submit" disabled={savingChatSettings || !company}>
               {savingChatSettings ? 'Сохраняем...' : 'Сохранить чат-настройки'}
             </button>
           </form>
-        </div>
 
-        {company ? (
-          <div className="employer-company-contacts">
-            <span>
-              <Globe size={14} />
-              {company.websiteUrl || 'Сайт не указан'}
-            </span>
-            <span>
-              <Mail size={14} />
-              {company.publicEmail || 'Email не указан'}
-            </span>
-            <span>
-              <Phone size={14} />
-              {company.publicPhone || 'Телефон не указан'}
-            </span>
-          </div>
-        ) : null}
+          <section className="admin-form-card">
+            <h3>Публичные ссылки компании</h3>
+            <form className="form-grid" onSubmit={onSaveCompanyLink}>
+              <label>
+                Тип ссылки
+                <select name="linkKind" value={companyLinkForm.linkKind} onChange={onCompanyLinkFormChange}>
+                  {companyLinkKindOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                URL
+                <input name="url" type="url" value={companyLinkForm.url} onChange={onCompanyLinkFormChange} placeholder="https://example.com" required />
+              </label>
+              <label>
+                Подпись (опционально)
+                <input name="label" type="text" value={companyLinkForm.label} onChange={onCompanyLinkFormChange} />
+              </label>
+              <div className="favorite-card__actions">
+                <button type="submit" className="btn btn--primary" disabled={!company || savingCompanyLink}>
+                  {savingCompanyLink ? 'Сохраняем...' : editingCompanyLinkId ? 'Обновить ссылку' : 'Добавить ссылку'}
+                </button>
+                {editingCompanyLinkId ? (
+                  <button type="button" className="btn btn--ghost" onClick={onCancelCompanyLinkEdit} disabled={savingCompanyLink}>
+                    Отмена изменений
+                  </button>
+                ) : null}
+              </div>
+            </form>
+
+            <div className="admin-list-grid">
+              {companyLinks.length ? (
+                companyLinks.map((link) => (
+                  <article key={link.id} className="admin-form-card admin-list-card">
+                    <div>
+                      <strong>{formatLinkLabel(companyLinkKindLabel[link.linkKind] ?? 'Link', link.label)}</strong>
+                      <p>{link.url || 'URL не указан'}</p>
+                    </div>
+                    <div className="favorite-card__actions">
+                      {link.url ? (
+                        <a className="btn btn--ghost" href={link.url} target="_blank" rel="noreferrer">
+                          Открыть
+                        </a>
+                      ) : null}
+                      <button type="button" className="btn btn--secondary" onClick={() => onEditCompanyLink(link)} disabled={savingCompanyLink || deletingCompanyLinkId === link.id}>
+                        Редактировать
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--danger"
+                        onClick={() => void onDeleteCompanyLink(link.id)}
+                        disabled={deletingCompanyLinkId === link.id || savingCompanyLink}
+                      >
+                        {deletingCompanyLinkId === link.id ? 'Удаляем...' : 'Удалить'}
+                      </button>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <p>Ссылки компании пока не добавлены.</p>
+              )}
+            </div>
+          </section>
+        </div>
               </section> : null}
             </>
           )}
