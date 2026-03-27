@@ -523,7 +523,6 @@ export function VacancyFlowPage() {
               {currentStep === 5 ? (
                 <section className="vf-section--publish">
                   <h2 className="vf-congrats">Готово!</h2>
-                  <p className="vf-congrats__text">Локация будет сохранена по ручному адресу (город/улица/дом) без обязательного mapPoint.</p>
                   <img className="vf-congrats__image" src="/chat-side.svg" alt="Success" />
                   <div className="vf-actions"><button type="button" className="vf-btn vf-btn--secondary" onClick={prevStep} disabled={isSubmitting}>Назад</button><button type="button" className="vf-btn vf-btn--primary" onClick={onPublish} disabled={isSubmitting}>{isSubmitting ? 'Публикуем...' : 'Опубликовать'}</button></div>
                 </section>
