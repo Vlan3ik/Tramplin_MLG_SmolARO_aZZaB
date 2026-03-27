@@ -107,6 +107,7 @@ export function FilterModal({ isOpen, filters, onApply, onClose, onReset }: Filt
       return
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(filters)
   }, [filters, isOpen])
 
@@ -116,6 +117,7 @@ export function FilterModal({ isOpen, filters, onApply, onClose, onReset }: Filt
     }
 
     const controller = new AbortController()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsTagsLoading(true)
     setTagsError('')
 

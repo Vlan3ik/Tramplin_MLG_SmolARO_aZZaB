@@ -21,6 +21,24 @@ type MediaViewerItem = {
   fileName: string
 }
 
+type ChatLinkedVacancyCard = {
+  vacancyId: number
+  title: string | null
+}
+
+type ChatLinkedCard = {
+  opportunity?: {
+    opportunityId: number
+    title: string | null
+  } | null
+  applicationEmployer?: {
+    vacancy?: ChatLinkedVacancyCard | null
+  } | null
+  applicationSeeker?: {
+    vacancy?: ChatLinkedVacancyCard | null
+  } | null
+} | null
+
 function isAbortError(error: unknown) {
   if (error instanceof DOMException && error.name === 'AbortError') {
     return true
@@ -273,7 +291,7 @@ export function ChatWidget() {
   const [errorMessage, setErrorMessage] = useState('')
   const [pendingOpenChatId, setPendingOpenChatId] = useState<number | null>(null)
   const [chatVacancyById, setChatVacancyById] = useState<Record<number, { vacancyId: number; vacancyTitle: string }>>({})
-  const [chatLinkedCardById, setChatLinkedCardById] = useState<Record<number, any>>({})
+  const [chatLinkedCardById, setChatLinkedCardById] = useState<Record<number, ChatLinkedCard>>({})
   const [mediaViewerItems, setMediaViewerItems] = useState<MediaViewerItem[]>([])
   const [activeMediaIndex, setActiveMediaIndex] = useState(0)
 

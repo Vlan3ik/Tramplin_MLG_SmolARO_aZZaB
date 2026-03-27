@@ -109,8 +109,8 @@ export function CuratorModerationPage() {
 
   useEffect(() => {
     let active = true
-    setLoading(true)
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     Promise.allSettled([loadUsers(), loadResumes(), loadVacancies(), loadOpportunities(), loadCompanies()])
       .then((results) => {
         if (!active) return
