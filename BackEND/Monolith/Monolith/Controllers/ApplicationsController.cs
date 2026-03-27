@@ -19,6 +19,12 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class ApplicationsController(AppDbContext dbContext, IHubContext<ChatHub> hubContext, IChatCacheService chatCache) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает отклики текущего пользователя.
+    /// </summary>
+    /// <remarks>
+    /// В ответ включаются отклики по вакансиям и возможностям, доступные пользователю после авторизации.
+    /// </remarks>
     [HttpGet("me")]
     [ProducesResponseType(typeof(IReadOnlyCollection<ApplicationListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<ApplicationListItemDto>>> GetMine(CancellationToken cancellationToken)

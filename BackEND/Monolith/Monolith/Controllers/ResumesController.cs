@@ -16,6 +16,12 @@ namespace Monolith.Controllers;
 [Produces("application/json")]
 public class ResumesController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает список опубликованных резюме.
+    /// </summary>
+    /// <remarks>
+    /// Учитывает фильтры, пагинацию, приватность профиля и флаг подписок текущего пользователя.
+    /// </remarks>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<ResumeListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<ResumeListItemDto>>> GetList(
@@ -198,6 +204,14 @@ public class ResumesController(AppDbContext dbContext) : ControllerBase
         return Ok(new PagedResponse<ResumeListItemDto>(items, totalCount, page, pageSize));
     }
 
+    /// <summary>
+    /// Возвращает подробное резюме пользователя.
+    /// </summary>
+    /// <param name="id">Идентификатор пользователя, которому принадлежит резюме.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <remarks>
+    /// Резюме будет возвращено только если оно опубликовано и доступно текущему пользователю по настройкам приватности.
+    /// </remarks>
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(ResumeDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]

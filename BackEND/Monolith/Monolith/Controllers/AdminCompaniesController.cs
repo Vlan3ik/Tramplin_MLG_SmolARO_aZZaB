@@ -10,8 +10,8 @@ using Monolith.Services.Common;
 namespace Monolith.Controllers;
 
 /// <summary>
-/// РђРґРјРёРЅРёСЃС‚СЂР°С‚РёРІРЅС‹Рµ РѕРїРµСЂР°С†РёРё РЅР°Рґ РєРѕРјРїР°РЅРёСЏРјРё.
-/// Р”РѕСЃС‚СѓРї С‚РѕР»СЊРєРѕ РґР»СЏ СЂРѕР»Рё curator.
+/// Административные операции над компаниями.
+/// Доступ только для ролей curator и admin.
 /// </summary>
 [ApiController]
 [Authorize(Roles = "curator,admin")]
@@ -20,13 +20,13 @@ namespace Monolith.Controllers;
 public class AdminCompaniesController(AppDbContext dbContext) : ControllerBase
 {
     /// <summary>
-    /// Р’РѕР·РІСЂР°С‰Р°РµС‚ СЃРїРёСЃРѕРє РєРѕРјРїР°РЅРёР№ СЃ РїР°РіРёРЅР°С†РёРµР№ Рё РїРѕРёСЃРєРѕРј.
+    /// Возвращает список компаний для модерации с пагинацией и поиском.
     /// </summary>
-    /// <param name="page">РќРѕРјРµСЂ СЃС‚СЂР°РЅРёС†С‹ (РЅР°С‡РёРЅР°СЏ СЃ 1).</param>
-    /// <param name="pageSize">Р Р°Р·РјРµСЂ СЃС‚СЂР°РЅРёС†С‹ (РјР°РєСЃРёРјСѓРј 100).</param>
-    /// <param name="search">РџРѕРёСЃРєРѕРІР°СЏ СЃС‚СЂРѕРєР° РїРѕ legalName/brandName/industry.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё.</param>
-    /// <returns>РџР°РіРёРЅРёСЂРѕРІР°РЅРЅС‹Р№ СЃРїРёСЃРѕРє РєРѕРјРїР°РЅРёР№.</returns>
+    /// <param name="page">Номер страницы, начиная с 1.</param>
+    /// <param name="pageSize">Размер страницы, максимум 100.</param>
+    /// <param name="search">Поисковая строка по legalName, brandName и industry.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Постраничный список компаний.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<AdminCompanyListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -60,11 +60,11 @@ public class AdminCompaniesController(AppDbContext dbContext) : ControllerBase
     }
 
     /// <summary>
-    /// РЎРѕР·РґР°РµС‚ РєРѕРјРїР°РЅРёСЋ РІ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РёРІРЅРѕРј РєРѕРЅС‚СѓСЂРµ.
+    /// Создаёт компанию в административном контуре.
     /// </summary>
-    /// <param name="request">РџРѕР»РЅС‹Р№ РЅР°Р±РѕСЂ РїРѕР»РµР№ РєРѕРјРїР°РЅРёРё.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё.</param>
-    /// <returns>РЎРѕР·РґР°РЅРЅР°СЏ РєРѕРјРїР°РЅРёСЏ.</returns>
+    /// <param name="request">Полный набор полей компании.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Созданная компания.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(AdminCompanyListItemDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -80,12 +80,12 @@ public class AdminCompaniesController(AppDbContext dbContext) : ControllerBase
     }
 
     /// <summary>
-    /// РћР±РЅРѕРІР»СЏРµС‚ РґР°РЅРЅС‹Рµ РєРѕРјРїР°РЅРёРё.
+    /// Обновляет данные компании.
     /// </summary>
-    /// <param name="id">РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РєРѕРјРїР°РЅРёРё.</param>
-    /// <param name="request">РќРѕРІС‹Рµ Р·РЅР°С‡РµРЅРёСЏ РїРѕР»РµР№ РєРѕРјРїР°РЅРёРё.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё.</param>
-    /// <returns>РћР±РЅРѕРІР»РµРЅРЅР°СЏ РєРѕРјРїР°РЅРёСЏ.</returns>
+    /// <param name="id">Идентификатор компании.</param>
+    /// <param name="request">Новые значения полей компании.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Обновлённая компания.</returns>
     [HttpPut("{id:long}")]
     [ProducesResponseType(typeof(AdminCompanyListItemDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -96,7 +96,7 @@ public class AdminCompaniesController(AppDbContext dbContext) : ControllerBase
         var company = await dbContext.Companies.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (company is null)
         {
-            return this.ToNotFoundError("admin.companies.not_found", "РљРѕРјРїР°РЅРёСЏ РЅРµ РЅР°Р№РґРµРЅР°.");
+            return this.ToNotFoundError("admin.companies.not_found", "Компания не найдена.");
         }
 
         Apply(company, request);
@@ -106,13 +106,13 @@ public class AdminCompaniesController(AppDbContext dbContext) : ControllerBase
     }
 
     /// <summary>
-    /// РЈРґР°Р»СЏРµС‚ РєРѕРјРїР°РЅРёСЋ.
+    /// Удаляет компанию.
     /// </summary>
     /// <remarks>
-    /// РЈРґР°Р»РµРЅРёРµ С„РёР·РёС‡РµСЃРєРѕРµ (hard delete), РІРєР»СЋС‡Р°СЏ Р·Р°РІРёСЃРёРјС‹Рµ Р·Р°РїРёСЃРё РїРѕ РєР°СЃРєР°РґРЅС‹Рј FK.
+    /// Удаление физическое, включая зависимые записи по каскадным внешним ключам.
     /// </remarks>
-    /// <param name="id">РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РєРѕРјРїР°РЅРёРё.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё.</param>
+    /// <param name="id">Идентификатор компании.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -123,7 +123,7 @@ public class AdminCompaniesController(AppDbContext dbContext) : ControllerBase
         var company = await dbContext.Companies.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (company is null)
         {
-            return this.ToNotFoundError("admin.companies.not_found", "РљРѕРјРїР°РЅРёСЏ РЅРµ РЅР°Р№РґРµРЅР°.");
+            return this.ToNotFoundError("admin.companies.not_found", "Компания не найдена.");
         }
 
         dbContext.Companies.Remove(company);
@@ -132,10 +132,10 @@ public class AdminCompaniesController(AppDbContext dbContext) : ControllerBase
     }
 
     /// <summary>
-    /// РџРѕРґС‚РІРµСЂР¶РґР°РµС‚ РІРµСЂРёС„РёРєР°С†РёСЋ РєРѕРјРїР°РЅРёРё.
+    /// Подтверждает верификацию компании.
     /// </summary>
-    /// <param name="id">РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РєРѕРјРїР°РЅРёРё.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё.</param>
+    /// <param name="id">Идентификатор компании.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpPost("{id:long}/verify")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -146,7 +146,7 @@ public class AdminCompaniesController(AppDbContext dbContext) : ControllerBase
         var company = await dbContext.Companies.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (company is null)
         {
-            return this.ToNotFoundError("admin.companies.not_found", "РљРѕРјРїР°РЅРёСЏ РЅРµ РЅР°Р№РґРµРЅР°.");
+            return this.ToNotFoundError("admin.companies.not_found", "Компания не найдена.");
         }
 
         company.Status = CompanyStatus.Verified;
@@ -155,10 +155,10 @@ public class AdminCompaniesController(AppDbContext dbContext) : ControllerBase
     }
 
     /// <summary>
-    /// РћС‚РєР»РѕРЅСЏРµС‚ РІРµСЂРёС„РёРєР°С†РёСЋ РєРѕРјРїР°РЅРёРё.
+    /// Отклоняет верификацию компании.
     /// </summary>
-    /// <param name="id">РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РєРѕРјРїР°РЅРёРё.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё.</param>
+    /// <param name="id">Идентификатор компании.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpPost("{id:long}/reject")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -169,7 +169,7 @@ public class AdminCompaniesController(AppDbContext dbContext) : ControllerBase
         var company = await dbContext.Companies.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (company is null)
         {
-            return this.ToNotFoundError("admin.companies.not_found", "РљРѕРјРїР°РЅРёСЏ РЅРµ РЅР°Р№РґРµРЅР°.");
+            return this.ToNotFoundError("admin.companies.not_found", "Компания не найдена.");
         }
 
         company.Status = CompanyStatus.Rejected;

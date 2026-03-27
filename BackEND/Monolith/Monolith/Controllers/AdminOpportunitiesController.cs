@@ -16,13 +16,13 @@ namespace Monolith.Controllers;
 public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBase
 {
     /// <summary>
-    /// Р’РѕР·РІСЂР°С‰Р°РµС‚ СЃРїРёСЃРѕРє РІРѕР·РјРѕР¶РЅРѕСЃС‚РµР№ РґР»СЏ РјРѕРґРµСЂР°С†РёРё СЃ РїР°РіРёРЅР°С†РёРµР№ Рё РїРѕРёСЃРєРѕРј.
+    /// Возвращает список возможностей для модерации с пагинацией и поиском.
     /// </summary>
-    /// <param name="page">РќРѕРјРµСЂ СЃС‚СЂР°РЅРёС†С‹ (РЅР°С‡РёРЅР°СЏ СЃ 1).</param>
-    /// <param name="pageSize">Р Р°Р·РјРµСЂ СЃС‚СЂР°РЅРёС†С‹ (РјР°РєСЃРёРјСѓРј 100).</param>
-    /// <param name="search">РџРѕРёСЃРєРѕРІР°СЏ СЃС‚СЂРѕРєР° РїРѕ Р·Р°РіРѕР»РѕРІРєСѓ Рё РєСЂР°С‚РєРѕРјСѓ РѕРїРёСЃР°РЅРёСЋ.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё С‡С‚РµРЅРёСЏ.</param>
-    /// <returns>РџР°РіРёРЅРёСЂРѕРІР°РЅРЅС‹Р№ СЃРїРёСЃРѕРє РІРѕР·РјРѕР¶РЅРѕСЃС‚РµР№.</returns>
+    /// <param name="page">Номер страницы, начиная с 1.</param>
+    /// <param name="pageSize">Размер страницы, максимум 100.</param>
+    /// <param name="search">Поисковая строка по заголовку и краткому описанию.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Постраничный список возможностей.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<AdminOpportunityListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<AdminOpportunityListItemDto>>> GetList(
@@ -52,11 +52,11 @@ public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBa
     }
 
     /// <summary>
-    /// РЎРѕР·РґР°РµС‚ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ РѕС‚ РёРјРµРЅРё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°.
+    /// Создаёт возможность от имени администратора.
     /// </summary>
-    /// <param name="request">Р”Р°РЅРЅС‹Рµ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё Р·Р°РїРёСЃРё.</param>
-    /// <returns>РЎРѕР·РґР°РЅРЅР°СЏ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ РІ РєСЂР°С‚РєРѕРј С„РѕСЂРјР°С‚Рµ.</returns>
+    /// <param name="request">Данные возможности.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Созданная возможность в кратком формате.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(AdminOpportunityListItemDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -113,12 +113,12 @@ public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBa
     }
 
     /// <summary>
-    /// РћР±РЅРѕРІР»СЏРµС‚ СЃСѓС‰РµСЃС‚РІСѓСЋС‰СѓСЋ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ.
+    /// Обновляет существующую возможность.
     /// </summary>
-    /// <param name="id">РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё.</param>
-    /// <param name="request">РќРѕРІС‹Рµ Р·РЅР°С‡РµРЅРёСЏ РїРѕР»РµР№ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё Р·Р°РїРёСЃРё.</param>
-    /// <returns>РћР±РЅРѕРІР»РµРЅРЅР°СЏ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ РІ РєСЂР°С‚РєРѕРј С„РѕСЂРјР°С‚Рµ.</returns>
+    /// <param name="id">Идентификатор возможности.</param>
+    /// <param name="request">Новые значения полей возможности.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Обновлённая возможность в кратком формате.</returns>
     [HttpPut("{id:long}")]
     [ProducesResponseType(typeof(AdminOpportunityListItemDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -144,12 +144,11 @@ public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBa
     }
 
     /// <summary>
-    /// РЈРґР°Р»СЏРµС‚ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ РїРѕ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂСѓ.
+    /// Обновляет статус возможности.
     /// </summary>
-    /// <param name="id">РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё.</param>
-    /// <param name="cancellationToken">РўРѕРєРµРЅ РѕС‚РјРµРЅС‹ РѕРїРµСЂР°С†РёРё СѓРґР°Р»РµРЅРёСЏ.</param>
-    /// <returns>РџСѓСЃС‚РѕР№ РѕС‚РІРµС‚ РїСЂРё СѓСЃРїРµС€РЅРѕРј СѓРґР°Р»РµРЅРёРё.</returns>
-    /// <param name="request">РќРѕРІС‹Р№ СЃС‚Р°С‚СѓСЃ РјРµСЂРѕРїСЂРёСЏС‚РёСЏ.</param>
+    /// <param name="id">Идентификатор возможности.</param>
+    /// <param name="request">Новый статус возможности.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpPatch("{id:long}/status")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -166,6 +165,11 @@ public class AdminOpportunitiesController(AppDbContext dbContext) : ControllerBa
         return NoContent();
     }
 
+    /// <summary>
+    /// Удаляет возможность из административного раздела.
+    /// </summary>
+    /// <param name="id">Идентификатор возможности.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
