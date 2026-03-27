@@ -260,6 +260,22 @@ public class AdminUsersController(
         return NoContent();
     }
 
+    [HttpPatch("{id:long}/status")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateStatus(long id, AdminUserStatusUpdateRequest request, CancellationToken cancellationToken)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (user is null)
+        {
+            return this.ToNotFoundError("admin.users.not_found", "Пользователь не найден.");
+        }
+
+        user.Status = request.Status;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     private async Task<Dictionary<long, IReadOnlyCollection<string>>> BuildRoleMap(long[] userIds, CancellationToken cancellationToken)
     {
         return await dbContext.UserRoles

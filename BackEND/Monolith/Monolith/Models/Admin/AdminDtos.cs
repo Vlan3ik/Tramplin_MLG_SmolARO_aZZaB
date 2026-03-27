@@ -21,6 +21,8 @@ public record AdminUserUpsertRequest(
 
 public record AdminUserResetPasswordResponse(string TempPassword);
 
+public record AdminUserStatusUpdateRequest(AccountStatus Status);
+
 public record AdminCompanyListItemDto(
     long Id,
     string LegalName,
@@ -43,6 +45,31 @@ public record AdminCompanyUpsertRequest(
     string? PublicEmail,
     string? PublicPhone,
     CompanyStatus Status);
+
+public record AdminCompanyStatusUpdateRequest(CompanyStatus Status);
+
+public record AdminResumeListItemDto(
+    long UserId,
+    string Username,
+    string Fio,
+    string? Headline,
+    string? DesiredPosition,
+    DateTimeOffset UpdatedAt,
+    bool IsArchived,
+    AccountStatus UserStatus);
+
+public record AdminResumeDetailDto(
+    long UserId,
+    string Username,
+    string Fio,
+    string? Headline,
+    string? DesiredPosition,
+    string? Summary,
+    DateTimeOffset UpdatedAt,
+    bool IsArchived,
+    AccountStatus UserStatus);
+
+public record AdminResumeArchiveUpdateRequest(bool IsArchived);
 
 public record AdminOpportunityListItemDto(
     long Id,
