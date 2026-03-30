@@ -139,6 +139,31 @@ const companyLinkKindOptions: Array<{ value: number; label: string }> = [
 
 const companyLinkKindLabel = Object.fromEntries(companyLinkKindOptions.map((item) => [item.value, item.label])) as Record<number, string>
 
+const employerTypeOptions: Array<{ value: number; label: string }> = [
+  { value: 1, label: '\u042e\u0440\u0438\u0434\u0438\u0447\u0435\u0441\u043a\u043e\u0435 \u043b\u0438\u0446\u043e' },
+  { value: 2, label: '\u0418\u041f' },
+  { value: 3, label: '\u0421\u0430\u043c\u043e\u0437\u0430\u043d\u044f\u0442\u044b\u0439' },
+  { value: 4, label: '\u041a\u0430\u0434\u0440\u043e\u0432\u043e\u0435 \u0430\u0433\u0435\u043d\u0442\u0441\u0442\u0432\u043e' },
+  { value: 5, label: '\u0427\u0430\u0441\u0442\u043d\u044b\u0439 \u0440\u0435\u043a\u0440\u0443\u0442\u0435\u0440' },
+  { value: 6, label: '\u0424\u0438\u0437\u0438\u0447\u0435\u0441\u043a\u043e\u0435 \u043b\u0438\u0446\u043e' },
+]
+
+const verificationDocumentTypeLabel: Record<number, string> = {
+  1: '\u0423\u0441\u0442\u0430\u0432\u043d\u044b\u0435 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b',
+  2: '\u0412\u044b\u043f\u0438\u0441\u043a\u0430 \u0415\u0413\u0420\u042e\u041b/\u0415\u0413\u0420\u0418\u041f',
+  3: '\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442 \u043f\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u0438\u0442\u0435\u043b\u044f',
+  4: '\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u0440\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b',
+  5: '\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 \u043f\u0443\u0431\u043b\u0438\u0447\u043d\u043e\u0441\u0442\u0438',
+}
+
+const verificationDocumentStatusLabel: Record<number, string> = {
+  1: '\u041d\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435',
+  2: '\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d',
+  3: '\u041e\u0448\u0438\u0431\u043a\u0430',
+  4: '\u041e\u0442\u043a\u043b\u043e\u043d\u0435\u043d',
+}
+
+
 function isAbortError(error: unknown) {
   if (error instanceof DOMException && error.name === 'AbortError') {
     return true
@@ -433,8 +458,7 @@ export function EmployerDashboardPage() {
   const [verificationRequirements, setVerificationRequirements] = useState<EmployerVerificationRequirement[]>([])
   const [verificationDocuments, setVerificationDocuments] = useState<EmployerVerificationDocument[]>([])
   const [verificationSaving, setVerificationSaving] = useState(false)
-  const [verificationUploadType, setVerificationUploadType] = useState(1)
-  const [verificationUploadFile, setVerificationUploadFile] = useState<File | null>(null)
+  const [verificationUploadFiles, setVerificationUploadFiles] = useState<Record<number, File | null>>({})
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
@@ -694,6 +718,24 @@ export function EmployerDashboardPage() {
     () => Array.from(new Set(applications.map((item) => item.status))).sort((a, b) => a - b),
     [applications],
   )
+  const requiredVerificationDocuments = useMemo(
+    () => verificationRequirements.filter((item) => item.isRequired),
+    [verificationRequirements],
+  )
+  const verificationDocumentByType = useMemo(() => {
+    const map = new Map<number, EmployerVerificationDocument>()
+    const sorted = [...verificationDocuments].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    sorted.forEach((item) => {
+      if (!map.has(item.documentType)) {
+        map.set(item.documentType, item)
+      }
+    })
+    return map
+  }, [verificationDocuments])
+  const missingRequiredVerificationDocumentTypes = useMemo(
+    () => requiredVerificationDocuments.filter((item) => !verificationDocumentByType.has(item.documentType)).map((item) => item.documentType),
+    [requiredVerificationDocuments, verificationDocumentByType],
+  )
 
   const selectedCandidateResume = selectedApplicationDetail?.candidateResume ?? null
 
@@ -802,17 +844,24 @@ export function EmployerDashboardPage() {
       await updateEmployerCompanyVerification(verificationProfile)
       const requirements = await fetchEmployerVerificationRequirements(verificationProfile.employerType)
       setVerificationRequirements(requirements)
-      setSuccess('Verification profile saved.')
+      setSuccess('Данные верификации сохранены.')
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Cannot save verification profile.')
+      setError(saveError instanceof Error ? saveError.message : 'Не удалось сохранить данные верификации.')
     } finally {
       setVerificationSaving(false)
     }
   }
 
-  async function onUploadVerificationDocument(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!verificationUploadFile) {
+  function onVerificationDocumentFileChange(documentType: number, file: File | null) {
+    setVerificationUploadFiles((state) => ({
+      ...state,
+      [documentType]: file,
+    }))
+  }
+
+  async function onUploadVerificationDocument(documentType: number) {
+    const file = verificationUploadFiles[documentType]
+    if (!file) {
       return
     }
 
@@ -820,12 +869,12 @@ export function EmployerDashboardPage() {
     setSuccess('')
     setVerificationSaving(true)
     try {
-      const uploaded = await uploadEmployerVerificationDocument(verificationUploadType, verificationUploadFile)
-      setVerificationDocuments((state) => [uploaded, ...state])
-      setVerificationUploadFile(null)
-      setSuccess('Verification document uploaded.')
+      const uploaded = await uploadEmployerVerificationDocument(documentType, file)
+      setVerificationDocuments((state) => [uploaded, ...state.filter((item) => item.id !== uploaded.id)])
+      setVerificationUploadFiles((state) => ({ ...state, [documentType]: null }))
+      setSuccess('Документ загружен.')
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : 'Cannot upload verification document.')
+      setError(uploadError instanceof Error ? uploadError.message : 'Не удалось загрузить документ.')
     } finally {
       setVerificationSaving(false)
     }
@@ -838,9 +887,9 @@ export function EmployerDashboardPage() {
     try {
       await deleteEmployerVerificationDocument(documentId)
       setVerificationDocuments((state) => state.filter((item) => item.id !== documentId))
-      setSuccess('Verification document deleted.')
+      setSuccess('Документ удален.')
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Cannot delete verification document.')
+      setError(deleteError instanceof Error ? deleteError.message : 'Не удалось удалить документ.')
     } finally {
       setVerificationSaving(false)
     }
@@ -1423,6 +1472,14 @@ export function EmployerDashboardPage() {
 
   async function onSubmitVerification() {
     if (!company) {
+      return
+    }
+
+    if (missingRequiredVerificationDocumentTypes.length > 0) {
+      const missingList = missingRequiredVerificationDocumentTypes
+        .map((documentType) => verificationDocumentTypeLabel[documentType] ?? `Документ #${documentType}`)
+        .join(', ')
+      setError(`Загрузите обязательные документы: ${missingList}.`)
       return
     }
 
@@ -2452,125 +2509,133 @@ export function EmployerDashboardPage() {
             <p>Заполните профиль, загрузите документы и отправьте на проверку.</p>
           </div>
 
-          {verificationProfile ? (
-            <form className="form-grid" onSubmit={onSaveVerificationProfile}>
-              <label>
-                Employer type
-                <select name="employerType" value={verificationProfile.employerType} onChange={onVerificationProfileChange}>
-                  <option value={1}>LegalEntity</option>
-                  <option value={2}>IndividualEntrepreneur</option>
-                  <option value={3}>SelfEmployed</option>
-                  <option value={4}>RecruitmentAgency</option>
-                  <option value={5}>PrivateRecruiter</option>
-                  <option value={6}>PrivatePerson</option>
-                </select>
-              </label>
-              <label>
-                OGRN/OGRNIP
-                <input name="ogrnOrOgrnip" type="text" value={verificationProfile.ogrnOrOgrnip} onChange={onVerificationProfileChange} />
-              </label>
-              <label>
-                INN
-                <input name="inn" type="text" value={verificationProfile.inn} onChange={onVerificationProfileChange} />
-              </label>
-              <label>
-                KPP
-                <input name="kpp" type="text" value={verificationProfile.kpp} onChange={onVerificationProfileChange} />
-              </label>
-              <label>
-                Legal address
-                <input name="legalAddress" type="text" value={verificationProfile.legalAddress} onChange={onVerificationProfileChange} />
-              </label>
-              <label>
-                Actual address
-                <input name="actualAddress" type="text" value={verificationProfile.actualAddress} onChange={onVerificationProfileChange} />
-              </label>
-              <label>
-                Representative name
-                <input name="representativeFullName" type="text" value={verificationProfile.representativeFullName} onChange={onVerificationProfileChange} />
-              </label>
-              <label>
-                Representative position
-                <input name="representativePosition" type="text" value={verificationProfile.representativePosition} onChange={onVerificationProfileChange} />
-              </label>
-              <label>
-                Industry
-                <select name="mainIndustryId" value={verificationProfile.mainIndustryId} onChange={onVerificationProfileChange}>
-                  {verificationIndustries.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Work email
-                <input name="workEmail" type="email" value={verificationProfile.workEmail} onChange={onVerificationProfileChange} />
-              </label>
-              <label>
-                Work phone
-                <input name="workPhone" type="text" value={verificationProfile.workPhone} onChange={onVerificationProfileChange} />
-              </label>
-              <label>
-                Public links
-                <input name="siteOrPublicLinks" type="text" value={verificationProfile.siteOrPublicLinks} onChange={onVerificationProfileChange} />
-              </label>
-              <button type="submit" className="btn btn--secondary" disabled={verificationSaving}>
-                {verificationSaving ? 'Saving...' : 'Save verification profile'}
-              </button>
-            </form>
-          ) : (
-            <p>Verification profile unavailable.</p>
-          )}
+          <div className="employer-verification__layout">
+            <div className="admin-form-card">
+              <h3>{'\u0414\u0430\u043d\u043d\u044b\u0435 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438'}</h3>
+              {verificationProfile ? (
+                <form className="form-grid employer-verification-form" onSubmit={onSaveVerificationProfile}>
+                  <label>
+                    {'\u0422\u0438\u043f \u0440\u0430\u0431\u043e\u0442\u043e\u0434\u0430\u0442\u0435\u043b\u044f'}
+                    <select name="employerType" value={verificationProfile.employerType} onChange={onVerificationProfileChange}>
+                      {employerTypeOptions.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {'\u041e\u0413\u0420\u041d/\u041e\u0413\u0420\u041d\u0418\u041f'}
+                    <input name="ogrnOrOgrnip" type="text" value={verificationProfile.ogrnOrOgrnip} onChange={onVerificationProfileChange} />
+                  </label>
+                  <label>
+                    {'\u0418\u041d\u041d'}
+                    <input name="inn" type="text" value={verificationProfile.inn} onChange={onVerificationProfileChange} />
+                  </label>
+                  <label>
+                    {'\u041a\u041f\u041f'}
+                    <input name="kpp" type="text" value={verificationProfile.kpp} onChange={onVerificationProfileChange} />
+                  </label>
+                  <label className="full-width">
+                    {'\u042e\u0440\u0438\u0434\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u0430\u0434\u0440\u0435\u0441'}
+                    <input name="legalAddress" type="text" value={verificationProfile.legalAddress} onChange={onVerificationProfileChange} />
+                  </label>
+                  <label className="full-width">
+                    {'\u0424\u0430\u043a\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u0430\u0434\u0440\u0435\u0441'}
+                    <input name="actualAddress" type="text" value={verificationProfile.actualAddress} onChange={onVerificationProfileChange} />
+                  </label>
+                  <label>
+                    {'\u0424\u0418\u041e \u043f\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u0438\u0442\u0435\u043b\u044f'}
+                    <input name="representativeFullName" type="text" value={verificationProfile.representativeFullName} onChange={onVerificationProfileChange} />
+                  </label>
+                  <label>
+                    {'\u0414\u043e\u043b\u0436\u043d\u043e\u0441\u0442\u044c \u043f\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u0438\u0442\u0435\u043b\u044f'}
+                    <input name="representativePosition" type="text" value={verificationProfile.representativePosition} onChange={onVerificationProfileChange} />
+                  </label>
+                  <label>
+                    {'\u041e\u0442\u0440\u0430\u0441\u043b\u044c'}
+                    <select name="mainIndustryId" value={verificationProfile.mainIndustryId} onChange={onVerificationProfileChange}>
+                      {verificationIndustries.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {'\u0420\u0430\u0431\u043e\u0447\u0438\u0439 email'}
+                    <input name="workEmail" type="email" value={verificationProfile.workEmail} onChange={onVerificationProfileChange} />
+                  </label>
+                  <label>
+                    {'\u0420\u0430\u0431\u043e\u0447\u0438\u0439 \u0442\u0435\u043b\u0435\u0444\u043e\u043d'}
+                    <input name="workPhone" type="text" value={verificationProfile.workPhone} onChange={onVerificationProfileChange} />
+                  </label>
+                  <label>
+                    {'\u0421\u0430\u0439\u0442 \u0438\u043b\u0438 \u043f\u0443\u0431\u043b\u0438\u0447\u043d\u044b\u0435 \u0441\u0441\u044b\u043b\u043a\u0438'}
+                    <input name="siteOrPublicLinks" type="text" value={verificationProfile.siteOrPublicLinks} onChange={onVerificationProfileChange} />
+                  </label>
+                  <button type="submit" className="btn btn--secondary employer-verification-form__save" disabled={verificationSaving}>
+                    {verificationSaving ? '\u0421\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u043c...' : '\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435'}
+                  </button>
+                </form>
+              ) : (
+                <p>{'\u041f\u0440\u043e\u0444\u0438\u043b\u044c \u0432\u0435\u0440\u0438\u0444\u0438\u043a\u0430\u0446\u0438\u0438 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d.'}</p>
+              )}
+            </div>
 
-          <div className="admin-form-card">
-            <h3>Required documents</h3>
-            {verificationRequirements.length ? (
-              <p>{verificationRequirements.filter((item) => item.isRequired).map((item) => `#${item.documentType}`).join(', ')}</p>
-            ) : (
-              <p>No requirements loaded.</p>
-            )}
+            <div className="admin-form-card">
+              <h3>{'\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b'}</h3>
+              <p>{'\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u044b\u0435 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b \u043f\u043e \u0441\u043f\u0438\u0441\u043a\u0443 \u043d\u0438\u0436\u0435.'}</p>
+              <div className="employer-verification-doc-list">
+                {requiredVerificationDocuments.length ? (
+                  requiredVerificationDocuments.map((requirement) => {
+                    const uploaded = verificationDocumentByType.get(requirement.documentType)
+                    const statusLabel = uploaded ? (verificationDocumentStatusLabel[uploaded.status] ?? `\u0421\u0442\u0430\u0442\u0443\u0441 #${uploaded.status}`) : '\u041d\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d'
+                    const selectedFile = verificationUploadFiles[requirement.documentType]
 
-            <form className="form-grid" onSubmit={onUploadVerificationDocument}>
-              <label>
-                Document type
-                <input
-                  type="number"
-                  min={1}
-                  value={verificationUploadType}
-                  onChange={(event) => setVerificationUploadType(Number(event.target.value) || 1)}
-                />
-              </label>
-              <label>
-                File
-                <input type="file" onChange={(event) => setVerificationUploadFile(event.target.files?.[0] ?? null)} />
-              </label>
-              <button type="submit" className="btn btn--secondary" disabled={verificationSaving || !verificationUploadFile}>
-                {verificationSaving ? 'Uploading...' : 'Upload document'}
-              </button>
-            </form>
-
-            <div className="admin-list-grid">
-              {verificationDocuments.map((item) => (
-                <article key={item.id} className="favorite-card admin-list-card">
-                  <div className="favorite-card__head">
-                    <div>
-                      <h3>{item.fileName || `Document #${item.id}`}</h3>
-                      <p>Type #{item.documentType} | status #{item.status}</p>
-                    </div>
-                  </div>
-                  <div className="favorite-card__actions">
-                    <button type="button" className="btn btn--danger" disabled={verificationSaving} onClick={() => void onDeleteVerificationDocument(item.id)}>
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              ))}
+                    return (
+                      <article key={requirement.documentType} className="employer-verification-doc-item">
+                        <div className="employer-verification-doc-item__head">
+                          <strong>{verificationDocumentTypeLabel[requirement.documentType] ?? `\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442 #${requirement.documentType}`}</strong>
+                          <span>{statusLabel}</span>
+                        </div>
+                        {uploaded ? <p className="employer-verification-doc-item__file">{uploaded.fileName || '\u0424\u0430\u0439\u043b \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d'}</p> : null}
+                        <div className="employer-verification-doc-item__actions">
+                          <input
+                            type="file"
+                            onChange={(event) => onVerificationDocumentFileChange(requirement.documentType, event.target.files?.[0] ?? null)}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn--secondary"
+                            disabled={verificationSaving || !selectedFile}
+                            onClick={() => void onUploadVerificationDocument(requirement.documentType)}
+                          >
+                            {verificationSaving ? '\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430...' : '\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c'}
+                          </button>
+                          {uploaded ? (
+                            <button
+                              type="button"
+                              className="btn btn--danger"
+                              disabled={verificationSaving}
+                              onClick={() => void onDeleteVerificationDocument(uploaded.id)}
+                            >
+                              {'\u0423\u0434\u0430\u043b\u0438\u0442\u044c'}
+                            </button>
+                          ) : null}
+                        </div>
+                      </article>
+                    )
+                  })
+                ) : (
+                  <p>{'\u0422\u0440\u0435\u0431\u043e\u0432\u0430\u043d\u0438\u044f \u043f\u043e \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430\u043c \u043f\u043e\u043a\u0430 \u043d\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d\u044b.'}</p>
+                )}
+              </div>
             </div>
           </div>
 
-          <button type="button" className="btn btn--primary" onClick={() => void onSubmitVerification()} disabled={submittingVerification || !company}>
-            {submittingVerification ? 'Отправляем...' : 'Отправить на верификацию'}
+          <button type="button" className="btn btn--primary employer-verification__submit" onClick={() => void onSubmitVerification()} disabled={submittingVerification || !company}>
+            {submittingVerification ? '\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c...' : '\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043d\u0430 \u0432\u0435\u0440\u0438\u0444\u0438\u043a\u0430\u0446\u0438\u044e'}
           </button>
         </div>
               </section> : null}
@@ -2714,4 +2779,3 @@ export function EmployerDashboardPage() {
     </div>
   )
 }
-

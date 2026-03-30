@@ -115,7 +115,7 @@ public class EmployerCompaniesController(AppDbContext dbContext, IObjectStorageS
             return this.ToNotFoundError("companies.verification.not_found", "Verification profile not found.");
         }
 
-        return Ok(ToProfileDetailDto(profile));
+        return Ok(ToProfileDetailDto(company, profile));
     }
 
     [HttpPatch("verification-profile")]
@@ -137,12 +137,27 @@ public class EmployerCompaniesController(AppDbContext dbContext, IObjectStorageS
             return this.ToBadRequestError("companies.verification.invalid_industry", "Industry not found.");
         }
 
+        var cityExists = await dbContext.Cities
+            .AnyAsync(x => x.Id == request.BaseCityId, cancellationToken);
+        if (!cityExists)
+        {
+            return this.ToBadRequestError("companies.verification.invalid_city", "City not found.");
+        }
+
         var profile = await dbContext.EmployerVerificationProfiles
             .FirstOrDefaultAsync(x => x.CompanyId == company.Id, cancellationToken);
         if (profile is null)
         {
             return this.ToBadRequestError("companies.verification.not_found", "Verification profile not found.");
         }
+
+        company.LegalName = request.LegalName.Trim();
+        company.BrandName = NormalizeNullable(request.BrandName);
+        company.BaseCityId = request.BaseCityId;
+        company.Description = string.IsNullOrWhiteSpace(request.Description) ? string.Empty : request.Description.Trim();
+        company.WebsiteUrl = NormalizeNullable(request.WebsiteUrl);
+        company.PublicEmail = NormalizeNullable(request.PublicEmail);
+        company.PublicPhone = NormalizeNullable(request.PublicPhone);
 
         profile.EmployerType = request.EmployerType;
         profile.OgrnOrOgrnip = request.OgrnOrOgrnip.Trim();
@@ -202,6 +217,13 @@ public class EmployerCompaniesController(AppDbContext dbContext, IObjectStorageS
             .OrderBy(x => x.DocumentType)
             .Select(x => new EmployerVerificationRequirementDto(x.DocumentType, x.IsRequired))
             .ToListAsync(cancellationToken);
+
+        if (requirements.Count == 0 && profileType.HasValue)
+        {
+            requirements = GetDefaultVerificationRequirements(profileType.Value)
+                .Select(x => new EmployerVerificationRequirementDto(x, true))
+                .ToList();
+        }
 
         return Ok(requirements);
     }
@@ -397,7 +419,7 @@ public class EmployerCompaniesController(AppDbContext dbContext, IObjectStorageS
             return this.ToBadRequestError("companies.verification.profile_missing", "Verification profile is missing.");
         }
 
-        var missingFields = GetMissingProfileFields(profile);
+        var missingFields = GetMissingProfileFields(company, profile);
         if (missingFields.Count > 0)
         {
             return this.ToBadRequestError("companies.verification.required_fields", $"Missing profile fields: {string.Join(", ", missingFields)}.");
@@ -567,9 +589,15 @@ public class EmployerCompaniesController(AppDbContext dbContext, IObjectStorageS
         };
     }
 
-    private static List<string> GetMissingProfileFields(EmployerVerificationProfile profile)
+    private static List<string> GetMissingProfileFields(Company company, EmployerVerificationProfile profile)
     {
         var missing = new List<string>();
+        if (string.IsNullOrWhiteSpace(company.LegalName)) missing.Add(nameof(company.LegalName));
+        if (company.BaseCityId <= 0) missing.Add(nameof(company.BaseCityId));
+        if (string.IsNullOrWhiteSpace(company.PublicEmail) && string.IsNullOrWhiteSpace(company.PublicPhone))
+        {
+            missing.Add($"{nameof(company.PublicEmail)}|{nameof(company.PublicPhone)}");
+        }
         if (string.IsNullOrWhiteSpace(profile.OgrnOrOgrnip)) missing.Add(nameof(profile.OgrnOrOgrnip));
         if (string.IsNullOrWhiteSpace(profile.Inn)) missing.Add(nameof(profile.Inn));
         if (string.IsNullOrWhiteSpace(profile.LegalAddress)) missing.Add(nameof(profile.LegalAddress));
@@ -645,13 +673,20 @@ public class EmployerCompaniesController(AppDbContext dbContext, IObjectStorageS
             profile.RejectReason);
     }
 
-    private static EmployerVerificationProfileDetailDto ToProfileDetailDto(EmployerVerificationProfile profile)
+    private static EmployerVerificationProfileDetailDto ToProfileDetailDto(Company company, EmployerVerificationProfile profile)
     {
         var missingDocs = string.IsNullOrWhiteSpace(profile.MissingDocs)
             ? Array.Empty<string>()
             : profile.MissingDocs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         return new EmployerVerificationProfileDetailDto(
+            company.LegalName,
+            company.BrandName,
+            company.BaseCityId,
+            company.Description,
+            company.WebsiteUrl,
+            company.PublicEmail,
+            company.PublicPhone,
             profile.EmployerType,
             profile.OgrnOrOgrnip,
             profile.Inn,
@@ -722,5 +757,56 @@ public class EmployerCompaniesController(AppDbContext dbContext, IObjectStorageS
                 chatSettings?.WorkingHoursFrom,
                 chatSettings?.WorkingHoursTo),
             ToSummary(c.VerificationProfile));
+    }
+
+    private static IReadOnlyList<VerificationDocumentType> GetDefaultVerificationRequirements(EmployerType employerType)
+    {
+        return employerType switch
+        {
+            EmployerType.LegalEntity => new[]
+            {
+                VerificationDocumentType.EgrulExtract,
+                VerificationDocumentType.CompanyBankDetailsCard,
+                VerificationDocumentType.RepresentativeAuthorization,
+                VerificationDocumentType.OfficePhoto,
+                VerificationDocumentType.DomainEmailProof
+            },
+            EmployerType.IndividualEntrepreneur => new[]
+            {
+                VerificationDocumentType.EgripExtract,
+                VerificationDocumentType.InnRegistrationProof,
+                VerificationDocumentType.WorkplacePhoto,
+                VerificationDocumentType.DomainEmailProof
+            },
+            EmployerType.SelfEmployed => new[]
+            {
+                VerificationDocumentType.NpdRegistrationProof,
+                VerificationDocumentType.InnRegistrationProof,
+                VerificationDocumentType.IdentityDocument,
+                VerificationDocumentType.PortfolioOrWebsiteProof
+            },
+            EmployerType.RecruitmentAgency => new[]
+            {
+                VerificationDocumentType.EgrulExtract,
+                VerificationDocumentType.CompanyBankDetailsCard,
+                VerificationDocumentType.HrActivityProof,
+                VerificationDocumentType.ServiceOfferOrContract,
+                VerificationDocumentType.BrandMaterials
+            },
+            EmployerType.PrivateRecruiter => new[]
+            {
+                VerificationDocumentType.IdentityDocument,
+                VerificationDocumentType.InnRegistrationProof,
+                VerificationDocumentType.NpdRegistrationProof,
+                VerificationDocumentType.RecruitingActivityProof,
+                VerificationDocumentType.CustomerAuthorizationProof
+            },
+            EmployerType.PrivatePerson => new[]
+            {
+                VerificationDocumentType.IdentityDocument,
+                VerificationDocumentType.PersonalHiringConfirmation
+            },
+            _ => Array.Empty<VerificationDocumentType>()
+        };
     }
 }

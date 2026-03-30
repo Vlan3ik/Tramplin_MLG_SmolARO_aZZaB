@@ -6,6 +6,13 @@ namespace Monolith.Models.Employer;
 public record CreateEmployerCompanyRequest(string LegalName, string? BrandName, string? LogoUrl);
 
 public record UpdateCompanyVerificationProfileRequest(
+    string LegalName,
+    string? BrandName,
+    long BaseCityId,
+    string? Description,
+    string? WebsiteUrl,
+    string? PublicEmail,
+    string? PublicPhone,
     EmployerType EmployerType,
     string OgrnOrOgrnip,
     string Inn,
@@ -32,6 +39,13 @@ public record EmployerVerificationProfileSummaryDto(
     string? RejectReason);
 
 public record EmployerVerificationProfileDetailDto(
+    string LegalName,
+    string? BrandName,
+    long BaseCityId,
+    string Description,
+    string? WebsiteUrl,
+    string? PublicEmail,
+    string? PublicPhone,
     EmployerType EmployerType,
     string OgrnOrOgrnip,
     string Inn,
