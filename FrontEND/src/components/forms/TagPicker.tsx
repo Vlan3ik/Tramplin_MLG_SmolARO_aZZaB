@@ -77,7 +77,7 @@ export function TagPicker({
     setIsOpen(false)
   }
 
-  const rootClassName = `tag-picker${disabled ? ' is-disabled' : ''}${isOpen ? ' is-open' : ''}${className ? ` ${className}` : ''}`
+  const rootClassName = `tag-picker${disabled ? ' is-disabled' : ''}${isOpen ? ' is-open is-open-up' : ''}${className ? ` ${className}` : ''}`
 
   return (
     <div className={rootClassName} ref={rootRef}>

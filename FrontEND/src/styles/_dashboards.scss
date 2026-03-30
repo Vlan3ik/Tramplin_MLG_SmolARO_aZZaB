@@ -2121,6 +2121,11 @@
   flex-wrap: wrap;
 }
 
+.employer-create-company__file-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
 .employer-company-media {
   margin-top: 1rem;
 }

@@ -193,11 +193,11 @@ export function DateInput({
       return
     }
 
-    const next = selectedDate ? new Date(selectedDate) : new Date()
-    next.setFullYear(day.getFullYear(), day.getMonth(), day.getDate())
+    const dayValue = normalizeDay(day)
+    const next = type === 'datetime-local' ? withTime(dayValue, timeValue) : dayValue
     setSelectedDate(next)
     if (type === 'date') {
-      applyValue(normalizeDay(next))
+      applyValue(next)
     }
   }
 
@@ -305,7 +305,14 @@ export function DateInput({
           ) : null}
 
           <span className="date-input__actions">
-            <button type="button" className="date-input__action-btn" onClick={() => applyValue(normalizeDay(new Date()), type === 'datetime-local' ? toTimeValue(new Date()) : timeValue)}>
+            <button
+              type="button"
+              className="date-input__action-btn"
+              onClick={() => {
+                const now = new Date()
+                applyValue(type === 'datetime-local' ? now : normalizeDay(now), type === 'datetime-local' ? toTimeValue(now) : timeValue)
+              }}
+            >
               Сегодня
             </button>
             <button type="button" className="date-input__action-btn" onClick={() => applyValue(null)}>
@@ -315,7 +322,7 @@ export function DateInput({
               <button
                 type="button"
                 className="date-input__action-btn is-primary"
-                onClick={() => applyValue(selectedDate ? normalizeDay(selectedDate) : null)}
+                onClick={() => applyValue(selectedDate)}
                 disabled={!selectedDate}
               >
                 Применить

@@ -1628,11 +1628,14 @@ export function EmployerDashboardPage() {
                   Бренд
                   <input name="brandName" type="text" value={createForm.brandName} onChange={onCreateFormChange} />
                 </label>
-                <label className="full-width">
+                <div className="full-width employer-create-company__file-field">
                   Логотип (опционально)
-                  <input type="file" accept="image/*" onChange={onCreateLogoChange} disabled={creatingCompany} />
-                  {createLogoFile ? <small>{createLogoFile.name}</small> : null}
-                </label>
+                  <label className="profile-settings-modal__file-button">
+                    <UploadCloud size={16} />
+                    {createLogoFile ? 'Файл выбран' : 'Выбрать файл'}
+                    <input type="file" accept="image/*" onChange={onCreateLogoChange} disabled={creatingCompany} />
+                  </label>
+                </div>
                 <button type="submit" className="btn btn--primary full-width" disabled={creatingCompany}>
                   {creatingCompany ? 'Создаем компанию...' : 'Создать компанию'}
                 </button>
@@ -1685,11 +1688,14 @@ export function EmployerDashboardPage() {
               Бренд
               <input name="brandName" type="text" value={createForm.brandName} onChange={onCreateFormChange} />
             </label>
-            <label className="full-width">
+            <div className="full-width employer-create-company__file-field">
               Логотип (опционально)
-              <input type="file" accept="image/*" onChange={onCreateLogoChange} disabled={creatingCompany} />
-              {createLogoFile ? <small>{createLogoFile.name}</small> : null}
-            </label>
+              <label className="profile-settings-modal__file-button">
+                <UploadCloud size={16} />
+                {createLogoFile ? 'Файл выбран' : 'Выбрать файл'}
+                <input type="file" accept="image/*" onChange={onCreateLogoChange} disabled={creatingCompany} />
+              </label>
+            </div>
             <button type="submit" className="btn btn--primary full-width" disabled={creatingCompany}>
               {creatingCompany ? 'Создаем компанию...' : 'Создать компанию'}
             </button>
