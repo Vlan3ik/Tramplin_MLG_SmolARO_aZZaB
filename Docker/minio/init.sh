@@ -1,5 +1,5 @@
 #!/bin/sh
-set -eu
+set -e
 
 echo "Waiting MinIO..."
 until mc alias set local http://minio:9000 minioadmin minioadmin >/dev/null 2>&1; do
@@ -35,49 +35,55 @@ SVG
 }
 
 upload_company_logos() {
-  local base="/seed/design-data/Компании"
-  if [ ! -d "$base" ]; then
-    echo "No company source directory found: $base"
+  local root="/seed/design-data"
+  if [ ! -d "$root" ]; then
+    echo "No test data root found: $root"
     return
   fi
 
   echo "Uploading company logos from test data..."
   local idx=1
-  find "$base" -mindepth 1 -maxdepth 1 -type d | sort | while IFS= read -r dir; do
-    logo_file="$(find "$dir" -mindepth 1 -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.svg' -o -iname '*.webp' \) | sort | head -n 1 || true)"
-    if [ -n "$logo_file" ]; then
-      ext="${logo_file##*.}"
-      ext="$(echo "$ext" | tr '[:upper:]' '[:lower:]')"
-      key="$(printf 'company-logos/test-data/company-%02d.%s' "$idx" "$ext")"
-      upload_file_if_exists "$logo_file" "$key"
+  find "$root" -mindepth 2 -maxdepth 3 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.svg' -o -iname '*.webp' \) | sort | while IFS= read -r logo_file; do
+    logo_dir="$(dirname "$logo_file")"
+    txt_exists="$(find "$logo_dir" -mindepth 1 -maxdepth 1 -type f -iname '*.txt' | head -n 1 || true)"
+    if [ -z "$txt_exists" ]; then
+      continue
     fi
+
+    ext="${logo_file##*.}"
+    ext="$(echo "$ext" | tr '[:upper:]' '[:lower:]')"
+    key="$(printf 'company-logos/test-data/company-%02d.%s' "$idx" "$ext")"
+    upload_file_if_exists "$logo_file" "$key"
     idx=$((idx + 1))
+    if [ "$idx" -gt 10 ]; then
+      break
+    fi
   done
 }
 
 upload_seeker_avatars() {
-  local base="/seed/design-data/Соискатели/Аватарки"
-  if [ ! -d "$base" ]; then
-    echo "No avatar source directory found: $base"
+  local root="/seed/design-data"
+  if [ ! -d "$root" ]; then
+    echo "No test data root found: $root"
     return
   fi
 
   echo "Uploading seeker avatars..."
-  find "$base" -mindepth 1 -maxdepth 1 -type f \( -iname '*.svg' -o -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) | sort | while IFS= read -r file; do
+  find "$root" -type f \( -iname 'avatar_*.svg' -o -iname 'avatar_*.png' -o -iname 'avatar_*.jpg' -o -iname 'avatar_*.jpeg' -o -iname 'avatar_*.webp' \) | sort | while IFS= read -r file; do
     filename="$(basename "$file")"
     upload_file_if_exists "$file" "user-avatars/seekers/$filename"
   done
 }
 
 upload_portfolio_photos() {
-  local base="/seed/design-data/Соискатели/Проекты"
-  if [ ! -d "$base" ]; then
-    echo "No portfolio photo source directory found: $base"
+  local root="/seed/design-data"
+  if [ ! -d "$root" ]; then
+    echo "No test data root found: $root"
     return
   fi
 
   echo "Uploading portfolio project photos..."
-  find "$base" -mindepth 1 -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | sort | while IFS= read -r file; do
+  find "$root" -type f \( -iname 'project_*.jpg' -o -iname 'project_*.jpeg' -o -iname 'project_*.png' -o -iname 'project_*.webp' \) | sort | while IFS= read -r file; do
     filename="$(basename "$file")"
     upload_file_if_exists "$file" "portfolio-projects/test-data/$filename"
   done
