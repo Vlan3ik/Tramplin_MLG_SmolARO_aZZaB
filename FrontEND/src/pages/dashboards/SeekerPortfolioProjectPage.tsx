@@ -9,6 +9,9 @@ import {
   updateMyPortfolioProjectPhoto,
   uploadMyPortfolioProjectPhoto,
 } from '../../api/portfolio'
+import { createApplication } from '../../api/applications'
+import { shareOpportunityToUser } from '../../api/chats'
+import { fetchEmployerCompany, fetchEmployerOpportunities, fetchEmployerVacancies } from '../../api/employer'
 import { fetchSeekerResume } from '../../api/me'
 import {
   fetchOpportunityCollaborationSuggestions,
@@ -147,6 +150,16 @@ export function SeekerPortfolioProjectPage() {
   const [vOpts, setVOpts] = useState<Opt[]>([])
   const [oQuery, setOQuery] = useState('')
   const [oOpts, setOOpts] = useState<Opt[]>([])
+  const [inviteModalType, setInviteModalType] = useState<'vacancy' | 'opportunity' | null>(null)
+  const [employerCompanyId, setEmployerCompanyId] = useState<number | null>(null)
+  const [inviteVacancyOptions, setInviteVacancyOptions] = useState<Opt[]>([])
+  const [inviteOpportunityOptions, setInviteOpportunityOptions] = useState<Opt[]>([])
+  const [selectedInviteVacancyId, setSelectedInviteVacancyId] = useState<number | null>(null)
+  const [selectedInviteOpportunityId, setSelectedInviteOpportunityId] = useState<number | null>(null)
+  const [loadingInviteOptions, setLoadingInviteOptions] = useState(false)
+  const [sendingInvite, setSendingInvite] = useState(false)
+  const [inviteError, setInviteError] = useState('')
+  const [inviteSuccess, setInviteSuccess] = useState('')
 
   const isOwner = Boolean(project && session?.user?.id && project.authorUserId === session.user.id)
   const backHref = username ? `/dashboard/seeker/${encodeURIComponent(username)}` : '/dashboard/seeker'
@@ -346,6 +359,48 @@ export function SeekerPortfolioProjectPage() {
   const projectSummaryText = project?.description || projectCard?.shortDescription || 'Описание не добавлено.'
   const hasRepo = Boolean(project?.repoUrl?.trim())
   const hasDemo = Boolean(project?.demoUrl?.trim())
+  const inviteTargetUserId = project?.authorUserId ?? null
+
+  useEffect(() => {
+    if (!inviteModalType || !isEmployerSession || !session?.accessToken) return
+
+    const c = new AbortController()
+    setLoadingInviteOptions(true)
+    setInviteError('')
+
+    ;(async () => {
+      try {
+        const [company, vacancies, opportunities] = await Promise.all([
+          fetchEmployerCompany(c.signal),
+          fetchEmployerVacancies(c.signal),
+          fetchEmployerOpportunities(c.signal),
+        ])
+        if (c.signal.aborted) return
+
+        const vacancyOptions = vacancies.map((item) => ({ id: item.id, title: item.title }))
+        const opportunityOptions = opportunities.map((item) => ({ id: item.id, title: item.title }))
+
+        setEmployerCompanyId(company.id ?? null)
+        setInviteVacancyOptions(vacancyOptions)
+        setInviteOpportunityOptions(opportunityOptions)
+        setSelectedInviteVacancyId(vacancyOptions[0]?.id ?? null)
+        setSelectedInviteOpportunityId(opportunityOptions[0]?.id ?? null)
+      } catch (e) {
+        if (!c.signal.aborted) {
+          setInviteError(e instanceof Error ? e.message : 'Не удалось загрузить вакансии и мероприятия работодателя.')
+          setEmployerCompanyId(null)
+          setInviteVacancyOptions([])
+          setInviteOpportunityOptions([])
+          setSelectedInviteVacancyId(null)
+          setSelectedInviteOpportunityId(null)
+        }
+      } finally {
+        if (!c.signal.aborted) setLoadingInviteOptions(false)
+      }
+    })()
+
+    return () => c.abort()
+  }, [inviteModalType, isEmployerSession, session?.accessToken])
 
   function openModal() {
     if (!project) return
@@ -529,6 +584,85 @@ export function SeekerPortfolioProjectPage() {
     }
   }
 
+  function onOpenInviteModal(type: 'vacancy' | 'opportunity') {
+    if (!isEmployerSession) return
+    setInviteError('')
+    setInviteSuccess('')
+    setInviteModalType(type)
+  }
+
+  function closeInviteModal() {
+    if (sendingInvite) return
+    setInviteModalType(null)
+  }
+
+  async function onInviteToVacancy() {
+    if (!session?.accessToken || !isEmployerSession) {
+      setInviteError('Чтобы пригласить соискателя, нужно авторизоваться как работодатель.')
+      return
+    }
+    if (!inviteTargetUserId) {
+      setInviteError('Не удалось определить автора проекта.')
+      return
+    }
+    if (!selectedInviteVacancyId) {
+      setInviteError('Выберите вакансию для приглашения.')
+      return
+    }
+    if (!employerCompanyId) {
+      setInviteError('Не удалось определить компанию работодателя.')
+      return
+    }
+
+    setSendingInvite(true)
+    setInviteError('')
+    setInviteSuccess('')
+
+    try {
+      await createApplication({
+        companyId: employerCompanyId,
+        candidateUserId: inviteTargetUserId,
+        vacancyId: selectedInviteVacancyId,
+        initiatorRole: 2,
+      })
+      setInviteSuccess('Приглашение на вакансию отправлено.')
+      setInviteModalType(null)
+    } catch (e) {
+      setInviteError(e instanceof Error ? e.message : 'Не удалось отправить приглашение.')
+    } finally {
+      setSendingInvite(false)
+    }
+  }
+
+  async function onInviteToOpportunity() {
+    if (!session?.accessToken || !isEmployerSession) {
+      setInviteError('Чтобы пригласить соискателя, нужно авторизоваться как работодатель.')
+      return
+    }
+    if (!inviteTargetUserId) {
+      setInviteError('Не удалось определить автора проекта.')
+      return
+    }
+    if (!selectedInviteOpportunityId) {
+      setInviteError('Выберите мероприятие для приглашения.')
+      return
+    }
+
+    setSendingInvite(true)
+    setInviteError('')
+    setInviteSuccess('')
+
+    try {
+      await shareOpportunityToUser(inviteTargetUserId, selectedInviteOpportunityId)
+      setInviteSuccess('Приглашение на мероприятие отправлено в чат.')
+      setInviteModalType(null)
+    } catch (e) {
+      setInviteError(e instanceof Error ? e.message : 'Не удалось отправить приглашение.')
+    } finally {
+      setSendingInvite(false)
+    }
+  }
+
   return (
     <>
       <TopServiceBar />
@@ -644,12 +778,12 @@ export function SeekerPortfolioProjectPage() {
                   <div className="seeker-project-sidebar__cta">
                     {isEmployerSession ? (
                       <>
-                        <Link className="btn btn--ghost" to="/vacancy-flow">
-                          Предложить вакансию
-                        </Link>
-                        <Link className="btn btn--ghost" to="/vacancy-flow">
-                          Предложить мероприятие
-                        </Link>
+                        <button type="button" className="btn btn--ghost" onClick={() => onOpenInviteModal('vacancy')}>
+                          Пригласить на вакансию
+                        </button>
+                        <button type="button" className="btn btn--ghost" onClick={() => onOpenInviteModal('opportunity')}>
+                          Пригласить на мероприятие
+                        </button>
                       </>
                     ) : (
                       <Link className="btn btn--primary" to={authorProfileHref}>
@@ -657,6 +791,8 @@ export function SeekerPortfolioProjectPage() {
                       </Link>
                     )}
                   </div>
+                  {inviteSuccess ? <div className="auth-feedback seeker-profile-feedback">{inviteSuccess}</div> : null}
+                  {inviteError ? <div className="auth-feedback auth-feedback--error">{inviteError}</div> : null}
 
                   <h3 className="seeker-project-sidebar__team-title">Совместно с</h3>
                   {teammates.length ? (
@@ -909,6 +1045,88 @@ export function SeekerPortfolioProjectPage() {
               >
                 {saving ? 'Сохраняем...' : 'Сохранить'}
               </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {inviteModalType ? (
+        <div className="profile-settings-modal" role="dialog" aria-modal="true" aria-labelledby="project-invite-modal-title">
+          <button
+            type="button"
+            className="profile-settings-modal__backdrop"
+            aria-label="Закрыть"
+            onClick={closeInviteModal}
+            disabled={sendingInvite}
+          />
+
+          <section className="card profile-settings-modal__dialog">
+            <div className="profile-settings-modal__head">
+              <h2 id="project-invite-modal-title">
+                {inviteModalType === 'vacancy' ? 'Пригласить на вакансию' : 'Пригласить на мероприятие'}
+              </h2>
+            </div>
+
+            {inviteError ? <div className="auth-feedback auth-feedback--error">{inviteError}</div> : null}
+            {loadingInviteOptions ? <p>Загружаем ваши варианты...</p> : null}
+
+            {inviteModalType === 'vacancy' ? (
+              <label>
+                Вакансия
+                <select
+                  value={selectedInviteVacancyId == null ? '' : String(selectedInviteVacancyId)}
+                  onChange={(event) => setSelectedInviteVacancyId(event.target.value ? Number(event.target.value) : null)}
+                  disabled={loadingInviteOptions || sendingInvite || !inviteVacancyOptions.length}
+                >
+                  <option value="">Выберите вакансию</option>
+                  {inviteVacancyOptions.map((item) => (
+                    <option key={`invite-vacancy-${item.id}`} value={item.id}>
+                      {item.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <label>
+                Мероприятие
+                <select
+                  value={selectedInviteOpportunityId == null ? '' : String(selectedInviteOpportunityId)}
+                  onChange={(event) => setSelectedInviteOpportunityId(event.target.value ? Number(event.target.value) : null)}
+                  disabled={loadingInviteOptions || sendingInvite || !inviteOpportunityOptions.length}
+                >
+                  <option value="">Выберите мероприятие</option>
+                  {inviteOpportunityOptions.map((item) => (
+                    <option key={`invite-opportunity-${item.id}`} value={item.id}>
+                      {item.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            <div className="profile-settings-modal__actions">
+              <button type="button" className="btn btn--ghost" onClick={closeInviteModal} disabled={sendingInvite}>
+                Отмена
+              </button>
+              {inviteModalType === 'vacancy' ? (
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => void onInviteToVacancy()}
+                  disabled={sendingInvite || loadingInviteOptions || !selectedInviteVacancyId || !inviteVacancyOptions.length}
+                >
+                  {sendingInvite ? 'Отправляем...' : 'Пригласить'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => void onInviteToOpportunity()}
+                  disabled={sendingInvite || loadingInviteOptions || !selectedInviteOpportunityId || !inviteOpportunityOptions.length}
+                >
+                  {sendingInvite ? 'Отправляем...' : 'Пригласить'}
+                </button>
+              )}
             </div>
           </section>
         </div>
