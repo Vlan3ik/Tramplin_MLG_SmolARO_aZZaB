@@ -1,3 +1,7 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Monolith.Contexts;
 using Monolith.Entities;
@@ -21,175 +25,675 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
             AccountStatus.Active,
             "/api/media/user-avatars/system/admin.svg");
 
-        var employers = new List<User>();
-        for (var i = 1; i <= 40; i++)
-        {
-            var employer = await EnsureUserAsync(
-                $"employer{i}@tramplin.local",
-                $"Работодатель {i}",
-                "Employer123!",
-                AccountStatus.Active,
-                "/api/media/user-avatars/system/employer.svg");
-            employers.Add(employer);
-        }
-
-        var seekers = new List<User>();
-        for (var i = 1; i <= 25; i++)
-        {
-            var seeker = await EnsureUserAsync(
-                $"seeker{i}@tramplin.local",
-                $"Соискатель {i}",
-                "Seeker123!",
-                AccountStatus.Active,
-                "/api/media/user-avatars/system/seeker.svg");
-            seekers.Add(seeker);
-        }
-
         await EnsureRoleAsync(curator.Id, PlatformRole.Curator, now);
         await EnsureSingleSuperCuratorAsync(curator.Id);
-        foreach (var employer in employers)
+
+        if (await HasDomainDataAsync())
         {
-            await EnsureRoleAsync(employer.Id, PlatformRole.Employer, now);
+            return;
         }
 
-        foreach (var seeker in seekers)
+        var seedDataRoot = ResolveSeedDataRoot();
+        var companySeeds = LoadCompanySeeds(seedDataRoot);
+        var vacancySeeds = LoadVacancySeeds(seedDataRoot);
+        var mapPointSeeds = LoadGeoPointSeeds(seedDataRoot);
+        var fioSeeds = LoadFioSeeds(seedDataRoot);
+        var eventSeeds = LoadEventSeeds(seedDataRoot);
+        var seekerAvatarUrls = LoadSeekerAvatarUrls(seedDataRoot);
+        var portfolioPhotoUrls = LoadPortfolioPhotoUrls(seedDataRoot);
+
+        if (companySeeds.Count != 10)
         {
-            await EnsureRoleAsync(seeker.Id, PlatformRole.Seeker, now);
+            throw new InvalidOperationException($"Ожидалось 10 компаний в тестовых данных, но найдено {companySeeds.Count}.");
+        }
+
+        if (vacancySeeds.Count < companySeeds.Count)
+        {
+            throw new InvalidOperationException("Недостаточно вакансий в тестовых данных: требуется минимум по одной вакансии на компанию.");
+        }
+
+        if (mapPointSeeds.Count < vacancySeeds.Count)
+        {
+            throw new InvalidOperationException("Недостаточно гео-точек для уникального размещения вакансий.");
         }
 
         var cities = await EnsureCitiesAsync();
-        await SeedSeekerProfilesAsync(seekers, cities);
-        var locations = await EnsureLocationsAsync(cities);
         var tags = await EnsureTagsAsync();
+        var locations = await EnsureLocationsFromGeoPointsAsync(cities, mapPointSeeds);
+        var employers = await EnsureCompanyEmployersAsync(companySeeds.Count, now);
 
-        await ClearDomainDataAsync();
-
-        var companies = BuildCompanies(cities);
+        var companies = BuildCompaniesFromSeeds(companySeeds, cities);
         dbContext.Companies.AddRange(companies);
         await dbContext.SaveChangesAsync();
+
         await SeedVerificationDictionariesAsync();
         await SeedCompanyVerificationProfilesAsync(companies, curator.Id);
 
         var companyMembers = BuildCompanyMembers(companies, employers);
         dbContext.CompanyMembers.AddRange(companyMembers);
-
-        dbContext.CompanyChatSettings.AddRange(companies.Select((company, index) => new CompanyChatSettings
-        {
-            CompanyId = company.Id,
-            AutoGreetingEnabled = true,
-            AutoGreetingText = $"Здравствуйте! Спасибо за интерес к компании «{company.BrandName ?? company.LegalName}».",
-            OutsideHoursEnabled = index % 2 == 0,
-            OutsideHoursText = "Мы получили сообщение вне рабочего времени и ответим в ближайший рабочий день.",
-            WorkingHoursTimezone = "Europe/Moscow",
-            WorkingHoursFrom = TimeSpan.FromHours(9),
-            WorkingHoursTo = TimeSpan.FromHours(18)
-        }));
-
-        var companyLinks = companies.Select(company => new CompanyLink
-        {
-            CompanyId = company.Id,
-            LinkKind = LinkType.Website,
-            Label = "Сайт",
-            Url = company.WebsiteUrl ?? string.Empty
-        }).ToList();
-
-        var webCanape = companies.FirstOrDefault(x => x.BrandName == "WebCanape");
-        if (webCanape is not null)
-        {
-            companyLinks.Add(new CompanyLink
-            {
-                CompanyId = webCanape.Id,
-                LinkKind = LinkType.Vk,
-                Label = "VK",
-                Url = "https://vk.com/webcanape"
-            });
-            companyLinks.Add(new CompanyLink
-            {
-                CompanyId = webCanape.Id,
-                LinkKind = LinkType.Other,
-                Label = "YouTube",
-                Url = "https://www.youtube.com/channel/UCq6b89UtrJaQF6ixSYGf3aA"
-            });
-        }
-
-        var coalla = companies.FirstOrDefault(x => x.BrandName == "Агентство Coalla");
-        if (coalla is not null)
-        {
-            companyLinks.Add(new CompanyLink
-            {
-                CompanyId = coalla.Id,
-                LinkKind = LinkType.Vk,
-                Label = "VK",
-                Url = "https://vk.com/coalla.agency"
-            });
-            companyLinks.Add(new CompanyLink
-            {
-                CompanyId = coalla.Id,
-                LinkKind = LinkType.Other,
-                Label = "YouTube",
-                Url = "https://www.youtube.com/channel/UCywGrjdmRCT_i8YbIikJAJg"
-            });
-        }
-
-        var prostyeResheniya = companies.FirstOrDefault(x => x.BrandName == "Простые решения");
-        if (prostyeResheniya is not null)
-        {
-            companyLinks.Add(new CompanyLink
-            {
-                CompanyId = prostyeResheniya.Id,
-                LinkKind = LinkType.Vk,
-                Label = "VK",
-                Url = "https://vk.com/odineska"
-            });
-            companyLinks.Add(new CompanyLink
-            {
-                CompanyId = prostyeResheniya.Id,
-                LinkKind = LinkType.Other,
-                Label = "YouTube",
-                Url = "https://www.youtube.com/user/odineska/"
-            });
-        }
-
-        dbContext.CompanyLinks.AddRange(companyLinks);
-
-        dbContext.CompanyInvites.AddRange(companies.Select((company, index) => new CompanyInvite
-        {
-            CompanyId = company.Id,
-            InvitedByUserId = companyMembers.First(x => x.CompanyId == company.Id && x.Role == CompanyMemberRole.Owner).UserId,
-            Role = CompanyMemberRole.Admin,
-            Token = $"seed-invite-company-{company.Id}-{index + 1}",
-            ExpiresAt = now.AddDays(14 + (index % 7)),
-            AcceptedAt = index % 3 == 0 ? now.AddDays(-index - 1) : null
-        }));
-
+        dbContext.CompanyChatSettings.AddRange(BuildCompanyChatSettings(companies));
+        dbContext.CompanyLinks.AddRange(BuildCompanyLinksFromSeeds(companies, companySeeds));
+        dbContext.CompanyInvites.AddRange(BuildCompanyInvites(companies, companyMembers, now));
         await dbContext.SaveChangesAsync();
 
-        var vacancies = BuildVacancies(companies, companyMembers, locations, now);
+        var vacancies = BuildVacanciesFromSeeds(companies, companyMembers, locations, vacancySeeds, now);
         dbContext.Vacancies.AddRange(vacancies);
         await dbContext.SaveChangesAsync();
 
-        var opportunities = BuildOpportunities(companies, companyMembers, locations, now);
+        var opportunities = BuildOpportunitiesFromSeeds(companies, companyMembers, locations, eventSeeds, now);
         dbContext.Opportunities.AddRange(opportunities);
         await dbContext.SaveChangesAsync();
-
-        await SeedPortfolioProjectsAsync(seekers, vacancies, opportunities);
 
         dbContext.VacancyTags.AddRange(BuildVacancyTags(vacancies, tags));
         dbContext.OpportunityTags.AddRange(BuildOpportunityTags(opportunities, tags));
         await dbContext.SaveChangesAsync();
 
-        var participations = BuildOpportunityParticipations(opportunities, seekers, now);
+        var seekers = await EnsureSeekersWithProfilesAsync(
+            targetCount: 30,
+            fioSeeds,
+            seekerAvatarUrls,
+            cities,
+            tags,
+            companies,
+            now);
+
+        var participations = BuildOpportunityParticipationsForAllSeekers(opportunities, seekers, now);
         dbContext.OpportunityParticipants.AddRange(participations);
         await dbContext.SaveChangesAsync();
 
-        await SeedOpportunityChatsAsync(opportunities, participations, companyMembers, now);
+        await SeedPortfolioProjectsForAllSeekersAsync(seekers, vacancies, opportunities, portfolioPhotoUrls, now);
 
-        var applications = BuildApplications(vacancies, seekers);
+        var applications = BuildApplicationsForAllSeekers(vacancies, seekers, now);
         dbContext.Applications.AddRange(applications);
         await dbContext.SaveChangesAsync();
 
+        await SeedSocialGraphAsync(seekers, vacancies, opportunities, applications, participations, now);
+        await SeedOpportunityChatsAsync(opportunities, participations, companyMembers, now);
         await SeedApplicationChatsAsync(applications, companyMembers);
         await SeedDirectChatsAsync(seekers);
+    }
+
+    private async Task<bool> HasDomainDataAsync()
+    {
+        return await dbContext.Companies.AnyAsync()
+            || await dbContext.Vacancies.AnyAsync()
+            || await dbContext.Opportunities.AnyAsync()
+            || await dbContext.CandidateProfiles.AnyAsync()
+            || await dbContext.Applications.AnyAsync();
+    }
+
+    private static string ResolveSeedDataRoot()
+    {
+        var fromEnv = Environment.GetEnvironmentVariable("SEED_TEST_DATA_DIR");
+        if (!string.IsNullOrWhiteSpace(fromEnv) && Directory.Exists(fromEnv))
+        {
+            return fromEnv;
+        }
+
+        var directCandidates = new[]
+        {
+            Path.Combine(Directory.GetCurrentDirectory(), "seed-data"),
+            Path.Combine(Directory.GetCurrentDirectory(), "Design", "Тестовые данные"),
+            Path.Combine(AppContext.BaseDirectory, "seed-data"),
+            Path.Combine(AppContext.BaseDirectory, "Design", "Тестовые данные")
+        };
+
+        foreach (var candidate in directCandidates)
+        {
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        var searchRoots = new[]
+        {
+            new DirectoryInfo(Directory.GetCurrentDirectory()),
+            new DirectoryInfo(AppContext.BaseDirectory)
+        };
+
+        foreach (var root in searchRoots)
+        {
+            for (var current = root; current is not null; current = current.Parent)
+            {
+                var candidate = Path.Combine(current.FullName, "Design", "Тестовые данные");
+                if (Directory.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Не удалось найти директорию тестовых данных. Укажите путь через переменную окружения SEED_TEST_DATA_DIR.");
+    }
+
+    private static List<CompanySeed> LoadCompanySeeds(string seedDataRoot)
+    {
+        var companiesDir = Path.Combine(seedDataRoot, "Компании");
+        if (!Directory.Exists(companiesDir))
+        {
+            throw new InvalidOperationException($"Папка компаний не найдена: {companiesDir}");
+        }
+
+        var directories = new DirectoryInfo(companiesDir)
+            .GetDirectories()
+            .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var result = new List<CompanySeed>(directories.Length);
+        for (var i = 0; i < directories.Length; i++)
+        {
+            var directory = directories[i];
+            var textFile = directory.GetFiles("*.txt").OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+            var text = textFile is null ? string.Empty : ReadAllTextWithFallback(textFile.FullName);
+            var lines = text
+                .Split('\n')
+                .Select(x => x.Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToArray();
+
+            var phone = Regex.Match(text, @"\+?\d[\d\s\-\(\)]{8,}\d").Value.Trim();
+            var emailMatch = Regex.Match(text, @"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}");
+            var email = emailMatch.Success ? emailMatch.Value : null;
+            var links = Regex.Matches(text, @"https?://[^\s""<>]+")
+                .Select(x => x.Value.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            var website = links.FirstOrDefault()
+                ?? lines.FirstOrDefault(x => LooksLikeDomain(x));
+
+            var normalizedWebsite = NormalizeUrl(website);
+
+            var description = string.IsNullOrWhiteSpace(text)
+                ? $"Профиль компании {directory.Name} из тестового набора."
+                : text.Trim();
+
+            var logoFile = directory.GetFiles("*.*")
+                .Where(x =>
+                    x.Extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                    x.Extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                    x.Extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                    x.Extension.Equals(".svg", StringComparison.OrdinalIgnoreCase) ||
+                    x.Extension.Equals(".webp", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+
+            var ext = logoFile?.Extension?.ToLowerInvariant() ?? ".svg";
+            var objectKey = $"company-logos/test-data/company-{i + 1:00}{ext}";
+
+            result.Add(new CompanySeed(
+                Name: directory.Name,
+                Description: description,
+                WebsiteUrl: normalizedWebsite,
+                PublicEmail: email,
+                PublicPhone: string.IsNullOrWhiteSpace(phone) ? null : phone,
+                AdditionalLinks: links,
+                LogoFilePath: logoFile?.FullName,
+                LogoObjectKey: objectKey));
+        }
+
+        return result;
+    }
+
+    private static List<VacancySeed> LoadVacancySeeds(string seedDataRoot)
+    {
+        var vacanciesDir = Path.Combine(seedDataRoot, "Вакансии");
+        if (!Directory.Exists(vacanciesDir))
+        {
+            throw new InvalidOperationException($"Папка вакансий не найдена: {vacanciesDir}");
+        }
+
+        var files = new DirectoryInfo(vacanciesDir)
+            .GetFiles("*.txt")
+            .OrderBy(file =>
+            {
+                var name = Path.GetFileNameWithoutExtension(file.Name);
+                return int.TryParse(name, out var numeric) ? numeric : int.MaxValue;
+            })
+            .ThenBy(file => file.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<VacancySeed>(files.Length);
+
+        foreach (var file in files)
+        {
+            var text = ReadAllTextWithFallback(file.FullName);
+            var lines = text
+                .Split('\n')
+                .Select(x => x.Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToArray();
+
+            if (lines.Length == 0)
+            {
+                continue;
+            }
+
+            var title = NormalizeVacancyTitle(lines[0]);
+            var shortDescription = BuildShortDescription(text, maxLength: 240);
+            var fullDescription = text.Trim();
+            var format = ParseWorkFormat(text);
+            var (salaryFrom, salaryTo) = ParseSalaryRange(text);
+            var kind = title.Contains("стаж", StringComparison.OrdinalIgnoreCase)
+                || title.Contains("младш", StringComparison.OrdinalIgnoreCase)
+                || title.Contains("junior", StringComparison.OrdinalIgnoreCase)
+                ? VacancyKind.Internship
+                : VacancyKind.Job;
+
+            var dedupKey = $"{NormalizeForDedup(title)}|{NormalizeForDedup(shortDescription)}";
+            if (!seen.Add(dedupKey))
+            {
+                continue;
+            }
+
+            result.Add(new VacancySeed(
+                Title: title,
+                ShortDescription: shortDescription,
+                FullDescription: fullDescription,
+                Kind: kind,
+                Format: format,
+                SalaryFrom: salaryFrom,
+                SalaryTo: salaryTo));
+        }
+
+        return result;
+    }
+
+    private static List<GeoPointSeed> LoadGeoPointSeeds(string seedDataRoot)
+    {
+        var filePath = Path.Combine(seedDataRoot, "Точки на карте.txt");
+        if (!File.Exists(filePath))
+        {
+            throw new InvalidOperationException($"GeoJSON с точками на карте не найден: {filePath}");
+        }
+
+        using var document = JsonDocument.Parse(ReadAllTextWithFallback(filePath));
+        if (!document.RootElement.TryGetProperty("features", out var features) || features.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidOperationException("Некорректный формат GeoJSON: отсутствует массив features.");
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<GeoPointSeed>();
+        foreach (var feature in features.EnumerateArray())
+        {
+            if (!feature.TryGetProperty("geometry", out var geometry))
+            {
+                continue;
+            }
+
+            if (!geometry.TryGetProperty("coordinates", out var coordinates) || coordinates.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            if (coordinates.GetArrayLength() < 2)
+            {
+                continue;
+            }
+
+            var lon = coordinates[0].GetDouble();
+            var lat = coordinates[1].GetDouble();
+            var key = $"{Math.Round(lat, 6):F6}:{Math.Round(lon, 6):F6}";
+            if (!seen.Add(key))
+            {
+                continue;
+            }
+
+            result.Add(new GeoPointSeed(lat, lon));
+        }
+
+        return result;
+    }
+
+    private static FioSeed LoadFioSeeds(string seedDataRoot)
+    {
+        var filePath = Path.Combine(seedDataRoot, "Соискатели", "ФИО_массивы.txt");
+        if (!File.Exists(filePath))
+        {
+            throw new InvalidOperationException($"Файл ФИО не найден: {filePath}");
+        }
+
+        var text = ReadAllTextWithFallback(filePath);
+        var lastNames = ParseQuotedArray(text, "ФАМИЛИИ");
+        var firstNames = ParseQuotedArray(text, "ИМЕНА");
+        var middleNames = ParseQuotedArray(text, "ОТЧЕСТВА");
+
+        if (lastNames.Count == 0 || firstNames.Count == 0 || middleNames.Count == 0)
+        {
+            throw new InvalidOperationException("Файл ФИО не содержит обязательные массивы фамилий, имён и отчеств.");
+        }
+
+        return new FioSeed(lastNames, firstNames, middleNames);
+    }
+
+    private static List<EventSeed> LoadEventSeeds(string seedDataRoot)
+    {
+        var filePath = Path.Combine(seedDataRoot, "мероприятия", "мероприятия.json");
+        if (!File.Exists(filePath))
+        {
+            throw new InvalidOperationException($"Файл мероприятий не найден: {filePath}");
+        }
+
+        using var document = JsonDocument.Parse(ReadAllTextWithFallback(filePath));
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidOperationException("Некорректный формат мероприятий: ожидается JSON-массив.");
+        }
+
+        var result = new List<EventSeed>();
+        foreach (var item in document.RootElement.EnumerateArray())
+        {
+            var title = TryGetJsonString(item, "название") ?? "Мероприятие";
+            var description = TryGetJsonString(item, "описание") ?? string.Empty;
+            var formatText = TryGetJsonString(item, "формат") ?? string.Empty;
+            var dateText = TryGetJsonString(item, "дата");
+            var tags = item.TryGetProperty("теги", out var tagsNode) && tagsNode.ValueKind == JsonValueKind.Array
+                ? tagsNode.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString() ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+                : [];
+
+            var shortDescription = BuildShortDescription(description, maxLength: 220);
+            var fullDescription = string.IsNullOrWhiteSpace(description)
+                ? $"Событие «{title}» из тестовых данных."
+                : description.Trim();
+            var kind = ParseOpportunityKind(title, description, tags);
+            var format = ParseWorkFormat(formatText);
+            var eventDate = DateOnly.TryParse(dateText, out var parsedDate)
+                ? new DateTimeOffset(parsedDate.ToDateTime(TimeOnly.FromTimeSpan(TimeSpan.FromHours(18))), TimeSpan.FromHours(3))
+                : DateTimeOffset.UtcNow.AddDays(14);
+
+            result.Add(new EventSeed(
+                Title: title,
+                ShortDescription: shortDescription,
+                FullDescription: fullDescription,
+                Kind: kind,
+                Format: format,
+                EventDate: eventDate));
+        }
+
+        return result;
+    }
+
+    private static List<string> LoadSeekerAvatarUrls(string seedDataRoot)
+    {
+        var avatarsDir = Path.Combine(seedDataRoot, "Соискатели", "Аватарки");
+        if (!Directory.Exists(avatarsDir))
+        {
+            return ["/api/media/user-avatars/system/seeker.svg"];
+        }
+
+        var files = new DirectoryInfo(avatarsDir)
+            .GetFiles("*.*")
+            .Where(x =>
+                x.Extension.Equals(".svg", StringComparison.OrdinalIgnoreCase) ||
+                x.Extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                x.Extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                x.Extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                x.Extension.Equals(".webp", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (files.Length == 0)
+        {
+            return ["/api/media/user-avatars/system/seeker.svg"];
+        }
+
+        return files.Select(x => $"/api/media/user-avatars/seekers/{x.Name}").ToList();
+    }
+
+    private static List<string> LoadPortfolioPhotoUrls(string seedDataRoot)
+    {
+        var photosDir = Path.Combine(seedDataRoot, "Соискатели", "Проекты");
+        if (!Directory.Exists(photosDir))
+        {
+            return [];
+        }
+
+        var files = new DirectoryInfo(photosDir)
+            .GetFiles("*.*")
+            .Where(x =>
+                x.Extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                x.Extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                x.Extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                x.Extension.Equals(".webp", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return files.Select(x => $"/api/media/portfolio-projects/test-data/{x.Name}").ToList();
+    }
+
+    private async Task<List<User>> EnsureCompanyEmployersAsync(int companyCount, DateTimeOffset assignedAt)
+    {
+        var employers = new List<User>(companyCount * 2);
+        for (var i = 1; i <= companyCount * 2; i++)
+        {
+            var employer = await EnsureUserAsync(
+                $"employer{i:00}@tramplin.local",
+                $"Работодатель {i}",
+                "Employer123!",
+                AccountStatus.Active,
+                "/api/media/user-avatars/system/employer.svg");
+            await EnsureRoleAsync(employer.Id, PlatformRole.Employer, assignedAt);
+            employers.Add(employer);
+        }
+
+        return employers;
+    }
+
+    private static List<Company> BuildCompaniesFromSeeds(IReadOnlyList<CompanySeed> seeds, IReadOnlyDictionary<string, City> cities)
+    {
+        var cityCodes = cities.Keys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
+        var companies = new List<Company>(seeds.Count);
+        for (var i = 0; i < seeds.Count; i++)
+        {
+            var seed = seeds[i];
+            var cityCode = seed.Description.Contains("смолен", StringComparison.OrdinalIgnoreCase)
+                ? "SMO"
+                : cityCodes[i % cityCodes.Length];
+            if (!cities.ContainsKey(cityCode))
+            {
+                cityCode = cityCodes[i % cityCodes.Length];
+            }
+
+            companies.Add(new Company
+            {
+                LegalName = seed.Name,
+                BrandName = seed.Name,
+                Description = seed.Description,
+                LogoUrl = $"/api/media/{seed.LogoObjectKey}",
+                WebsiteUrl = seed.WebsiteUrl,
+                PublicEmail = seed.PublicEmail ?? $"hr{i + 1:00}@tramplin.local",
+                PublicPhone = seed.PublicPhone ?? $"+7 (900) 000-{(10 + i):00}-{(20 + i):00}",
+                BaseCityId = cities[cityCode].Id,
+                Status = CompanyStatus.Verified
+            });
+        }
+
+        return companies;
+    }
+
+    private static List<CompanyChatSettings> BuildCompanyChatSettings(IReadOnlyList<Company> companies)
+    {
+        return companies.Select((company, index) => new CompanyChatSettings
+        {
+            CompanyId = company.Id,
+            AutoGreetingEnabled = true,
+            AutoGreetingText = $"Здравствуйте! Спасибо за интерес к компании «{company.BrandName ?? company.LegalName}».",
+            OutsideHoursEnabled = index % 2 == 0,
+            OutsideHoursText = "Мы получили ваше сообщение и ответим в ближайшее рабочее время.",
+            WorkingHoursTimezone = "Europe/Moscow",
+            WorkingHoursFrom = TimeSpan.FromHours(9),
+            WorkingHoursTo = TimeSpan.FromHours(18)
+        }).ToList();
+    }
+
+    private static List<CompanyLink> BuildCompanyLinksFromSeeds(IReadOnlyList<Company> companies, IReadOnlyList<CompanySeed> seeds)
+    {
+        var links = new List<CompanyLink>(companies.Count * 2);
+        for (var i = 0; i < companies.Count; i++)
+        {
+            var company = companies[i];
+            var seed = seeds[i];
+            if (!string.IsNullOrWhiteSpace(seed.WebsiteUrl))
+            {
+                links.Add(new CompanyLink
+                {
+                    CompanyId = company.Id,
+                    LinkKind = LinkType.Website,
+                    Label = "Сайт",
+                    Url = seed.WebsiteUrl
+                });
+            }
+
+            foreach (var extraLink in seed.AdditionalLinks.Take(3))
+            {
+                links.Add(new CompanyLink
+                {
+                    CompanyId = company.Id,
+                    LinkKind = extraLink.Contains("vk.com", StringComparison.OrdinalIgnoreCase) ? LinkType.Vk : LinkType.Other,
+                    Label = extraLink.Contains("vk.com", StringComparison.OrdinalIgnoreCase) ? "VK" : "Ссылка",
+                    Url = extraLink
+                });
+            }
+        }
+
+        return links;
+    }
+
+    private static List<CompanyInvite> BuildCompanyInvites(
+        IReadOnlyList<Company> companies,
+        IReadOnlyCollection<CompanyMember> companyMembers,
+        DateTimeOffset now)
+    {
+        return companies.Select((company, index) => new CompanyInvite
+        {
+            CompanyId = company.Id,
+            InvitedByUserId = companyMembers.First(x => x.CompanyId == company.Id && x.Role == CompanyMemberRole.Owner).UserId,
+            Role = CompanyMemberRole.Admin,
+            Token = $"seed-invite-company-{company.Id}-{index + 1}",
+            ExpiresAt = now.AddDays(14 + (index % 5)),
+            AcceptedAt = now.AddDays(-Math.Max(1, index % 6))
+        }).ToList();
+    }
+
+    private async Task<List<LocationEntity>> EnsureLocationsFromGeoPointsAsync(
+        IReadOnlyDictionary<string, City> cities,
+        IReadOnlyList<GeoPointSeed> geoPointSeeds)
+    {
+        var geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
+        var cityValues = cities.Values.ToArray();
+        var locations = new List<LocationEntity>(geoPointSeeds.Count);
+
+        for (var i = 0; i < geoPointSeeds.Count; i++)
+        {
+            var point = geoPointSeeds[i];
+            var city = cityValues
+                .OrderBy(x => SquaredDistance(
+                    (double)(x.Latitude ?? 0m),
+                    (double)(x.Longitude ?? 0m),
+                    point.Latitude,
+                    point.Longitude))
+                .First();
+
+            locations.Add(new LocationEntity
+            {
+                CityId = city.Id,
+                GeoPoint = geometryFactory.CreatePoint(new Coordinate(point.Longitude, point.Latitude)),
+                StreetName = $"Тестовая точка {i + 1}",
+                HouseNumber = "1"
+            });
+        }
+
+        dbContext.Locations.AddRange(locations);
+        await dbContext.SaveChangesAsync();
+        return locations;
+    }
+
+    private static List<Vacancy> BuildVacanciesFromSeeds(
+        IReadOnlyList<Company> companies,
+        IReadOnlyCollection<CompanyMember> members,
+        IReadOnlyList<LocationEntity> locations,
+        IReadOnlyList<VacancySeed> vacancySeeds,
+        DateTimeOffset now)
+    {
+        var ownerByCompany = members
+            .Where(x => x.Role == CompanyMemberRole.Owner)
+            .ToDictionary(x => x.CompanyId, x => x.UserId);
+
+        var vacancies = new List<Vacancy>(vacancySeeds.Count);
+        for (var i = 0; i < vacancySeeds.Count; i++)
+        {
+            var seed = vacancySeeds[i];
+            var company = companies[i % companies.Count];
+            var location = locations[i];
+
+            vacancies.Add(new Vacancy
+            {
+                CompanyId = company.Id,
+                CreatedByUserId = ownerByCompany[company.Id],
+                Title = seed.Title,
+                ShortDescription = seed.ShortDescription,
+                FullDescription = seed.FullDescription,
+                Kind = seed.Kind,
+                Format = seed.Format,
+                Status = OpportunityStatus.Active,
+                CityId = location.CityId,
+                LocationId = location.Id,
+                SalaryFrom = seed.SalaryFrom,
+                SalaryTo = seed.SalaryTo,
+                CurrencyCode = "RUB",
+                SalaryTaxMode = SalaryTaxMode.Unknown,
+                PublishAt = now.AddDays(-20 + i),
+                ApplicationDeadline = now.AddDays(15 + (i % 20))
+            });
+        }
+
+        return vacancies;
+    }
+
+    private static List<Opportunity> BuildOpportunitiesFromSeeds(
+        IReadOnlyList<Company> companies,
+        IReadOnlyCollection<CompanyMember> members,
+        IReadOnlyList<LocationEntity> locations,
+        IReadOnlyList<EventSeed> eventSeeds,
+        DateTimeOffset now)
+    {
+        var ownerByCompany = members
+            .Where(x => x.Role == CompanyMemberRole.Owner)
+            .ToDictionary(x => x.CompanyId, x => x.UserId);
+
+        var opportunities = new List<Opportunity>(eventSeeds.Count);
+        for (var i = 0; i < eventSeeds.Count; i++)
+        {
+            var seed = eventSeeds[i];
+            var company = companies[i % companies.Count];
+            var location = locations[(i + 5) % locations.Count];
+
+            opportunities.Add(new Opportunity
+            {
+                CompanyId = company.Id,
+                CreatedByUserId = ownerByCompany[company.Id],
+                Title = seed.Title,
+                ShortDescription = seed.ShortDescription,
+                FullDescription = seed.FullDescription,
+                Kind = seed.Kind,
+                Format = seed.Format,
+                Status = OpportunityStatus.Active,
+                CityId = location.CityId,
+                LocationId = location.Id,
+                PriceType = PriceType.Free,
+                PriceAmount = null,
+                PriceCurrencyCode = null,
+                ParticipantsCanWrite = i % 3 != 0,
+                PublishAt = now.AddDays(-10 + i),
+                EventDate = seed.EventDate
+            });
+        }
+
+        return opportunities;
     }
 
     private async Task SeedPortfolioProjectsAsync(
@@ -939,6 +1443,521 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         await dbContext.SaveChangesAsync();
     }
 
+    private async Task<List<User>> EnsureSeekersWithProfilesAsync(
+        int targetCount,
+        FioSeed fioSeeds,
+        IReadOnlyList<string> avatarUrls,
+        IReadOnlyDictionary<string, City> cities,
+        IReadOnlyDictionary<string, Tag> tags,
+        IReadOnlyList<Company> companies,
+        DateTimeOffset assignedAt)
+    {
+        var random = new Random(20260330);
+        var seekers = new List<User>(targetCount);
+        var cityIds = cities.Values.Select(x => x.Id).ToArray();
+        var technologyTags = tags
+            .Where(x => x.Key.StartsWith("technology::", StringComparison.OrdinalIgnoreCase))
+            .Select(x => x.Value)
+            .DistinctBy(x => x.Id)
+            .ToArray();
+
+        if (cityIds.Length == 0)
+        {
+            throw new InvalidOperationException("Не найдено ни одного города для заполнения профилей соискателей.");
+        }
+
+        for (var i = 0; i < targetCount; i++)
+        {
+            var lastName = fioSeeds.LastNames[random.Next(fioSeeds.LastNames.Count)];
+            var firstName = fioSeeds.FirstNames[random.Next(fioSeeds.FirstNames.Count)];
+            var middleName = fioSeeds.MiddleNames[random.Next(fioSeeds.MiddleNames.Count)];
+            var fio = $"{lastName} {firstName} {middleName}".Trim();
+            var avatarUrl = avatarUrls.Count == 0
+                ? "/api/media/user-avatars/system/seeker.svg"
+                : avatarUrls[random.Next(avatarUrls.Count)];
+            var cityId = cityIds[random.Next(cityIds.Length)];
+
+            var seeker = await EnsureUserAsync(
+                $"seeker{i + 1:00}@tramplin.local",
+                fio,
+                "Seeker123!",
+                AccountStatus.Active,
+                avatarUrl);
+            seeker.Fio = fio;
+            seeker.AvatarUrl = avatarUrl;
+            await EnsureRoleAsync(seeker.Id, PlatformRole.Seeker, assignedAt);
+            seekers.Add(seeker);
+
+            var profile = await dbContext.CandidateProfiles.FirstOrDefaultAsync(x => x.UserId == seeker.Id);
+            if (profile is null)
+            {
+                profile = new CandidateProfile
+                {
+                    UserId = seeker.Id,
+                    Fio = fio,
+                    BirthDate = DateOnly.FromDateTime(DateTime.UtcNow.Date.AddYears(-22 - random.Next(12)).AddDays(random.Next(365))),
+                    Gender = random.Next(2) == 0 ? CandidateGender.Male : CandidateGender.Female,
+                    Phone = $"+7 (9{random.Next(10)}) {random.Next(100):000}-{random.Next(100):00}-{random.Next(100):00}",
+                    CityId = cityId,
+                    About = BuildSeekerAbout(firstName),
+                    AvatarUrl = avatarUrl
+                };
+                dbContext.CandidateProfiles.Add(profile);
+            }
+            else
+            {
+                profile.Fio = fio;
+                profile.CityId = cityId;
+                profile.Phone ??= $"+7 (900) 100-{i / 10:00}-{i % 10:00}";
+                profile.AvatarUrl = avatarUrl;
+                profile.About ??= BuildSeekerAbout(firstName);
+            }
+
+            var privacy = await dbContext.CandidatePrivacySettings.FirstOrDefaultAsync(x => x.UserId == seeker.Id);
+            if (privacy is null)
+            {
+                dbContext.CandidatePrivacySettings.Add(new CandidatePrivacySettings
+                {
+                    UserId = seeker.Id,
+                    ProfileVisibility = PrivacyScope.AuthorizedUsers,
+                    ResumeVisibility = PrivacyScope.AuthorizedUsers,
+                    OpenToWork = true,
+                    ShowContactsInResume = true,
+                    ShowInFriendsFavorites = true,
+                    ShowInFriendsApplications = true
+                });
+            }
+            else
+            {
+                privacy.OpenToWork = true;
+                privacy.ShowContactsInResume = true;
+                privacy.ShowInFriendsFavorites = true;
+                privacy.ShowInFriendsApplications = true;
+            }
+
+            var resume = await dbContext.CandidateResumeProfiles.FirstOrDefaultAsync(x => x.UserId == seeker.Id);
+            if (resume is null)
+            {
+                resume = new CandidateResumeProfile
+                {
+                    UserId = seeker.Id
+                };
+                dbContext.CandidateResumeProfiles.Add(resume);
+            }
+
+            resume.Headline = BuildResumeHeadline(firstName);
+            resume.DesiredPosition = BuildDesiredPosition(firstName);
+            resume.Summary = BuildResumeSummary(firstName);
+            resume.SalaryFrom = 70000 + random.Next(12) * 10000;
+            resume.SalaryTo = resume.SalaryFrom + 60000 + random.Next(9) * 10000;
+            resume.CurrencyCode = "RUB";
+
+            var skillRows = await dbContext.CandidateResumeSkills.Where(x => x.UserId == seeker.Id).ToListAsync();
+            var experienceRows = await dbContext.CandidateResumeExperiences.Where(x => x.UserId == seeker.Id).ToListAsync();
+            var educationRows = await dbContext.CandidateResumeEducation.Where(x => x.UserId == seeker.Id).ToListAsync();
+            var resumeLinkRows = await dbContext.CandidateResumeLinks.Where(x => x.UserId == seeker.Id).ToListAsync();
+            var publicLinkRows = await dbContext.UserPublicLinks.Where(x => x.UserId == seeker.Id).ToListAsync();
+
+            if (skillRows.Count > 0) dbContext.CandidateResumeSkills.RemoveRange(skillRows);
+            if (experienceRows.Count > 0) dbContext.CandidateResumeExperiences.RemoveRange(experienceRows);
+            if (educationRows.Count > 0) dbContext.CandidateResumeEducation.RemoveRange(educationRows);
+            if (resumeLinkRows.Count > 0) dbContext.CandidateResumeLinks.RemoveRange(resumeLinkRows);
+            if (publicLinkRows.Count > 0) dbContext.UserPublicLinks.RemoveRange(publicLinkRows);
+
+            var selectedSkills = technologyTags
+                .OrderBy(_ => random.Next())
+                .Take(Math.Min(4, technologyTags.Length))
+                .ToArray();
+            foreach (var selectedSkill in selectedSkills)
+            {
+                dbContext.CandidateResumeSkills.Add(new CandidateResumeSkill
+                {
+                    UserId = seeker.Id,
+                    TagId = selectedSkill.Id,
+                    Level = random.Next(2, 6),
+                    YearsExperience = Math.Round((decimal)(0.5 + random.NextDouble() * 6), 1)
+                });
+            }
+
+            var primaryCompany = companies[(i + random.Next(companies.Count)) % companies.Count];
+            dbContext.CandidateResumeExperiences.Add(new CandidateResumeExperience
+            {
+                UserId = seeker.Id,
+                CompanyId = primaryCompany.Id,
+                CompanyName = primaryCompany.BrandName ?? primaryCompany.LegalName,
+                Position = resume.DesiredPosition ?? "Специалист",
+                Description = "Разработка и улучшение продуктовых функций, командное взаимодействие, работа с обратной связью пользователей.",
+                StartDate = DateOnly.FromDateTime(DateTime.UtcNow.Date.AddYears(-1 - random.Next(4)).AddMonths(-random.Next(11))),
+                EndDate = random.Next(4) == 0 ? null : DateOnly.FromDateTime(DateTime.UtcNow.Date.AddMonths(-random.Next(1, 7))),
+                IsCurrent = random.Next(4) == 0
+            });
+
+            dbContext.CandidateResumeEducation.Add(new CandidateResumeEducation
+            {
+                UserId = seeker.Id,
+                University = random.Next(2) == 0 ? "НИУ ВШЭ" : "СмолГУ",
+                Faculty = random.Next(2) == 0 ? "Информационные технологии" : "Прикладная математика",
+                Specialty = random.Next(2) == 0 ? "Разработка ПО" : "Аналитика и цифровые продукты",
+                Course = random.Next(2, 5),
+                GraduationYear = DateTime.UtcNow.Year + random.Next(-2, 2)
+            });
+
+            dbContext.CandidateResumeLinks.Add(new CandidateResumeLink
+            {
+                UserId = seeker.Id,
+                Kind = "github",
+                Url = $"https://github.com/{TransliterateToAscii(firstName.ToLowerInvariant())}{i + 1:00}",
+                Label = "GitHub"
+            });
+            dbContext.CandidateResumeLinks.Add(new CandidateResumeLink
+            {
+                UserId = seeker.Id,
+                Kind = "portfolio",
+                Url = $"https://portfolio.tramplin.local/{seeker.Id}",
+                Label = "Портфолио"
+            });
+
+            dbContext.UserPublicLinks.Add(new UserPublicLink
+            {
+                UserId = seeker.Id,
+                Kind = "telegram",
+                Url = $"https://t.me/{TransliterateToAscii(firstName.ToLowerInvariant())}_{i + 10}",
+                Label = "Telegram",
+                SortOrder = 0
+            });
+            dbContext.UserPublicLinks.Add(new UserPublicLink
+            {
+                UserId = seeker.Id,
+                Kind = "website",
+                Url = $"https://tramplin.local/u/{seeker.Id}",
+                Label = "Публичный профиль",
+                SortOrder = 1
+            });
+        }
+
+        await dbContext.SaveChangesAsync();
+        return seekers;
+    }
+
+    private static List<OpportunityParticipant> BuildOpportunityParticipationsForAllSeekers(
+        IReadOnlyList<Opportunity> opportunities,
+        IReadOnlyList<User> seekers,
+        DateTimeOffset now)
+    {
+        var result = new List<OpportunityParticipant>(seekers.Count * 2);
+        var seen = new HashSet<(long OpportunityId, long UserId)>();
+
+        for (var i = 0; i < seekers.Count; i++)
+        {
+            var primaryOpportunity = opportunities[i % opportunities.Count];
+            if (seen.Add((primaryOpportunity.Id, seekers[i].Id)))
+            {
+                result.Add(new OpportunityParticipant
+                {
+                    OpportunityId = primaryOpportunity.Id,
+                    UserId = seekers[i].Id,
+                    JoinedAt = now.AddDays(-(i % 14)).AddHours(-(i % 5))
+                });
+            }
+
+            if (i % 2 == 0)
+            {
+                var secondaryOpportunity = opportunities[(i + 3) % opportunities.Count];
+                if (seen.Add((secondaryOpportunity.Id, seekers[i].Id)))
+                {
+                    result.Add(new OpportunityParticipant
+                    {
+                        OpportunityId = secondaryOpportunity.Id,
+                        UserId = seekers[i].Id,
+                        JoinedAt = now.AddDays(-(i % 8)).AddHours(-2)
+                    });
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private async Task SeedPortfolioProjectsForAllSeekersAsync(
+        IReadOnlyList<User> seekers,
+        IReadOnlyList<Vacancy> vacancies,
+        IReadOnlyList<Opportunity> opportunities,
+        IReadOnlyList<string> portfolioPhotoUrls,
+        DateTimeOffset now)
+    {
+        var projectTitles = new[]
+        {
+            "CRM-модуль для отдела продаж",
+            "Сервис аналитики рекламных кампаний",
+            "Панель мониторинга инцидентов",
+            "Витрина данных для маркетинга",
+            "Платформа внутреннего обучения",
+            "Конструктор отчётов для бизнеса"
+        };
+        var projectRoles = new[]
+        {
+            "Backend-разработчик",
+            "Frontend-разработчик",
+            "QA-инженер",
+            "Аналитик",
+            "Продакт-менеджер",
+            "Data Engineer"
+        };
+
+        var projects = new List<CandidateResumeProject>(seekers.Count);
+        for (var i = 0; i < seekers.Count; i++)
+        {
+            projects.Add(new CandidateResumeProject
+            {
+                UserId = seekers[i].Id,
+                Title = $"{projectTitles[i % projectTitles.Length]} #{i + 1}",
+                Role = projectRoles[i % projectRoles.Length],
+                Description = "Реальный учебно-производственный проект: планирование, реализация, тестирование и выпуск результата в команде.",
+                StartDate = DateOnly.FromDateTime(now.AddMonths(-8 - (i % 6)).Date),
+                EndDate = i % 5 == 0 ? null : DateOnly.FromDateTime(now.AddMonths(-(i % 3)).Date),
+                RepoUrl = $"https://github.com/tramplin-demo/project-{i + 1:00}",
+                DemoUrl = $"https://demo.tramplin.local/projects/{i + 1:00}"
+            });
+        }
+
+        dbContext.CandidateResumeProjects.AddRange(projects);
+        await dbContext.SaveChangesAsync();
+
+        var photos = new List<CandidateResumeProjectPhoto>(projects.Count * 2);
+        var participants = new List<CandidateResumeProjectParticipant>(projects.Count * 2);
+        var collaborations = new List<CandidateResumeProjectCollaboration>(projects.Count * 3);
+
+        for (var i = 0; i < projects.Count; i++)
+        {
+            var project = projects[i];
+            var owner = seekers[i];
+            var collaborator = seekers[(i + 1) % seekers.Count];
+            var mainPhoto = portfolioPhotoUrls.Count == 0
+                ? "/api/media/user-avatars/system/seeker.svg"
+                : portfolioPhotoUrls[i % portfolioPhotoUrls.Count];
+
+            photos.Add(new CandidateResumeProjectPhoto
+            {
+                ProjectId = project.Id,
+                Url = mainPhoto,
+                SortOrder = 0,
+                IsMain = true
+            });
+
+            if (portfolioPhotoUrls.Count > 1)
+            {
+                photos.Add(new CandidateResumeProjectPhoto
+                {
+                    ProjectId = project.Id,
+                    Url = portfolioPhotoUrls[(i + 1) % portfolioPhotoUrls.Count],
+                    SortOrder = 1,
+                    IsMain = false
+                });
+            }
+
+            participants.Add(new CandidateResumeProjectParticipant
+            {
+                ProjectId = project.Id,
+                UserId = owner.Id,
+                Role = project.Role ?? "Участник"
+            });
+            participants.Add(new CandidateResumeProjectParticipant
+            {
+                ProjectId = project.Id,
+                UserId = collaborator.Id,
+                Role = "Коллаборатор"
+            });
+
+            collaborations.Add(new CandidateResumeProjectCollaboration
+            {
+                ProjectId = project.Id,
+                Type = PortfolioCollaborationType.User,
+                UserId = collaborator.Id,
+                Label = "Совместная работа по фиче",
+                SortOrder = 0
+            });
+            collaborations.Add(new CandidateResumeProjectCollaboration
+            {
+                ProjectId = project.Id,
+                Type = PortfolioCollaborationType.Vacancy,
+                VacancyId = vacancies[i % vacancies.Count].Id,
+                Label = "Связано с откликом на вакансию",
+                SortOrder = 1
+            });
+            collaborations.Add(new CandidateResumeProjectCollaboration
+            {
+                ProjectId = project.Id,
+                Type = PortfolioCollaborationType.Opportunity,
+                OpportunityId = opportunities[i % opportunities.Count].Id,
+                Label = "Результат участия в мероприятии",
+                SortOrder = 2
+            });
+        }
+
+        dbContext.CandidateResumeProjectPhotos.AddRange(photos);
+        dbContext.CandidateResumeProjectParticipants.AddRange(participants);
+        dbContext.CandidateResumeProjectCollaborations.AddRange(collaborations);
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static List<Application> BuildApplicationsForAllSeekers(
+        IReadOnlyList<Vacancy> vacancies,
+        IReadOnlyList<User> seekers,
+        DateTimeOffset now)
+    {
+        var statuses = new[]
+        {
+            ApplicationStatus.New,
+            ApplicationStatus.InReview,
+            ApplicationStatus.Interview,
+            ApplicationStatus.Offer
+        };
+
+        var applications = new List<Application>(seekers.Count * 2);
+        var seen = new HashSet<(long UserId, long VacancyId)>();
+
+        for (var i = 0; i < seekers.Count; i++)
+        {
+            for (var j = 0; j < 2; j++)
+            {
+                var vacancy = vacancies[(i + j * 7) % vacancies.Count];
+                if (!seen.Add((seekers[i].Id, vacancy.Id)))
+                {
+                    continue;
+                }
+
+                applications.Add(new Application
+                {
+                    CompanyId = vacancy.CompanyId,
+                    CandidateUserId = seekers[i].Id,
+                    VacancyId = vacancy.Id,
+                    InitiatorRole = PlatformRole.Seeker,
+                    Status = statuses[(i + j) % statuses.Length],
+                    CreatedAt = now.AddDays(-(i % 15)).AddHours(-j),
+                    UpdatedAt = now.AddDays(-(i % 15))
+                });
+            }
+        }
+
+        return applications;
+    }
+
+    private async Task SeedSocialGraphAsync(
+        IReadOnlyList<User> seekers,
+        IReadOnlyList<Vacancy> vacancies,
+        IReadOnlyList<Opportunity> opportunities,
+        IReadOnlyList<Application> applications,
+        IReadOnlyList<OpportunityParticipant> participations,
+        DateTimeOffset now)
+    {
+        var subscriptions = new List<UserSubscription>(seekers.Count * 3);
+        var subscriptionSeen = new HashSet<(long Follower, long Following)>();
+
+        for (var i = 0; i < seekers.Count; i++)
+        {
+            var follower = seekers[i].Id;
+            var firstFollowing = seekers[(i + 1) % seekers.Count].Id;
+            var secondFollowing = seekers[(i + 2) % seekers.Count].Id;
+
+            if (subscriptionSeen.Add((follower, firstFollowing)))
+            {
+                subscriptions.Add(new UserSubscription
+                {
+                    FollowerUserId = follower,
+                    FollowingUserId = firstFollowing,
+                    CreatedAt = now.AddDays(-(i % 7))
+                });
+            }
+
+            if (subscriptionSeen.Add((firstFollowing, follower)))
+            {
+                subscriptions.Add(new UserSubscription
+                {
+                    FollowerUserId = firstFollowing,
+                    FollowingUserId = follower,
+                    CreatedAt = now.AddDays(-(i % 7)).AddMinutes(-10)
+                });
+            }
+
+            if (subscriptionSeen.Add((follower, secondFollowing)))
+            {
+                subscriptions.Add(new UserSubscription
+                {
+                    FollowerUserId = follower,
+                    FollowingUserId = secondFollowing,
+                    CreatedAt = now.AddDays(-(i % 5)).AddMinutes(-20)
+                });
+            }
+        }
+
+        var contacts = new List<UserContact>(seekers.Count);
+        var contactSeen = new HashSet<(long User, long Contact)>();
+        for (var i = 0; i < seekers.Count; i += 2)
+        {
+            var first = seekers[i].Id;
+            var second = seekers[(i + 1) % seekers.Count].Id;
+
+            if (contactSeen.Add((first, second)))
+            {
+                contacts.Add(new UserContact
+                {
+                    UserId = first,
+                    ContactUserId = second,
+                    CreatedAt = now.AddDays(-(i % 6))
+                });
+            }
+
+            if (contactSeen.Add((second, first)))
+            {
+                contacts.Add(new UserContact
+                {
+                    UserId = second,
+                    ContactUserId = first,
+                    CreatedAt = now.AddDays(-(i % 6)).AddMinutes(-5)
+                });
+            }
+        }
+
+        var contactRequests = new List<ContactRequest>(seekers.Count / 2);
+        for (var i = 0; i < seekers.Count; i += 3)
+        {
+            contactRequests.Add(new ContactRequest
+            {
+                FromUserId = seekers[i].Id,
+                ToUserId = seekers[(i + 2) % seekers.Count].Id,
+                Status = i % 2 == 0 ? ContactRequestStatus.Pending : ContactRequestStatus.Accepted,
+                CreatedAt = now.AddDays(-(i % 4)),
+                UpdatedAt = now.AddDays(-(i % 3))
+            });
+        }
+
+        var favorites = new List<UserOpportunityFavorite>(seekers.Count * 2);
+        for (var i = 0; i < seekers.Count; i++)
+        {
+            favorites.Add(new UserOpportunityFavorite
+            {
+                UserId = seekers[i].Id,
+                VacancyId = vacancies[i % vacancies.Count].Id,
+                OpportunityId = null,
+                CreatedAt = now.AddDays(-(i % 8))
+            });
+            favorites.Add(new UserOpportunityFavorite
+            {
+                UserId = seekers[i].Id,
+                VacancyId = null,
+                OpportunityId = opportunities[(i + 3) % opportunities.Count].Id,
+                CreatedAt = now.AddDays(-(i % 6)).AddMinutes(-15)
+            });
+        }
+
+        dbContext.UserSubscriptions.AddRange(subscriptions);
+        dbContext.UserContacts.AddRange(contacts);
+        dbContext.ContactRequests.AddRange(contactRequests);
+        dbContext.UserOpportunityFavorites.AddRange(favorites);
+
+        await dbContext.SaveChangesAsync();
+    }
+
     private async Task<User> EnsureUserAsync(string email, string fullName, string password, AccountStatus status, string? avatarUrl = null)
     {
         var normalizedEmail = email.Trim().ToLowerInvariant();
@@ -1496,6 +2515,367 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         ];
     }
 
+    private static string ReadAllTextWithFallback(string filePath)
+    {
+        var bytes = File.ReadAllBytes(filePath);
+
+        try
+        {
+            return new UTF8Encoding(false, true).GetString(bytes);
+        }
+        catch (DecoderFallbackException)
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            return Encoding.GetEncoding(1251).GetString(bytes);
+        }
+    }
+
+    private static bool LooksLikeDomain(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var candidate = value.Trim();
+        if (candidate.Contains(' ') || candidate.Contains('@') || candidate.Length > 120)
+        {
+            return false;
+        }
+
+        return candidate.Contains('.');
+    }
+
+    private static string? NormalizeUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var candidate = value.Trim().TrimEnd('.', ',', ';');
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return null;
+        }
+
+        if (candidate.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || candidate.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return candidate;
+        }
+
+        if (!candidate.Contains('.') || candidate.Contains(' '))
+        {
+            return null;
+        }
+
+        return $"https://{candidate}";
+    }
+
+    private static string BuildShortDescription(string text, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "Подробности доступны в описании.";
+        }
+
+        var paragraph = text
+            .Split('\n')
+            .Select(x => x.Trim())
+            .FirstOrDefault(x => x.Length >= 40 && !x.Contains('₽') && !x.Contains("зарплат", StringComparison.OrdinalIgnoreCase))
+            ?? text.Split('\n').Select(x => x.Trim()).FirstOrDefault(x => x.Length >= 10)
+            ?? text.Trim();
+
+        if (paragraph.Length <= maxLength)
+        {
+            return paragraph;
+        }
+
+        var cut = paragraph[..maxLength];
+        var lastSpace = cut.LastIndexOf(' ');
+        return (lastSpace > 0 ? cut[..lastSpace] : cut).TrimEnd() + "...";
+    }
+
+    private static List<string> ParseQuotedArray(string text, string label)
+    {
+        var match = Regex.Match(
+            text,
+            $@"{Regex.Escape(label)}\s*=\s*\[(?<items>[\s\S]*?)\]",
+            RegexOptions.CultureInvariant);
+
+        if (!match.Success)
+        {
+            return [];
+        }
+
+        return Regex.Matches(match.Groups["items"].Value, "\"([^\"]+)\"")
+            .Select(x => x.Groups[1].Value.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string? TryGetJsonString(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property))
+        {
+            return null;
+        }
+
+        return property.ValueKind == JsonValueKind.String ? property.GetString() : null;
+    }
+
+    private static WorkFormat ParseWorkFormat(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return WorkFormat.Onsite;
+        }
+
+        var value = text.ToLowerInvariant();
+        if (value.Contains("удален") || value.Contains("онлайн"))
+        {
+            return WorkFormat.Remote;
+        }
+
+        if (value.Contains("гибрид"))
+        {
+            return WorkFormat.Hybrid;
+        }
+
+        return WorkFormat.Onsite;
+    }
+
+    private static OpportunityKind ParseOpportunityKind(string title, string description, IReadOnlyCollection<string> tags)
+    {
+        var text = $"{title} {description} {string.Join(' ', tags)}".ToLowerInvariant();
+        if (text.Contains("хакатон"))
+        {
+            return OpportunityKind.Hackathon;
+        }
+
+        if (text.Contains("open day") || text.Contains("день открытых двер"))
+        {
+            return OpportunityKind.OpenDay;
+        }
+
+        if (text.Contains("лекц") || text.Contains("вебинар") || text.Contains("семинар") || text.Contains("интенсив"))
+        {
+            return OpportunityKind.Lecture;
+        }
+
+        return OpportunityKind.Other;
+    }
+
+    private static (decimal? SalaryFrom, decimal? SalaryTo) ParseSalaryRange(string text)
+    {
+        var salaryLine = text
+            .Split('\n')
+            .Select(x => x.Trim())
+            .FirstOrDefault(x => x.Contains('₽'));
+
+        if (salaryLine is null)
+        {
+            return (null, null);
+        }
+
+        var values = Regex.Matches(salaryLine, @"\d[\d\s]{1,}")
+            .Select(x => x.Value.Replace(" ", string.Empty))
+            .Select(x => decimal.TryParse(x, NumberStyles.Number, CultureInfo.InvariantCulture, out var value) ? value : (decimal?)null)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .ToArray();
+
+        if (values.Length == 0)
+        {
+            return (null, null);
+        }
+
+        if (values.Length == 1)
+        {
+            if (salaryLine.Contains("до", StringComparison.OrdinalIgnoreCase))
+            {
+                return (Math.Round(values[0] * 0.75m), values[0]);
+            }
+
+            if (salaryLine.Contains("от", StringComparison.OrdinalIgnoreCase))
+            {
+                return (values[0], Math.Round(values[0] * 1.35m));
+            }
+
+            return (values[0], values[0]);
+        }
+
+        var min = Math.Min(values[0], values[1]);
+        var max = Math.Max(values[0], values[1]);
+        return (min, max);
+    }
+
+    private static string NormalizeVacancyTitle(string rawTitle)
+    {
+        if (string.IsNullOrWhiteSpace(rawTitle))
+        {
+            return "IT-специалист";
+        }
+
+        var normalized = Regex.Replace(rawTitle.Trim(), @"\s+", " ");
+        var lower = normalized.ToLowerInvariant();
+
+        if (lower == "devops")
+        {
+            return "Инженер DevOps";
+        }
+
+        normalized = normalized
+            .Replace("Junior Product Manager", "Младший продакт-менеджер", StringComparison.OrdinalIgnoreCase)
+            .Replace("Manual QA Engineer", "QA-инженер", StringComparison.OrdinalIgnoreCase)
+            .Replace("Frontend developer", "фронтенд-разработчик", StringComparison.OrdinalIgnoreCase)
+            .Replace("Front-end developer", "фронтенд-разработчик", StringComparison.OrdinalIgnoreCase)
+            .Replace("Front-end", "фронтенд", StringComparison.OrdinalIgnoreCase)
+            .Replace("Frontend", "фронтенд", StringComparison.OrdinalIgnoreCase)
+            .Replace("Developer", "разработчик", StringComparison.OrdinalIgnoreCase)
+            .Replace("Junior", "Младший", StringComparison.OrdinalIgnoreCase);
+
+        if (!Regex.IsMatch(normalized, "[А-Яа-яЁё]"))
+        {
+            normalized = $"IT-специалист ({normalized})";
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeForDedup(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder(value.Length);
+        foreach (var character in value.ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                builder.Append(character);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static string BuildSeekerAbout(string firstName)
+    {
+        var variants = new[]
+        {
+            "Развиваюсь в продуктовом IT, люблю системный подход и понятные процессы.",
+            "Сфокусирован(а) на практических задачах, командной коммуникации и аккуратной реализации.",
+            "Ищу проекты с сильной командой, прозрачной обратной связью и ростом компетенций.",
+            "Работаю на результат: анализирую метрики, предлагаю улучшения и довожу задачи до релиза."
+        };
+
+        return variants[StableIndex(firstName, variants.Length)];
+    }
+
+    private static string BuildResumeHeadline(string firstName)
+    {
+        var variants = new[]
+        {
+            "Junior/Middle IT-специалист",
+            "Инженер продукта",
+            "Разработчик и аналитик цифровых сервисов",
+            "Специалист по разработке и качеству ПО"
+        };
+
+        return variants[StableIndex(firstName + "_headline", variants.Length)];
+    }
+
+    private static string BuildDesiredPosition(string firstName)
+    {
+        var variants = new[]
+        {
+            "Backend-разработчик",
+            "Frontend-разработчик",
+            "QA-инженер",
+            "Product Analyst",
+            "Data Engineer"
+        };
+
+        return variants[StableIndex(firstName + "_position", variants.Length)];
+    }
+
+    private static string BuildResumeSummary(string firstName)
+    {
+        var variants = new[]
+        {
+            "Опыт участия в коммерческих и учебных проектах, уверенная работа в кросс-функциональной команде.",
+            "Практикую аккуратный инженерный подход: декомпозиция задач, контроль качества, измеримый результат.",
+            "Есть опыт работы с требованиями, интеграциями и пользовательскими сценариями в web-продуктах.",
+            "Веду проекты от постановки до релиза, умею договариваться о приоритетах и сроках."
+        };
+
+        return variants[StableIndex(firstName + "_summary", variants.Length)];
+    }
+
+    private static int StableIndex(string seed, int modulo)
+    {
+        if (modulo <= 0)
+        {
+            return 0;
+        }
+
+        var hash = seed.GetHashCode(StringComparison.Ordinal);
+        var normalized = unchecked((int)(uint)hash);
+        return normalized % modulo;
+    }
+
+    private static string TransliterateToAscii(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "user";
+        }
+
+        var map = new Dictionary<char, string>
+        {
+            ['а'] = "a", ['б'] = "b", ['в'] = "v", ['г'] = "g", ['д'] = "d", ['е'] = "e", ['ё'] = "e",
+            ['ж'] = "zh", ['з'] = "z", ['и'] = "i", ['й'] = "y", ['к'] = "k", ['л'] = "l", ['м'] = "m",
+            ['н'] = "n", ['о'] = "o", ['п'] = "p", ['р'] = "r", ['с'] = "s", ['т'] = "t", ['у'] = "u",
+            ['ф'] = "f", ['х'] = "h", ['ц'] = "c", ['ч'] = "ch", ['ш'] = "sh", ['щ'] = "sch", ['ъ'] = "",
+            ['ы'] = "y", ['ь'] = "", ['э'] = "e", ['ю'] = "yu", ['я'] = "ya"
+        };
+
+        var builder = new StringBuilder(value.Length);
+        foreach (var character in value.ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                if (map.TryGetValue(character, out var mapped))
+                {
+                    builder.Append(mapped);
+                }
+                else
+                {
+                    builder.Append(character);
+                }
+            }
+            else if (builder.Length == 0 || builder[^1] != '-')
+            {
+                builder.Append('-');
+            }
+        }
+
+        var result = builder.ToString().Trim('-');
+        return string.IsNullOrWhiteSpace(result) ? "user" : result;
+    }
+
+    private static double SquaredDistance(double latA, double lonA, double latB, double lonB)
+    {
+        var lat = latA - latB;
+        var lon = lonA - lonB;
+        return lat * lat + lon * lon;
+    }
+
     private static string BuildSlug(string value)
     {
         return value
@@ -1507,6 +2887,40 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
             .Replace("(", string.Empty)
             .Replace(")", string.Empty);
     }
+
+    private sealed record CompanySeed(
+        string Name,
+        string Description,
+        string? WebsiteUrl,
+        string? PublicEmail,
+        string? PublicPhone,
+        IReadOnlyList<string> AdditionalLinks,
+        string? LogoFilePath,
+        string LogoObjectKey);
+
+    private sealed record VacancySeed(
+        string Title,
+        string ShortDescription,
+        string FullDescription,
+        VacancyKind Kind,
+        WorkFormat Format,
+        decimal? SalaryFrom,
+        decimal? SalaryTo);
+
+    private sealed record GeoPointSeed(double Latitude, double Longitude);
+
+    private sealed record FioSeed(
+        IReadOnlyList<string> LastNames,
+        IReadOnlyList<string> FirstNames,
+        IReadOnlyList<string> MiddleNames);
+
+    private sealed record EventSeed(
+        string Title,
+        string ShortDescription,
+        string FullDescription,
+        OpportunityKind Kind,
+        WorkFormat Format,
+        DateTimeOffset EventDate);
 
     private sealed record VacancySeedTemplate(
         string Title,
@@ -1530,3 +2944,4 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         bool ParticipantsCanWrite,
         string[] TagKeys);
 }
+

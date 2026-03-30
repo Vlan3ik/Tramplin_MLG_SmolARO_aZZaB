@@ -34,19 +34,58 @@ SVG
   echo "Uploaded: $target_object"
 }
 
-echo "Uploading company logos from seed..."
-upload_file_if_exists "/seed/companies/WebCanape/logo.jpg" "company-logos/webcanape/logo.jpg"
-upload_file_if_exists "/seed/companies/Coalla/logo.jpg" "company-logos/coalla/logo.jpg"
-upload_file_if_exists "/seed/companies/ProstyeResheniya/logo.jpg" "company-logos/prostyeresheniya/logo.jpg"
+upload_company_logos() {
+  local base="/seed/design-data/Компании"
+  if [ ! -d "$base" ]; then
+    echo "No company source directory found: $base"
+    return
+  fi
 
-echo "Uploading generated placeholders for companies without source logos..."
-upload_inline_svg "company-logos/yandex/logo.svg" "YA" "#ffcc00"
-upload_inline_svg "company-logos/vk/logo.svg" "VK" "#0077ff"
-upload_inline_svg "company-logos/ozon-tech/logo.svg" "OZ" "#005bff"
-upload_inline_svg "company-logos/t-bank/logo.svg" "TB" "#333333"
-upload_inline_svg "company-logos/2gis/logo.svg" "2G" "#00a651"
-upload_inline_svg "company-logos/kaspersky/logo.svg" "KA" "#006d5b"
-upload_inline_svg "company-logos/sber/logo.svg" "SB" "#21a038"
+  echo "Uploading company logos from test data..."
+  local idx=1
+  find "$base" -mindepth 1 -maxdepth 1 -type d | sort | while IFS= read -r dir; do
+    logo_file="$(find "$dir" -mindepth 1 -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.svg' -o -iname '*.webp' \) | sort | head -n 1 || true)"
+    if [ -n "$logo_file" ]; then
+      ext="${logo_file##*.}"
+      ext="$(echo "$ext" | tr '[:upper:]' '[:lower:]')"
+      key="$(printf 'company-logos/test-data/company-%02d.%s' "$idx" "$ext")"
+      upload_file_if_exists "$logo_file" "$key"
+    fi
+    idx=$((idx + 1))
+  done
+}
+
+upload_seeker_avatars() {
+  local base="/seed/design-data/Соискатели/Аватарки"
+  if [ ! -d "$base" ]; then
+    echo "No avatar source directory found: $base"
+    return
+  fi
+
+  echo "Uploading seeker avatars..."
+  find "$base" -mindepth 1 -maxdepth 1 -type f \( -iname '*.svg' -o -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) | sort | while IFS= read -r file; do
+    filename="$(basename "$file")"
+    upload_file_if_exists "$file" "user-avatars/seekers/$filename"
+  done
+}
+
+upload_portfolio_photos() {
+  local base="/seed/design-data/Соискатели/Проекты"
+  if [ ! -d "$base" ]; then
+    echo "No portfolio photo source directory found: $base"
+    return
+  fi
+
+  echo "Uploading portfolio project photos..."
+  find "$base" -mindepth 1 -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | sort | while IFS= read -r file; do
+    filename="$(basename "$file")"
+    upload_file_if_exists "$file" "portfolio-projects/test-data/$filename"
+  done
+}
+
+upload_company_logos
+upload_seeker_avatars
+upload_portfolio_photos
 
 echo "Uploading system user avatars..."
 upload_inline_svg "user-avatars/system/admin.svg" "AD" "#1f2937"

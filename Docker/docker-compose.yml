@@ -38,7 +38,7 @@
       - minio
     volumes:
       - ./minio/init.sh:/init.sh:ro
-      - ./minio/seed/companies:/seed/companies:ro
+      - "../Design/Тестовые данные:/seed/design-data:ro"
     entrypoint: ["/bin/sh", "/init.sh"]
     restart: "no"
 
@@ -75,6 +75,9 @@
       Minio__Bucket: tramplin-media
       Minio__UseSsl: "false"
       ConnectionStrings__Redis: redis:6379
+      SEED_TEST_DATA_DIR: /app/seed-data
+    volumes:
+      - "../Design/Тестовые данные:/app/seed-data:ro"
 
   frontend:
     image: node:20-alpine
