@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { useMemo, type KeyboardEvent, type MouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpportunitySocialState } from '../../hooks/useOpportunitySocialState'
+import { useSeekerPrivacySettings } from '../../hooks/useSeekerPrivacySettings'
 import type { Opportunity } from '../../types/opportunity'
 import { typeLabel } from '../../types/opportunity'
 import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
@@ -43,8 +44,10 @@ function getInitials(name: string) {
 export function OpportunityCard({ opportunity, compact = false, isApplying = false, isApplied = false, onApply, onToggleFavorite }: OpportunityCardProps) {
   const navigate = useNavigate()
   const socialState = useOpportunitySocialState(opportunity)
+  const privacySettings = useSeekerPrivacySettings()
   const favoriteEntityType = getFavoriteEntityType(opportunity)
   const isFavorite = socialState.isFavoriteByMe || isFavoriteEntity(favoriteEntityType, opportunity.id)
+  const hasFriendsFavorite = privacySettings.showSocialProofs && socialState.friendFavoritesCount > 0
   const favoriteLabel = useMemo(() => (isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'), [isFavorite])
   const detailsPath = useMemo(() => buildOpportunityDetailsPath(opportunity), [opportunity])
   const isClosed = opportunity.status >= 4
@@ -84,7 +87,13 @@ export function OpportunityCard({ opportunity, compact = false, isApplying = fal
   }
 
   return (
-    <article className={clsx('opportunity-card card', compact && 'opportunity-card--compact')} role="link" tabIndex={0} onClick={handleOpenDetails} onKeyDown={handleCardKeyDown}>
+    <article
+      className={clsx('opportunity-card card', compact && 'opportunity-card--compact', hasFriendsFavorite && 'opportunity-card--friends-favorite')}
+      role="link"
+      tabIndex={0}
+      onClick={handleOpenDetails}
+      onKeyDown={handleCardKeyDown}
+    >
       <button className={clsx('btn btn--icon opportunity-card__favorite', isFavorite && 'btn--icon-active')} type="button" aria-label={favoriteLabel} onClick={handleFavoriteToggle}>
         <Bookmark size={16} fill={isFavorite ? 'currentColor' : 'none'} />
       </button>
