@@ -190,6 +190,13 @@ type CreateEmployerCompanyApiRequest = {
 }
 
 type UpdateEmployerCompanyVerificationApiRequest = {
+  legalName: string
+  brandName: string | null
+  baseCityId: number
+  description: string | null
+  websiteUrl: string | null
+  publicEmail: string | null
+  publicPhone: string | null
   employerType: number
   ogrnOrOgrnip: string
   inn: string
@@ -380,6 +387,13 @@ export type EmployerVerificationIndustry = {
 }
 
 export type EmployerVerificationProfile = {
+  legalName: string
+  brandName: string
+  baseCityId: number
+  description: string
+  websiteUrl: string
+  publicEmail: string
+  publicPhone: string
   employerType: number
   ogrnOrOgrnip: string
   inn: string
@@ -421,6 +435,13 @@ export type EmployerVerificationDocument = {
 }
 
 type EmployerVerificationProfileApi = {
+  legalName?: string | null
+  brandName?: string | null
+  baseCityId?: number | null
+  description?: string | null
+  websiteUrl?: string | null
+  publicEmail?: string | null
+  publicPhone?: string | null
   employerType?: number | null
   ogrnOrOgrnip?: string | null
   inn?: string | null
@@ -505,24 +526,26 @@ export type CreateEmployerCompanyRequest = {
 }
 
 export type UpdateEmployerCompanyVerificationRequest = {
-  employerType?: number
-  ogrnOrOgrnip?: string
-  inn?: string
-  kpp?: string
-  legalAddress?: string
-  actualAddress?: string
-  representativeFullName?: string
-  representativePosition?: string
-  mainIndustryId?: number
-  taxOffice?: string
-  workEmail?: string
-  workPhone?: string
-  siteOrPublicLinks?: string
-  legalType?: number
-  taxId?: string
-  registrationNumber?: string
-  publicEmail?: string
-  publicPhone?: string
+  legalName: string
+  brandName: string
+  baseCityId: number
+  description: string
+  websiteUrl: string
+  publicEmail: string
+  publicPhone: string
+  employerType: number
+  ogrnOrOgrnip: string
+  inn: string
+  kpp: string
+  legalAddress: string
+  actualAddress: string
+  representativeFullName: string
+  representativePosition: string
+  mainIndustryId: number
+  taxOffice: string
+  workEmail: string
+  workPhone: string
+  siteOrPublicLinks: string
 }
 
 export type UpdateEmployerCompanyChatSettingsRequest = {
@@ -1017,25 +1040,27 @@ export function createEmployerCompany(payload: CreateEmployerCompanyRequest) {
 }
 
 export function updateEmployerCompanyVerification(payload: UpdateEmployerCompanyVerificationRequest) {
-  const employerType = payload.employerType ?? payload.legalType ?? 1
-  const inn = payload.inn ?? payload.taxId ?? ''
-  const ogrnOrOgrnip = payload.ogrnOrOgrnip ?? payload.registrationNumber ?? ''
-  const workEmail = payload.workEmail ?? payload.publicEmail ?? ''
-  const workPhone = payload.workPhone ?? payload.publicPhone ?? ''
   const request: UpdateEmployerCompanyVerificationApiRequest = {
-    employerType,
-    ogrnOrOgrnip: ogrnOrOgrnip.trim(),
-    inn: inn.trim(),
-    kpp: toNullableString(payload.kpp ?? ''),
-    legalAddress: (payload.legalAddress ?? '').trim(),
-    actualAddress: toNullableString(payload.actualAddress ?? ''),
-    representativeFullName: (payload.representativeFullName ?? '').trim(),
-    representativePosition: toNullableString(payload.representativePosition ?? ''),
-    mainIndustryId: payload.mainIndustryId ?? 1,
-    taxOffice: toNullableString(payload.taxOffice ?? ''),
-    workEmail: workEmail.trim(),
-    workPhone: workPhone.trim(),
-    siteOrPublicLinks: toNullableString(payload.siteOrPublicLinks ?? ''),
+    legalName: payload.legalName.trim(),
+    brandName: toNullableString(payload.brandName),
+    baseCityId: payload.baseCityId,
+    description: toNullableString(payload.description),
+    websiteUrl: toNullableString(payload.websiteUrl),
+    publicEmail: toNullableString(payload.publicEmail),
+    publicPhone: toNullableString(payload.publicPhone),
+    employerType: payload.employerType,
+    ogrnOrOgrnip: payload.ogrnOrOgrnip.trim(),
+    inn: payload.inn.trim(),
+    kpp: toNullableString(payload.kpp),
+    legalAddress: payload.legalAddress.trim(),
+    actualAddress: toNullableString(payload.actualAddress),
+    representativeFullName: payload.representativeFullName.trim(),
+    representativePosition: toNullableString(payload.representativePosition),
+    mainIndustryId: payload.mainIndustryId,
+    taxOffice: toNullableString(payload.taxOffice),
+    workEmail: payload.workEmail.trim(),
+    workPhone: payload.workPhone.trim(),
+    siteOrPublicLinks: toNullableString(payload.siteOrPublicLinks),
   }
 
   return patchJson<unknown, UpdateEmployerCompanyVerificationApiRequest>('/employer/company/verification-profile', request)
@@ -1061,6 +1086,13 @@ export function submitEmployerCompanyVerification() {
 
 function mapVerificationProfile(response: EmployerVerificationProfileApi): EmployerVerificationProfile {
   return {
+    legalName: response.legalName ?? '',
+    brandName: response.brandName ?? '',
+    baseCityId: response.baseCityId ?? 1,
+    description: response.description ?? '',
+    websiteUrl: response.websiteUrl ?? '',
+    publicEmail: response.publicEmail ?? '',
+    publicPhone: response.publicPhone ?? '',
     employerType: response.employerType ?? 1,
     ogrnOrOgrnip: response.ogrnOrOgrnip ?? '',
     inn: response.inn ?? '',
