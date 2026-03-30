@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createApplication } from '../api/applications'
-import { addOpportunityToFavorites, addVacancyToFavorites, removeOpportunityFromFavorites, removeVacancyFromFavorites } from '../api/favorites'
+import { addOpportunityToFavorites, addVacancyToFavorites, fetchMyFavorites, removeOpportunityFromFavorites, removeVacancyFromFavorites } from '../api/favorites'
 import {
   fetchHomeListOpportunities,
   fetchMapOpportunities,
@@ -22,8 +22,8 @@ import { EventsCarouselSection } from '../components/layout/events-carousel/Even
 import { useSearchParams } from 'react-router-dom'
 import { useCity } from '../contexts/CityContext'
 import {
+  applyOpportunitySocialSnapshot,
   resolveOpportunitySocialEntityType,
-  setOpportunityFavoriteState,
   upsertOpportunitySocialState,
   upsertOpportunitySocialStates,
 } from '../utils/opportunity-social-state'
@@ -36,6 +36,27 @@ const defaultFilters: OpportunityFilters = {
   salaryTo: null,
   statuses: [],
   verifiedOnly: false,
+}
+
+type FavoriteIdsSnapshot = {
+  vacancyIds: Set<number>
+  opportunityIds: Set<number>
+}
+
+function toFavoriteIdsSnapshot(value: { vacancyIds: number[]; opportunityIds: number[] }): FavoriteIdsSnapshot {
+  return {
+    vacancyIds: new Set(value.vacancyIds),
+    opportunityIds: new Set(value.opportunityIds),
+  }
+}
+
+function resolveIsFavoriteFromSnapshot(opportunity: Opportunity, snapshot: FavoriteIdsSnapshot | null) {
+  if (!snapshot) {
+    return opportunity.isFavoriteByMe
+  }
+
+  const entityType = resolveOpportunitySocialEntityType(opportunity)
+  return entityType === 'vacancy' ? snapshot.vacancyIds.has(opportunity.id) : snapshot.opportunityIds.has(opportunity.id)
 }
 
 export function HomePage() {
@@ -65,6 +86,7 @@ export function HomePage() {
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState(false)
   const [applyingIds, setApplyingIds] = useState<Record<number, boolean>>({})
+  const [favoriteIdsSnapshot, setFavoriteIdsSnapshot] = useState<FavoriteIdsSnapshot | null>(null)
 
   const listQuery = useMemo(
     () => ({
@@ -86,6 +108,30 @@ export function HomePage() {
     [appliedSearch, filters, mapBounds],
   )
 
+  useEffect(() => {
+    if (!session?.accessToken) {
+      setFavoriteIdsSnapshot(null)
+      return
+    }
+
+    const controller = new AbortController()
+    void fetchMyFavorites(controller.signal)
+      .then((response) => {
+        if (controller.signal.aborted) {
+          return
+        }
+
+        setFavoriteIdsSnapshot(toFavoriteIdsSnapshot(response))
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setFavoriteIdsSnapshot(null)
+        }
+      })
+
+    return () => controller.abort()
+  }, [session?.accessToken, session?.user?.id])
+
   const loadListOpportunities = useCallback(
     async (signal?: AbortSignal) => {
       setIsListLoading(true)
@@ -93,9 +139,10 @@ export function HomePage() {
 
       try {
         const response = await fetchHomeListOpportunities(listQuery, signal)
-        setListItems(response.items)
+        const nextItems = response.items.map((item) => ({ ...item, isFavoriteByMe: resolveIsFavoriteFromSnapshot(item, favoriteIdsSnapshot) }))
+        setListItems(nextItems)
         setListTotal(response.total)
-        upsertOpportunitySocialStates(response.items)
+        upsertOpportunitySocialStates(nextItems)
       } catch (error) {
         if (signal?.aborted) {
           return
@@ -108,7 +155,7 @@ export function HomePage() {
         }
       }
     },
-    [listQuery],
+    [favoriteIdsSnapshot, listQuery],
   )
 
   const loadMapOpportunities = useCallback(
@@ -122,9 +169,10 @@ export function HomePage() {
 
       try {
         const response = await fetchMapOpportunities(mapQuery, signal)
-        setMapItems(response.items)
+        const nextItems = response.items.map((item) => ({ ...item, isFavoriteByMe: resolveIsFavoriteFromSnapshot(item, favoriteIdsSnapshot) }))
+        setMapItems(nextItems)
         setMapTotal(response.total)
-        upsertOpportunitySocialStates(response.items)
+        upsertOpportunitySocialStates(nextItems)
       } catch (error) {
         if (signal?.aborted) {
           return
@@ -137,7 +185,7 @@ export function HomePage() {
         }
       }
     },
-    [mapQuery],
+    [favoriteIdsSnapshot, mapQuery],
   )
 
   useEffect(() => {
@@ -290,33 +338,42 @@ export function HomePage() {
     const entityType = resolveOpportunitySocialEntityType(opportunity)
 
     try {
-      if (entityType === 'vacancy') {
-        if (nextValue) {
-          await addVacancyToFavorites(opportunity.id)
-        } else {
-          await removeVacancyFromFavorites(opportunity.id)
-        }
-      } else {
-        if (nextValue) {
-          await addOpportunityToFavorites(opportunity.id)
-        } else {
-          await removeOpportunityFromFavorites(opportunity.id)
-        }
-      }
+      const snapshot =
+        entityType === 'vacancy'
+          ? nextValue
+            ? await addVacancyToFavorites(opportunity.id)
+            : await removeVacancyFromFavorites(opportunity.id)
+          : nextValue
+            ? await addOpportunityToFavorites(opportunity.id)
+            : await removeOpportunityFromFavorites(opportunity.id)
 
+      applyOpportunitySocialSnapshot(snapshot)
       setListItems((current) =>
         current.map((item) =>
-          item.id === opportunity.id && resolveOpportunitySocialEntityType(item) === entityType ? { ...item, isFavoriteByMe: nextValue } : item,
+          item.id === opportunity.id && resolveOpportunitySocialEntityType(item) === entityType
+            ? {
+                ...item,
+                isFavoriteByMe: snapshot.isFavoriteByMe,
+                friendFavoritesCount: snapshot.friendFavoritesCount,
+                friendsAppliedCount: snapshot.friendApplicationsCount,
+              }
+            : item,
         ),
       )
       setMapItems((current) =>
         current.map((item) =>
-          item.id === opportunity.id && resolveOpportunitySocialEntityType(item) === entityType ? { ...item, isFavoriteByMe: nextValue } : item,
+          item.id === opportunity.id && resolveOpportunitySocialEntityType(item) === entityType
+            ? {
+                ...item,
+                isFavoriteByMe: snapshot.isFavoriteByMe,
+                friendFavoritesCount: snapshot.friendFavoritesCount,
+                friendsAppliedCount: snapshot.friendApplicationsCount,
+              }
+            : item,
         ),
       )
-      setOpportunityFavoriteState(entityType, opportunity.id, nextValue)
 
-      return nextValue
+      return snapshot.isFavoriteByMe
     } catch (error) {
       setActionError(true)
       setActionMessage(error instanceof Error ? error.message : 'Не удалось обновить избранное.')

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarDays, RefreshCw, Search, SlidersHorizontal } from 'lucide-react'
-import { addOpportunityToFavorites, removeOpportunityFromFavorites } from '../api/favorites'
+import { addOpportunityToFavorites, fetchMyFavorites, removeOpportunityFromFavorites } from '../api/favorites'
 import { fetchEventsListOpportunities, participateInOpportunity } from '../api/opportunities'
 import { FilterModal } from '../components/home/FilterModal'
 import { OpportunityCard } from '../components/home/OpportunityCard'
 import { useAuth } from '../hooks/useAuth'
 import { useCity } from '../contexts/CityContext'
 import type { Opportunity, OpportunityFilters, OpportunityType } from '../types/opportunity'
-import { getFavoriteEntityType, toggleFavoriteEntity } from '../utils/favorites'
+import { getFavoriteEntityType } from '../utils/favorites'
+import { applyOpportunitySocialSnapshot } from '../utils/opportunity-social-state'
 
 const defaultFilters: OpportunityFilters = {
   types: ['event'],
@@ -17,6 +18,27 @@ const defaultFilters: OpportunityFilters = {
   salaryTo: null,
   statuses: [],
   verifiedOnly: false,
+}
+
+type FavoriteIdsSnapshot = {
+  vacancyIds: Set<number>
+  opportunityIds: Set<number>
+}
+
+function toFavoriteIdsSnapshot(value: { vacancyIds: number[]; opportunityIds: number[] }): FavoriteIdsSnapshot {
+  return {
+    vacancyIds: new Set(value.vacancyIds),
+    opportunityIds: new Set(value.opportunityIds),
+  }
+}
+
+function resolveIsFavoriteFromSnapshot(opportunity: Opportunity, snapshot: FavoriteIdsSnapshot | null) {
+  if (!snapshot) {
+    return opportunity.isFavoriteByMe
+  }
+
+  const entityType = getFavoriteEntityType(opportunity)
+  return entityType === 'vacancy' ? snapshot.vacancyIds.has(opportunity.id) : snapshot.opportunityIds.has(opportunity.id)
 }
 
 export function EventsPage() {
@@ -35,6 +57,7 @@ export function EventsPage() {
   const [statusError, setStatusError] = useState(false)
   const [participatingIds, setParticipatingIds] = useState<Record<number, boolean>>({})
   const [applyingIds, setApplyingIds] = useState<Record<number, boolean>>({})
+  const [favoriteIdsSnapshot, setFavoriteIdsSnapshot] = useState<FavoriteIdsSnapshot | null>(null)
 
   const query = useMemo(
     () => ({
@@ -50,6 +73,28 @@ export function EventsPage() {
     [appliedSearch, filters, selectedCityId],
   )
 
+  useEffect(() => {
+    if (!session?.accessToken) {
+      setFavoriteIdsSnapshot(null)
+      return
+    }
+
+    const controller = new AbortController()
+    void fetchMyFavorites(controller.signal)
+      .then((response) => {
+        if (!controller.signal.aborted) {
+          setFavoriteIdsSnapshot(toFavoriteIdsSnapshot(response))
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setFavoriteIdsSnapshot(null)
+        }
+      })
+
+    return () => controller.abort()
+  }, [session?.accessToken, session?.user?.id])
+
   const loadEvents = useCallback(
     async (signal?: AbortSignal) => {
       setIsLoading(true)
@@ -57,7 +102,7 @@ export function EventsPage() {
 
       try {
         const response = await fetchEventsListOpportunities(query, signal)
-        setItems(response.items)
+        setItems(response.items.map((item) => ({ ...item, isFavoriteByMe: resolveIsFavoriteFromSnapshot(item, favoriteIdsSnapshot) })))
         setTotal(response.total)
       } catch (error) {
         if (signal?.aborted) {
@@ -71,7 +116,7 @@ export function EventsPage() {
         }
       }
     },
-    [query],
+    [favoriteIdsSnapshot, query],
   )
 
   useEffect(() => {
@@ -129,21 +174,25 @@ export function EventsPage() {
   }
 
   async function handleToggleFavorite(opportunity: Opportunity, nextValue: boolean) {
-    if (!session?.accessToken) {
-      const actualValue = toggleFavoriteEntity(getFavoriteEntityType(opportunity), opportunity.id)
-      setItems((current) => current.map((item) => (item.id === opportunity.id ? { ...item, isFavoriteByMe: actualValue } : item)))
-      return actualValue
-    }
-
     try {
-      if (nextValue) {
-        await addOpportunityToFavorites(opportunity.id)
-      } else {
-        await removeOpportunityFromFavorites(opportunity.id)
-      }
+      const snapshot = nextValue
+        ? await addOpportunityToFavorites(opportunity.id)
+        : await removeOpportunityFromFavorites(opportunity.id)
 
-      setItems((current) => current.map((item) => (item.id === opportunity.id ? { ...item, isFavoriteByMe: nextValue } : item)))
-      return nextValue
+      applyOpportunitySocialSnapshot(snapshot)
+      setItems((current) =>
+        current.map((item) =>
+          item.id === opportunity.id && getFavoriteEntityType(item) === snapshot.entityType
+            ? {
+                ...item,
+                isFavoriteByMe: snapshot.isFavoriteByMe,
+                friendFavoritesCount: snapshot.friendFavoritesCount,
+                friendsAppliedCount: snapshot.friendApplicationsCount,
+              }
+            : item,
+        ),
+      )
+      return snapshot.isFavoriteByMe
     } catch (error) {
       setStatusError(true)
       setStatusMessage(error instanceof Error ? error.message : 'Не удалось обновить избранное.')

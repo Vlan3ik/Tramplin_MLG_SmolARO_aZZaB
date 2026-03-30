@@ -67,6 +67,8 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         var companies = BuildCompanies(cities);
         dbContext.Companies.AddRange(companies);
         await dbContext.SaveChangesAsync();
+        await SeedVerificationDictionariesAsync();
+        await SeedCompanyVerificationProfilesAsync(companies, curator.Id);
 
         var companyMembers = BuildCompanyMembers(companies, employers);
         dbContext.CompanyMembers.AddRange(companyMembers);
@@ -466,10 +468,6 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
             {
                 LegalName = template.Item1,
                 BrandName = template.Item2,
-                LegalType = i % 4 == 0 ? CompanyLegalType.IndividualEntrepreneur : CompanyLegalType.LegalEntity,
-                TaxId = $"7701{i + 1:000000}",
-                RegistrationNumber = $"1027700{i + 1:000000}",
-                Industry = template.Item3,
                 Description = template.Item4,
                 LogoUrl = template is { Item6: not null } ? template.Item6 : $"/api/media/company-logos/seed/company-{i + 1:00}.svg",
                 WebsiteUrl = template.Item5,
@@ -1260,6 +1258,139 @@ public class SeedDataService(AppDbContext dbContext, IPasswordHasher passwordHas
         dbContext.CompanyLinks.RemoveRange(await dbContext.CompanyLinks.ToListAsync());
         dbContext.CompanyMembers.RemoveRange(await dbContext.CompanyMembers.ToListAsync());
         dbContext.Companies.RemoveRange(await dbContext.Companies.ToListAsync());
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedVerificationDictionariesAsync()
+    {
+        if (!await dbContext.EmployerVerificationIndustries.AnyAsync())
+        {
+            var names = new[]
+            {
+                ("it-software", "IT / Software"),
+                ("design-creative", "Design / Creative"),
+                ("marketing-media", "Marketing / Media"),
+                ("education", "Education"),
+                ("hr-recruitment", "HR / Recruitment"),
+                ("finance-accounting", "Finance / Accounting"),
+                ("sales-support", "Sales / Customer Support"),
+                ("manufacturing-engineering", "Manufacturing / Engineering"),
+                ("logistics", "Logistics"),
+                ("healthcare", "Healthcare"),
+                ("construction-real-estate", "Construction / Real Estate"),
+                ("retail-horeca", "Retail / HoReCa"),
+                ("public-ngo", "Public / NGO"),
+                ("other", "Other")
+            };
+
+            dbContext.EmployerVerificationIndustries.AddRange(
+                names.Select((x, index) => new EmployerVerificationIndustry
+                {
+                    Slug = x.Item1,
+                    Name = x.Item2,
+                    SortOrder = index
+                }));
+            await dbContext.SaveChangesAsync();
+        }
+
+        if (!await dbContext.EmployerVerificationRequiredDocuments.AnyAsync())
+        {
+            var requirements = new Dictionary<EmployerType, VerificationDocumentType[]>
+            {
+                [EmployerType.LegalEntity] =
+                [
+                    VerificationDocumentType.EgrulExtract,
+                    VerificationDocumentType.CompanyBankDetailsCard,
+                    VerificationDocumentType.RepresentativeAuthorization,
+                    VerificationDocumentType.OfficePhoto,
+                    VerificationDocumentType.DomainEmailProof
+                ],
+                [EmployerType.IndividualEntrepreneur] =
+                [
+                    VerificationDocumentType.EgripExtract,
+                    VerificationDocumentType.InnRegistrationProof,
+                    VerificationDocumentType.WorkplacePhoto,
+                    VerificationDocumentType.DomainEmailProof
+                ],
+                [EmployerType.SelfEmployed] =
+                [
+                    VerificationDocumentType.NpdRegistrationProof,
+                    VerificationDocumentType.InnRegistrationProof,
+                    VerificationDocumentType.IdentityDocument,
+                    VerificationDocumentType.PortfolioOrWebsiteProof
+                ],
+                [EmployerType.RecruitmentAgency] =
+                [
+                    VerificationDocumentType.EgrulExtract,
+                    VerificationDocumentType.CompanyBankDetailsCard,
+                    VerificationDocumentType.HrActivityProof,
+                    VerificationDocumentType.ServiceOfferOrContract,
+                    VerificationDocumentType.BrandMaterials
+                ],
+                [EmployerType.PrivateRecruiter] =
+                [
+                    VerificationDocumentType.IdentityDocument,
+                    VerificationDocumentType.InnRegistrationProof,
+                    VerificationDocumentType.NpdRegistrationProof,
+                    VerificationDocumentType.RecruitingActivityProof,
+                    VerificationDocumentType.CustomerAuthorizationProof
+                ],
+                [EmployerType.PrivatePerson] =
+                [
+                    VerificationDocumentType.IdentityDocument,
+                    VerificationDocumentType.PersonalHiringConfirmation
+                ]
+            };
+
+            dbContext.EmployerVerificationRequiredDocuments.AddRange(
+                requirements.SelectMany(
+                    x => x.Value.Select(doc => new EmployerVerificationRequiredDocument
+                    {
+                        EmployerType = x.Key,
+                        DocumentType = doc,
+                        IsRequired = true
+                    })));
+            await dbContext.SaveChangesAsync();
+        }
+    }
+
+    private async Task SeedCompanyVerificationProfilesAsync(IReadOnlyList<Company> companies, long curatorUserId)
+    {
+        var firstIndustryId = await dbContext.EmployerVerificationIndustries
+            .OrderBy(x => x.SortOrder)
+            .Select(x => x.Id)
+            .FirstAsync();
+
+        dbContext.EmployerVerificationProfiles.AddRange(companies.Select((company, index) =>
+        {
+            var companyStatus = company.Status == CompanyStatus.Verified
+                ? CompanyStatus.PendingVerification
+                : company.Status;
+            company.Status = companyStatus;
+
+            return new EmployerVerificationProfile
+            {
+                CompanyId = company.Id,
+                EmployerType = index % 4 == 0 ? EmployerType.IndividualEntrepreneur : EmployerType.LegalEntity,
+                OgrnOrOgrnip = $"1027700{index + 1:000000}",
+                Inn = $"7701{index + 1:000000}",
+                Kpp = index % 4 == 0 ? null : $"77010{index % 10}001",
+                LegalAddress = "г. Москва, ул. Тверская, д. 1",
+                ActualAddress = "г. Москва, ул. Тверская, д. 1",
+                RepresentativeFullName = $"Представитель {index + 1}",
+                RepresentativePosition = "HR Manager",
+                MainIndustryId = firstIndustryId,
+                TaxOffice = "ИФНС России №1",
+                WorkEmail = company.PublicEmail ?? $"hr{index + 1}@tramplin.local",
+                WorkPhone = company.PublicPhone ?? $"+7 (495) 700-{10 + index:00}-{20 + index:00}",
+                SiteOrPublicLinks = company.WebsiteUrl,
+                ReviewStatus = companyStatus == CompanyStatus.PendingVerification ? VerificationReviewStatus.PendingReview : VerificationReviewStatus.Draft,
+                SubmittedAt = companyStatus == CompanyStatus.PendingVerification ? DateTimeOffset.UtcNow.AddDays(-(index % 7)) : null,
+                VerifiedByUserId = companyStatus == CompanyStatus.Verified ? curatorUserId : null,
+                VerifiedAt = companyStatus == CompanyStatus.Verified ? DateTimeOffset.UtcNow.AddDays(-(index % 14 + 1)) : null
+            };
+        }));
+
         await dbContext.SaveChangesAsync();
     }
 

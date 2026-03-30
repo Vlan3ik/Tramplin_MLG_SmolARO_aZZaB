@@ -9,6 +9,7 @@ using Monolith.Models.Chat;
 using Monolith.Models.Common;
 using Monolith.Services.Chats;
 using Monolith.Services.Common;
+using Monolith.Services.Social;
 using Monolith.Services.Storage;
 
 namespace Monolith.Controllers;
@@ -21,7 +22,8 @@ public class ChatsController(
     AppDbContext dbContext,
     IHubContext<ChatHub> hubContext,
     IChatCacheService chatCache,
-    IObjectStorageService storageService) : ControllerBase
+    IObjectStorageService storageService,
+    IOpportunitySocialStateService socialStateService) : ControllerBase
 {
     private const long MaxAttachmentSizeBytes = 10 * 1024 * 1024;
     private static readonly HashSet<string> AllowedImageTypes =
@@ -135,6 +137,29 @@ public class ChatsController(
                 x.LastMessage is null ? null : ToDto(x.LastMessage)))
             .ToList();
 
+        var lastMessages = result
+            .Where(x => x.LastMessage is not null)
+            .Select(x => x.LastMessage!)
+            .ToArray();
+
+        if (lastMessages.Length > 0)
+        {
+            var enrichedMessages = await EnrichMessagesSocialState(lastMessages, userId, cancellationToken);
+            var enrichedById = enrichedMessages.ToDictionary(x => x.Id);
+            result = result.Select(x =>
+            {
+                if (x.LastMessage is null)
+                {
+                    return x;
+                }
+
+                return x with
+                {
+                    LastMessage = enrichedById.GetValueOrDefault(x.LastMessage.Id, x.LastMessage)
+                };
+            }).ToList();
+        }
+
         await chatCache.SetAsync(cacheKey, result, TimeSpan.FromSeconds(20), cancellationToken);
         return Ok(result);
     }
@@ -234,7 +259,7 @@ public class ChatsController(
 
         var normalizedLimit = Math.Clamp(limit, 1, 200);
         var historyToken = await chatCache.GetChatHistoryTokenAsync(chatId, cancellationToken);
-        var cacheKey = $"chats:history:chat:{chatId}:before:{beforeMessageId?.ToString() ?? "null"}:limit:{normalizedLimit}:v:{historyToken}";
+        var cacheKey = $"chats:history:user:{userId}:chat:{chatId}:before:{beforeMessageId?.ToString() ?? "null"}:limit:{normalizedLimit}:v:{historyToken}";
 
         var cached = await chatCache.GetAsync<ChatHistoryPageDto>(cacheKey, cancellationToken);
         if (cached is not null)
@@ -243,6 +268,8 @@ public class ChatsController(
         }
 
         var page = await BuildHistoryPageAsync(chatId, beforeMessageId, normalizedLimit, cancellationToken);
+        var enrichedMessages = await EnrichMessagesSocialState(page.Messages, userId, cancellationToken);
+        page = page with { Messages = enrichedMessages };
         await chatCache.SetAsync(cacheKey, page, TimeSpan.FromSeconds(20), cancellationToken);
         return Ok(page);
     }
@@ -297,6 +324,10 @@ public class ChatsController(
 
         var normalizedLimit = Math.Clamp(limit, 1, 200);
         var history = await BuildHistoryPageAsync(chatId, beforeMessageId, normalizedLimit, cancellationToken);
+        history = history with
+        {
+            Messages = await EnrichMessagesSocialState(history.Messages, userId, cancellationToken)
+        };
         var linkedCard = BuildLinkedCard(chat, userId);
 
         var dto = new ChatDetailDto(
@@ -368,7 +399,10 @@ public class ChatsController(
                                 a.Vacancy.SalaryTaxMode,
                                 a.Vacancy.SalaryFrom,
                                 a.Vacancy.SalaryTo,
-                                a.Vacancy.CurrencyCode),
+                                a.Vacancy.CurrencyCode,
+                                false,
+                                0,
+                                0),
                         a.OpportunityId == null || a.Opportunity == null
                             ? null
                             : new OpportunityLinkedCardDto(
@@ -380,10 +414,14 @@ public class ChatsController(
                                 a.Opportunity.EventDate,
                                 a.Opportunity.PriceType,
                                 a.Opportunity.PriceAmount,
-                                a.Opportunity.PriceCurrencyCode)))
+                                a.Opportunity.PriceCurrencyCode,
+                                false,
+                                0,
+                                0)))
                     .ToArray()))
             .ToListAsync(cancellationToken);
-        return Ok(messages);
+        var enrichedMessages = await EnrichMessagesSocialState(messages, userId, cancellationToken);
+        return Ok(enrichedMessages);
     }
 
     /// <summary>
@@ -616,9 +654,9 @@ public class ChatsController(
             .Where(x => x.Id == message.Id)
             .Select(ToMessageDtoExpression())
             .FirstAsync(cancellationToken);
-
         await hubContext.Clients.Group(ChatHub.GroupName(chatId)).SendAsync("new", dto, cancellationToken);
-        return Created(string.Empty, new ShareVacancyToUserResponse(chatId, dto));
+        var enrichedDto = await EnrichMessageSocialState(dto, userId, cancellationToken);
+        return Created(string.Empty, new ShareVacancyToUserResponse(chatId, enrichedDto));
     }
 
     [HttpPost("share/opportunity")]
@@ -679,9 +717,9 @@ public class ChatsController(
             .Where(x => x.Id == message.Id)
             .Select(ToMessageDtoExpression())
             .FirstAsync(cancellationToken);
-
         await hubContext.Clients.Group(ChatHub.GroupName(chatId)).SendAsync("new", dto, cancellationToken);
-        return Created(string.Empty, new ShareVacancyToUserResponse(chatId, dto));
+        var enrichedDto = await EnrichMessageSocialState(dto, userId, cancellationToken);
+        return Created(string.Empty, new ShareVacancyToUserResponse(chatId, enrichedDto));
     }
 
     /// <summary>
@@ -832,7 +870,10 @@ public class ChatsController(
                             a.Vacancy.SalaryTaxMode,
                             a.Vacancy.SalaryFrom,
                             a.Vacancy.SalaryTo,
-                            a.Vacancy.CurrencyCode),
+                            a.Vacancy.CurrencyCode,
+                            false,
+                            0,
+                            0),
                     a.OpportunityId == null || a.Opportunity == null
                         ? null
                         : new OpportunityLinkedCardDto(
@@ -844,8 +885,95 @@ public class ChatsController(
                             a.Opportunity.EventDate,
                             a.Opportunity.PriceType,
                             a.Opportunity.PriceAmount,
-                            a.Opportunity.PriceCurrencyCode)))
+                            a.Opportunity.PriceCurrencyCode,
+                            false,
+                            0,
+                            0)))
                 .ToArray());
+
+    private async Task<ChatMessageDto> EnrichMessageSocialState(ChatMessageDto message, long userId, CancellationToken cancellationToken)
+    {
+        var enriched = await EnrichMessagesSocialState([message], userId, cancellationToken);
+        return enriched.Length == 0 ? message : enriched[0];
+    }
+
+    private async Task<ChatMessageDto[]> EnrichMessagesSocialState(
+        IReadOnlyCollection<ChatMessageDto> messages,
+        long userId,
+        CancellationToken cancellationToken)
+    {
+        if (messages.Count == 0)
+        {
+            return [];
+        }
+
+        var vacancyIds = messages
+            .SelectMany(x => x.Attachments)
+            .Where(x => x.Vacancy is not null)
+            .Select(x => x.Vacancy!.VacancyId)
+            .Distinct()
+            .ToArray();
+        var opportunityIds = messages
+            .SelectMany(x => x.Attachments)
+            .Where(x => x.Opportunity is not null)
+            .Select(x => x.Opportunity!.OpportunityId)
+            .Distinct()
+            .ToArray();
+
+        var vacancySnapshots = vacancyIds.Length == 0
+            ? new Dictionary<long, OpportunitySocialStateSnapshot>()
+            : await socialStateService.GetVacancySnapshots(userId, vacancyIds, cancellationToken);
+        var opportunitySnapshots = opportunityIds.Length == 0
+            ? new Dictionary<long, OpportunitySocialStateSnapshot>()
+            : await socialStateService.GetOpportunitySnapshots(userId, opportunityIds, cancellationToken);
+
+        return messages.Select(message =>
+        {
+            if (message.Attachments.Count == 0)
+            {
+                return message;
+            }
+
+            var attachments = message.Attachments
+                .Select(attachment =>
+                {
+                    var vacancy = attachment.Vacancy;
+                    if (vacancy is not null)
+                    {
+                        var snapshot = vacancySnapshots.GetValueOrDefault(vacancy.VacancyId, default);
+                        return attachment with
+                        {
+                            Vacancy = vacancy with
+                            {
+                                IsFavoriteByMe = snapshot.IsFavoriteByMe,
+                                FriendFavoritesCount = snapshot.FriendFavoritesCount,
+                                FriendApplicationsCount = snapshot.FriendApplicationsCount
+                            }
+                        };
+                    }
+
+                    var opportunity = attachment.Opportunity;
+                    if (opportunity is not null)
+                    {
+                        var snapshot = opportunitySnapshots.GetValueOrDefault(opportunity.OpportunityId, default);
+                        return attachment with
+                        {
+                            Opportunity = opportunity with
+                            {
+                                IsFavoriteByMe = snapshot.IsFavoriteByMe,
+                                FriendFavoritesCount = snapshot.FriendFavoritesCount,
+                                FriendApplicationsCount = snapshot.FriendApplicationsCount
+                            }
+                        };
+                    }
+
+                    return attachment;
+                })
+                .ToArray();
+
+            return message with { Attachments = attachments };
+        }).ToArray();
+    }
 
     private ErrorResponse? ValidateFiles(IReadOnlyCollection<IFormFile> files)
     {

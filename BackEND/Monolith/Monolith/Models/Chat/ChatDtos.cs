@@ -89,7 +89,10 @@ public record OpportunityLinkedCardDto(
     DateTimeOffset? EventDate,
     PriceType PriceType,
     decimal? PriceAmount,
-    string? PriceCurrencyCode);
+    string? PriceCurrencyCode,
+    bool IsFavoriteByMe = false,
+    int FriendFavoritesCount = 0,
+    int FriendApplicationsCount = 0);
 
 public record ApplicationEmployerLinkedCardDto(
     long ApplicationId,
@@ -113,7 +116,10 @@ public record VacancyLinkedCardDto(
     SalaryTaxMode SalaryTaxMode,
     decimal? SalaryFrom,
     decimal? SalaryTo,
-    string? CurrencyCode);
+    string? CurrencyCode,
+    bool IsFavoriteByMe = false,
+    int FriendFavoritesCount = 0,
+    int FriendApplicationsCount = 0);
 
 public record CandidateLinkedCardDto(
     long UserId,

@@ -1,4 +1,4 @@
-import { deleteJson, getJson, patchJson, postJson } from './client'
+import { deleteJson, getJson, patchJson, postForm, postJson } from './client'
 import type { OpportunityType } from '../types/opportunity'
 import type { ResumeEducation, ResumeExperience, ResumeLink, ResumeProject, ResumeSkill } from '../types/resume'
 import type { CompanyMedia, CompanyMediaType } from '../types/company'
@@ -38,6 +38,13 @@ type EmployerCompanyApi = {
   status: number | string
   membershipRole: number | string
   chatSettings: EmployerCompanyChatSettingsApi | null
+  verification?: {
+    employerType?: number | string | null
+    reviewStatus?: number | string | null
+    submittedAt?: string | null
+    verifiedAt?: string | null
+    rejectReason?: string | null
+  } | null
 }
 
 type EmployerCompanyMediaApi = {
@@ -183,17 +190,19 @@ type CreateEmployerCompanyApiRequest = {
 }
 
 type UpdateEmployerCompanyVerificationApiRequest = {
-  legalName: string
-  brandName: string | null
-  legalType: number
-  taxId: string
-  registrationNumber: string
-  industry: string
-  description: string
-  baseCityId: number
-  websiteUrl: string | null
-  publicEmail: string | null
-  publicPhone: string | null
+  employerType: number
+  ogrnOrOgrnip: string
+  inn: string
+  kpp: string | null
+  legalAddress: string
+  actualAddress: string | null
+  representativeFullName: string
+  representativePosition: string | null
+  mainIndustryId: number
+  taxOffice: string | null
+  workEmail: string
+  workPhone: string
+  siteOrPublicLinks: string | null
 }
 
 type UpdateEmployerCompanyChatSettingsApiRequest = {
@@ -354,6 +363,102 @@ export type EmployerCompany = {
     workingHoursFrom: string
     workingHoursTo: string
   }
+  verification: {
+    employerType: string
+    reviewStatus: string
+    submittedAt: string
+    verifiedAt: string
+    rejectReason: string
+  }
+}
+
+export type EmployerVerificationIndustry = {
+  id: number
+  slug: string
+  name: string
+  sortOrder: number
+}
+
+export type EmployerVerificationProfile = {
+  employerType: number
+  ogrnOrOgrnip: string
+  inn: string
+  kpp: string
+  legalAddress: string
+  actualAddress: string
+  representativeFullName: string
+  representativePosition: string
+  mainIndustryId: number
+  mainIndustryName: string
+  taxOffice: string
+  workEmail: string
+  workPhone: string
+  siteOrPublicLinks: string
+  reviewStatus: number
+  submittedAt: string
+  verifiedAt: string
+  rejectReason: string
+  missingDocs: string[]
+}
+
+export type EmployerVerificationRequirement = {
+  documentType: number
+  isRequired: boolean
+}
+
+export type EmployerVerificationDocument = {
+  id: number
+  documentType: number
+  fileName: string
+  contentType: string
+  sizeBytes: number
+  status: number
+  moderatorComment: string
+  uploadedByUserId: number
+  reviewedByUserId: number | null
+  reviewedAt: string
+  createdAt: string
+}
+
+type EmployerVerificationProfileApi = {
+  employerType?: number | null
+  ogrnOrOgrnip?: string | null
+  inn?: string | null
+  kpp?: string | null
+  legalAddress?: string | null
+  actualAddress?: string | null
+  representativeFullName?: string | null
+  representativePosition?: string | null
+  mainIndustryId?: number | null
+  mainIndustryName?: string | null
+  taxOffice?: string | null
+  workEmail?: string | null
+  workPhone?: string | null
+  siteOrPublicLinks?: string | null
+  reviewStatus?: number | null
+  submittedAt?: string | null
+  verifiedAt?: string | null
+  rejectReason?: string | null
+  missingDocs?: string[] | null
+}
+
+type EmployerVerificationRequirementApi = {
+  documentType?: number | null
+  isRequired?: boolean | null
+}
+
+type EmployerVerificationDocumentApi = {
+  id?: number | null
+  documentType?: number | null
+  fileName?: string | null
+  contentType?: string | null
+  sizeBytes?: number | null
+  status?: number | null
+  moderatorComment?: string | null
+  uploadedByUserId?: number | null
+  reviewedByUserId?: number | null
+  reviewedAt?: string | null
+  createdAt?: string | null
 }
 
 function parseCompanyMediaType(value: EmployerCompanyMediaApi['type'], mimeType: string | null): CompanyMediaType | null {
@@ -400,17 +505,24 @@ export type CreateEmployerCompanyRequest = {
 }
 
 export type UpdateEmployerCompanyVerificationRequest = {
-  legalName: string
-  brandName: string
-  legalType: number
-  taxId: string
-  registrationNumber: string
-  industry: string
-  description: string
-  baseCityId: number
-  websiteUrl: string
-  publicEmail: string
-  publicPhone: string
+  employerType?: number
+  ogrnOrOgrnip?: string
+  inn?: string
+  kpp?: string
+  legalAddress?: string
+  actualAddress?: string
+  representativeFullName?: string
+  representativePosition?: string
+  mainIndustryId?: number
+  taxOffice?: string
+  workEmail?: string
+  workPhone?: string
+  siteOrPublicLinks?: string
+  legalType?: number
+  taxId?: string
+  registrationNumber?: string
+  publicEmail?: string
+  publicPhone?: string
 }
 
 export type UpdateEmployerCompanyChatSettingsRequest = {
@@ -715,6 +827,7 @@ function parseOpportunityType(kind: number): OpportunityType {
 }
 
 function mapEmployerCompany(response: EmployerCompanyApi): EmployerCompany {
+  const verification = response.verification
   return {
     id: response.id,
     legalName: response.legalName ?? '',
@@ -743,6 +856,13 @@ function mapEmployerCompany(response: EmployerCompanyApi): EmployerCompany {
       workingHoursTimezone: response.chatSettings?.workingHoursTimezone ?? 'Europe/Moscow',
       workingHoursFrom: response.chatSettings?.workingHoursFrom ?? '',
       workingHoursTo: response.chatSettings?.workingHoursTo ?? '',
+    },
+    verification: {
+      employerType: String(verification?.employerType ?? ''),
+      reviewStatus: String(verification?.reviewStatus ?? ''),
+      submittedAt: verification?.submittedAt ?? '',
+      verifiedAt: verification?.verifiedAt ?? '',
+      rejectReason: verification?.rejectReason ?? '',
     },
   }
 }
@@ -897,21 +1017,28 @@ export function createEmployerCompany(payload: CreateEmployerCompanyRequest) {
 }
 
 export function updateEmployerCompanyVerification(payload: UpdateEmployerCompanyVerificationRequest) {
+  const employerType = payload.employerType ?? payload.legalType ?? 1
+  const inn = payload.inn ?? payload.taxId ?? ''
+  const ogrnOrOgrnip = payload.ogrnOrOgrnip ?? payload.registrationNumber ?? ''
+  const workEmail = payload.workEmail ?? payload.publicEmail ?? ''
+  const workPhone = payload.workPhone ?? payload.publicPhone ?? ''
   const request: UpdateEmployerCompanyVerificationApiRequest = {
-    legalName: payload.legalName.trim(),
-    brandName: toNullableString(payload.brandName),
-    legalType: payload.legalType,
-    taxId: payload.taxId.trim(),
-    registrationNumber: payload.registrationNumber.trim(),
-    industry: payload.industry.trim(),
-    description: payload.description.trim(),
-    baseCityId: payload.baseCityId,
-    websiteUrl: toNullableString(payload.websiteUrl),
-    publicEmail: toNullableString(payload.publicEmail),
-    publicPhone: toNullableString(payload.publicPhone),
+    employerType,
+    ogrnOrOgrnip: ogrnOrOgrnip.trim(),
+    inn: inn.trim(),
+    kpp: toNullableString(payload.kpp ?? ''),
+    legalAddress: (payload.legalAddress ?? '').trim(),
+    actualAddress: toNullableString(payload.actualAddress ?? ''),
+    representativeFullName: (payload.representativeFullName ?? '').trim(),
+    representativePosition: toNullableString(payload.representativePosition ?? ''),
+    mainIndustryId: payload.mainIndustryId ?? 1,
+    taxOffice: toNullableString(payload.taxOffice ?? ''),
+    workEmail: workEmail.trim(),
+    workPhone: workPhone.trim(),
+    siteOrPublicLinks: toNullableString(payload.siteOrPublicLinks ?? ''),
   }
 
-  return patchJson<unknown, UpdateEmployerCompanyVerificationApiRequest>('/employer/company/verification', request)
+  return patchJson<unknown, UpdateEmployerCompanyVerificationApiRequest>('/employer/company/verification-profile', request)
 }
 
 export function updateEmployerCompanyChatSettings(payload: UpdateEmployerCompanyChatSettingsRequest) {
@@ -930,6 +1057,86 @@ export function updateEmployerCompanyChatSettings(payload: UpdateEmployerCompany
 
 export function submitEmployerCompanyVerification() {
   return postJson<unknown, Record<string, never>>('/employer/company/submit-verification', {})
+}
+
+function mapVerificationProfile(response: EmployerVerificationProfileApi): EmployerVerificationProfile {
+  return {
+    employerType: response.employerType ?? 1,
+    ogrnOrOgrnip: response.ogrnOrOgrnip ?? '',
+    inn: response.inn ?? '',
+    kpp: response.kpp ?? '',
+    legalAddress: response.legalAddress ?? '',
+    actualAddress: response.actualAddress ?? '',
+    representativeFullName: response.representativeFullName ?? '',
+    representativePosition: response.representativePosition ?? '',
+    mainIndustryId: response.mainIndustryId ?? 0,
+    mainIndustryName: response.mainIndustryName ?? '',
+    taxOffice: response.taxOffice ?? '',
+    workEmail: response.workEmail ?? '',
+    workPhone: response.workPhone ?? '',
+    siteOrPublicLinks: response.siteOrPublicLinks ?? '',
+    reviewStatus: response.reviewStatus ?? 1,
+    submittedAt: response.submittedAt ?? '',
+    verifiedAt: response.verifiedAt ?? '',
+    rejectReason: response.rejectReason ?? '',
+    missingDocs: response.missingDocs ?? [],
+  }
+}
+
+function mapVerificationRequirement(response: EmployerVerificationRequirementApi): EmployerVerificationRequirement {
+  return {
+    documentType: response.documentType ?? 0,
+    isRequired: Boolean(response.isRequired),
+  }
+}
+
+function mapVerificationDocument(response: EmployerVerificationDocumentApi): EmployerVerificationDocument {
+  return {
+    id: response.id ?? 0,
+    documentType: response.documentType ?? 0,
+    fileName: response.fileName ?? '',
+    contentType: response.contentType ?? '',
+    sizeBytes: response.sizeBytes ?? 0,
+    status: response.status ?? 1,
+    moderatorComment: response.moderatorComment ?? '',
+    uploadedByUserId: response.uploadedByUserId ?? 0,
+    reviewedByUserId: response.reviewedByUserId ?? null,
+    reviewedAt: response.reviewedAt ?? '',
+    createdAt: response.createdAt ?? '',
+  }
+}
+
+export async function fetchEmployerVerificationProfile(signal?: AbortSignal) {
+  const response = await getJson<EmployerVerificationProfileApi>('/employer/company/verification-profile', { signal })
+  return mapVerificationProfile(response)
+}
+
+export async function fetchEmployerVerificationRequirements(employerType?: number, signal?: AbortSignal) {
+  const query = employerType ? `?employerType=${employerType}` : ''
+  const response = await getJson<EmployerVerificationRequirementApi[]>(`/employer/company/verification-requirements${query}`, { signal })
+  return (Array.isArray(response) ? response : []).map(mapVerificationRequirement)
+}
+
+export async function fetchEmployerVerificationDocuments(signal?: AbortSignal) {
+  const response = await getJson<EmployerVerificationDocumentApi[]>('/employer/company/verification-documents', { signal })
+  return (Array.isArray(response) ? response : []).map(mapVerificationDocument)
+}
+
+export async function uploadEmployerVerificationDocument(documentType: number, file: File) {
+  const formData = new FormData()
+  formData.append('documentType', String(documentType))
+  formData.append('file', file)
+  const response = await postForm<EmployerVerificationDocumentApi>('/employer/company/verification-documents', formData)
+  return mapVerificationDocument(response)
+}
+
+export function deleteEmployerVerificationDocument(documentId: number) {
+  return deleteJson<unknown>(`/employer/company/verification-documents/${documentId}`)
+}
+
+export async function fetchEmployerVerificationIndustries(signal?: AbortSignal) {
+  const response = await getJson<EmployerVerificationIndustry[]>('/employer/company/verification-industries', { signal })
+  return Array.isArray(response) ? response : []
 }
 
 export async function fetchEmployerCompanyLinks(signal?: AbortSignal) {

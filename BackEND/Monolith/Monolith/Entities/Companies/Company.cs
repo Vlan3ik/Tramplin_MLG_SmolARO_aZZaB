@@ -5,10 +5,6 @@ public class Company
     public long Id { get; set; }
     public string LegalName { get; set; } = string.Empty;
     public string? BrandName { get; set; }
-    public CompanyLegalType LegalType { get; set; }
-    public string TaxId { get; set; } = string.Empty;
-    public string RegistrationNumber { get; set; } = string.Empty;
-    public string Industry { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string? LogoUrl { get; set; }
     public string? WebsiteUrl { get; set; }
@@ -28,4 +24,5 @@ public class Company
     public List<Application> Applications { get; set; } = new();
     public List<CandidateResumeExperience> ResumeExperiences { get; set; } = new();
     public CompanyChatSettings? ChatSettings { get; set; }
+    public EmployerVerificationProfile? VerificationProfile { get; set; }
 }

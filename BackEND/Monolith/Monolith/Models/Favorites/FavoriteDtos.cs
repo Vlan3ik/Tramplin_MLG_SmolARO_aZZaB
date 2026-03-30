@@ -7,3 +7,10 @@ public record MyFavoritesDto(
 public record SyncFavoritesRequest(
     IReadOnlyCollection<long>? VacancyIds,
     IReadOnlyCollection<long>? OpportunityIds);
+
+public record FavoriteEntitySocialSnapshotDto(
+    string EntityType,
+    long Id,
+    bool IsFavoriteByMe,
+    int FriendFavoritesCount,
+    int FriendApplicationsCount);

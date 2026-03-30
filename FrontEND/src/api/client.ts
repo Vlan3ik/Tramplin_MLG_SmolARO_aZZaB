@@ -72,15 +72,6 @@ function writeStoredTokens(tokens: RefreshApiResponse) {
   window.dispatchEvent(new Event(AUTH_SESSION_EVENT))
 }
 
-function clearStoredSession() {
-  if (!isBrowser()) {
-    return
-  }
-
-  window.localStorage.removeItem(AUTH_STORAGE_KEY)
-  window.dispatchEvent(new Event(AUTH_SESSION_EVENT))
-}
-
 function createHeaders(withAuth: boolean, includeJsonContentType: boolean) {
   const headers = new Headers()
 
@@ -120,22 +111,25 @@ async function tryRefreshAccessToken() {
     return false
   }
 
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refreshToken }),
-  })
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+    })
 
-  if (!response.ok) {
-    clearStoredSession()
+    if (!response.ok) {
+      return false
+    }
+
+    const payload = (await response.json()) as RefreshApiResponse
+    writeStoredTokens(payload)
+    return true
+  } catch {
     return false
   }
-
-  const payload = (await response.json()) as RefreshApiResponse
-  writeStoredTokens(payload)
-  return true
 }
 
 function refreshAccessTokenShared() {

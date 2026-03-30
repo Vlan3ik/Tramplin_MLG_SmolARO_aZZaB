@@ -146,6 +146,48 @@ export type AdminCompany = {
   createdAt: string
 }
 
+export type AdminVerificationDocument = {
+  id: number
+  documentType: number
+  fileName: string
+  contentType: string
+  sizeBytes: number
+  status: number
+  moderatorComment: string
+  uploadedByUserId: number
+  reviewedByUserId: number | null
+  reviewedAt: string | null
+  createdAt: string
+}
+
+export type AdminCompanyVerificationDetail = {
+  companyId: number
+  legalName: string
+  brandName: string
+  companyStatus: number
+  employerType: number
+  reviewStatus: number
+  ogrnOrOgrnip: string
+  inn: string
+  kpp: string
+  legalAddress: string
+  actualAddress: string
+  representativeFullName: string
+  representativePosition: string
+  mainIndustryId: number
+  mainIndustryName: string
+  taxOffice: string
+  workEmail: string
+  workPhone: string
+  siteOrPublicLinks: string
+  submittedAt: string | null
+  verifiedAt: string | null
+  verifiedByUserId: number | null
+  rejectReason: string
+  missingDocs: string[]
+  documents: AdminVerificationDocument[]
+}
+
 export type AdminVacancy = {
   id: number
   companyId: number
@@ -465,11 +507,30 @@ export function deleteAdminCompany(id: number) {
 }
 
 export function verifyAdminCompany(id: number) {
-  return postJson<unknown, Record<string, never>>(`/admin/companies/${id}/verify`, {})
+  return postJson<unknown, Record<string, never>>(`/admin/companies/${id}/verification/approve`, {})
 }
 
-export function rejectAdminCompany(id: number) {
-  return postJson<unknown, Record<string, never>>(`/admin/companies/${id}/reject`, {})
+export function rejectAdminCompany(id: number, rejectReason = 'Rejected by moderator', missingDocuments: number[] = []) {
+  return postJson<unknown, { rejectReason: string; missingDocuments: number[] }>(`/admin/companies/${id}/verification/reject`, {
+    rejectReason,
+    missingDocuments,
+  })
+}
+
+export function fetchAdminCompanyVerification(id: number) {
+  return getJson<AdminCompanyVerificationDetail>(`/admin/companies/${id}/verification`)
+}
+
+export function acceptAdminCompanyVerificationDocument(companyId: number, docId: number, moderatorComment = '') {
+  return postJson<unknown, { moderatorComment: string }>(`/admin/companies/${companyId}/verification/documents/${docId}/accept`, {
+    moderatorComment,
+  })
+}
+
+export function rejectAdminCompanyVerificationDocument(companyId: number, docId: number, moderatorComment = '') {
+  return postJson<unknown, { moderatorComment: string }>(`/admin/companies/${companyId}/verification/documents/${docId}/reject`, {
+    moderatorComment,
+  })
 }
 
 export function updateAdminCompanyStatus(id: number, status: number) {

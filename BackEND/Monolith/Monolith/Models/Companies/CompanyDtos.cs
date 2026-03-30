@@ -5,7 +5,7 @@ namespace Monolith.Models.Companies;
 public record CompanyListItemDto(
     long Id,
     string Name,
-    string Industry,
+    string? Industry,
     bool Verified,
     string CityName,
     string? LogoUrl,
@@ -17,7 +17,7 @@ public record CompanyDetailDto(
     long Id,
     string LegalName,
     string? BrandName,
-    string Industry,
+    string? Industry,
     string Description,
     bool Verified,
     string CityName,

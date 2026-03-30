@@ -79,6 +79,26 @@ function truncate(value: string | null | undefined, limit = 70) {
   return normalized.length > limit ? `${normalized.slice(0, limit - 1)}…` : normalized
 }
 
+function buildAttachmentSocialLabel(state: {
+  isFavoriteByMe: boolean
+  friendFavoritesCount: number
+  friendApplicationsCount: number
+}) {
+  const parts: string[] = []
+
+  if (state.isFavoriteByMe) {
+    parts.push('В избранном')
+  }
+  if (state.friendFavoritesCount > 0) {
+    parts.push('У друзей в избранном')
+  }
+  if (state.friendApplicationsCount > 0) {
+    parts.push(`Откликнулись ${state.friendApplicationsCount} друзей`)
+  }
+
+  return parts.join(' • ')
+}
+
 function getMessagePreview(message: ChatMessage | null | undefined) {
   if (!message) {
     return 'Без сообщений'
@@ -1241,6 +1261,7 @@ export function ChatWidget() {
                                 }
 
                                 if (attachment.type === 4 && attachment.vacancy) {
+                                  const socialLabel = buildAttachmentSocialLabel(attachment.vacancy)
                                   return (
                                     <button
                                       key={`a-${attachment.id}`}
@@ -1250,11 +1271,13 @@ export function ChatWidget() {
                                     >
                                       <span>Рекомендация вакансии</span>
                                       <strong>{attachment.vacancy.title}</strong>
+                                      {socialLabel ? <small>{socialLabel}</small> : null}
                                     </button>
                                   )
                                 }
 
                                 if (attachment.type === 5 && attachment.opportunity) {
+                                  const socialLabel = buildAttachmentSocialLabel(attachment.opportunity)
                                   return (
                                     <button
                                       key={`a-${attachment.id}`}
@@ -1264,6 +1287,7 @@ export function ChatWidget() {
                                     >
                                       <span>Рекомендация мероприятия</span>
                                       <strong>{attachment.opportunity.title}</strong>
+                                      {socialLabel ? <small>{socialLabel}</small> : null}
                                     </button>
                                   )
                                 }

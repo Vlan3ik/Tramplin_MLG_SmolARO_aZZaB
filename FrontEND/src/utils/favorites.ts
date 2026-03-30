@@ -126,6 +126,36 @@ export function toggleFavoriteEntity(entityType: GuestFavoriteEntityType, id: nu
   return true
 }
 
+export function setFavoriteEntity(entityType: GuestFavoriteEntityType, id: number, isFavorite: boolean) {
+  const snapshot = readSnapshot()
+  const key = entityType === 'vacancy' ? 'vacancyIds' : 'opportunityIds'
+  const currentIds = snapshot[key]
+
+  if (isFavorite) {
+    if (currentIds.includes(id)) {
+      return true
+    }
+
+    writeSnapshot({
+      ...snapshot,
+      [key]: [...currentIds, id],
+    })
+
+    return true
+  }
+
+  if (!currentIds.includes(id)) {
+    return false
+  }
+
+  writeSnapshot({
+    ...snapshot,
+    [key]: currentIds.filter((value) => value !== id),
+  })
+
+  return false
+}
+
 export function isFavoriteOpportunity(id: number) {
   return isFavoriteEntity('opportunity', id)
 }

@@ -8,7 +8,7 @@ import { typeLabel } from '../../types/opportunity'
 import { buildOpportunityDetailsPath } from '../../utils/opportunity-routing'
 import { getTagDisplayLabel } from '../../utils/tag-labels'
 import { getTagToneClass } from '../../utils/tag-tones'
-import { isFavoriteOpportunity, toggleFavoriteOpportunity } from '../../utils/favorites'
+import { getFavoriteEntityType, isFavoriteEntity, toggleFavoriteEntity } from '../../utils/favorites'
 import { resolveOpportunitySocialEntityType, setOpportunityFavoriteState } from '../../utils/opportunity-social-state'
 import { OpportunityStateBadges } from './OpportunityStateBadges'
 
@@ -43,7 +43,8 @@ function getInitials(name: string) {
 export function OpportunityCard({ opportunity, compact = false, isApplying = false, isApplied = false, onApply, onToggleFavorite }: OpportunityCardProps) {
   const navigate = useNavigate()
   const socialState = useOpportunitySocialState(opportunity)
-  const isFavorite = socialState.isFavoriteByMe || isFavoriteOpportunity(opportunity.id)
+  const favoriteEntityType = getFavoriteEntityType(opportunity)
+  const isFavorite = socialState.isFavoriteByMe || isFavoriteEntity(favoriteEntityType, opportunity.id)
   const favoriteLabel = useMemo(() => (isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'), [isFavorite])
   const detailsPath = useMemo(() => buildOpportunityDetailsPath(opportunity), [opportunity])
   const isClosed = opportunity.status >= 4
@@ -62,7 +63,7 @@ export function OpportunityCard({ opportunity, compact = false, isApplying = fal
   async function handleFavoriteToggle(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation()
     const entityType = resolveOpportunitySocialEntityType(opportunity)
-    const nextValue = onToggleFavorite ? !isFavorite : toggleFavoriteOpportunity(opportunity.id)
+    const nextValue = onToggleFavorite ? !isFavorite : toggleFavoriteEntity(entityType, opportunity.id)
     if (onToggleFavorite) {
       const result = await onToggleFavorite(opportunity, nextValue)
       if (typeof result === 'boolean') {

@@ -11,6 +11,7 @@ using Monolith.Services.Chats;
 using Monolith.Services.Geo;
 using Monolith.Services.Storage;
 using Monolith.Services.Seeding;
+using Monolith.Services.Social;
 using Monolith.Contexts;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,6 +35,7 @@ builder.Services.AddScoped<ISeedDataService, SeedDataService>();
 builder.Services.AddScoped<IObjectStorageService, MinioObjectStorageService>();
 builder.Services.AddScoped<IChatCacheService, ChatCacheService>();
 builder.Services.AddScoped<IEmployerLocationService, EmployerLocationService>();
+builder.Services.AddScoped<IOpportunitySocialStateService, OpportunitySocialStateService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<IReverseGeocodingService, NominatimReverseGeocodingService>((sp, client) =>
 {

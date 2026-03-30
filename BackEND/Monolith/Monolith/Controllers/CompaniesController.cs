@@ -31,6 +31,8 @@ public class CompaniesController(AppDbContext dbContext) : ControllerBase
         var companies = dbContext.Companies
             .AsNoTracking()
             .Include(x => x.BaseCity)
+            .Include(x => x.VerificationProfile)
+                .ThenInclude(x => x!.MainIndustry)
             .Include(x => x.Vacancies)
             .Include(x => x.Opportunities)
             .AsQueryable();
@@ -52,7 +54,7 @@ public class CompaniesController(AppDbContext dbContext) : ControllerBase
         if (!string.IsNullOrWhiteSpace(query.Industry))
         {
             var industry = query.Industry.Trim().ToLowerInvariant();
-            companies = companies.Where(x => x.Industry.ToLower().Contains(industry));
+            companies = companies.Where(x => x.VerificationProfile != null && x.VerificationProfile.MainIndustry.Name.ToLower().Contains(industry));
         }
 
         if (query.VerifiedOnly == true)
@@ -68,7 +70,7 @@ public class CompaniesController(AppDbContext dbContext) : ControllerBase
             .Select(x => new CompanyListItemDto(
                 x.Id,
                 x.BrandName ?? x.LegalName,
-                x.Industry,
+                x.VerificationProfile != null ? x.VerificationProfile.MainIndustry.Name : null,
                 x.Status == CompanyStatus.Verified,
                 x.BaseCity.CityName,
                 x.LogoUrl,
@@ -96,6 +98,8 @@ public class CompaniesController(AppDbContext dbContext) : ControllerBase
             .Include(x => x.BaseCity)
             .Include(x => x.Links)
             .Include(x => x.Media)
+            .Include(x => x.VerificationProfile)
+                .ThenInclude(x => x!.MainIndustry)
             .Include(x => x.Vacancies)
             .Include(x => x.Opportunities)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -129,7 +133,7 @@ public class CompaniesController(AppDbContext dbContext) : ControllerBase
             company.Id,
             company.LegalName,
             company.BrandName,
-            company.Industry,
+            company.VerificationProfile?.MainIndustry.Name,
             company.Description,
             company.Status == CompanyStatus.Verified,
             company.BaseCity.CityName,

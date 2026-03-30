@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { createApplication } from '../api/applications'
 import { shareOpportunityToUser, shareVacancyToUser } from '../api/chats'
 import { fetchMyContacts } from '../api/contacts'
-import { addOpportunityToFavorites, addVacancyToFavorites, removeOpportunityFromFavorites, removeVacancyFromFavorites } from '../api/favorites'
+import { addOpportunityToFavorites, addVacancyToFavorites, fetchMyFavorites, removeOpportunityFromFavorites, removeVacancyFromFavorites } from '../api/favorites'
 import { fetchHomeOpportunities, fetchOpportunityDetailById, participateInOpportunity } from '../api/opportunities'
 import { fetchMyFollowerSubscriptions, fetchMyFollowingSubscriptions } from '../api/subscriptions'
 import { OpportunityLocationMap } from '../components/home/OpportunityLocationMap'
@@ -15,8 +15,38 @@ import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityDetail } from '../types/opportunity'
 import { typeLabel } from '../types/opportunity'
 import type { OpportunityEntityType } from '../utils/opportunity-routing'
-import { resolveOpportunitySocialEntityType, setOpportunityFavoriteState, upsertOpportunitySocialState, upsertOpportunitySocialStates } from '../utils/opportunity-social-state'
+import { applyOpportunitySocialSnapshot, resolveOpportunitySocialEntityType, upsertOpportunitySocialState, upsertOpportunitySocialStates } from '../utils/opportunity-social-state'
 import { getTagDisplayLabel } from '../utils/tag-labels'
+
+type FavoriteIdsSnapshot = {
+  vacancyIds: Set<number>
+  opportunityIds: Set<number>
+}
+
+function toFavoriteIdsSnapshot(value: { vacancyIds: number[]; opportunityIds: number[] }): FavoriteIdsSnapshot {
+  return {
+    vacancyIds: new Set(value.vacancyIds),
+    opportunityIds: new Set(value.opportunityIds),
+  }
+}
+
+function resolveIsFavoriteFromSnapshot(opportunity: Opportunity, snapshot: FavoriteIdsSnapshot | null) {
+  if (!snapshot) {
+    return opportunity.isFavoriteByMe
+  }
+
+  const entityType = resolveOpportunitySocialEntityType(opportunity)
+  return entityType === 'vacancy' ? snapshot.vacancyIds.has(opportunity.id) : snapshot.opportunityIds.has(opportunity.id)
+}
+
+function resolveDetailFavoriteFromSnapshot(opportunity: OpportunityDetail, snapshot: FavoriteIdsSnapshot | null) {
+  if (!snapshot) {
+    return opportunity.isFavoriteByMe
+  }
+
+  const entityType = resolveOpportunitySocialEntityType(opportunity)
+  return entityType === 'vacancy' ? snapshot.vacancyIds.has(opportunity.id) : snapshot.opportunityIds.has(opportunity.id)
+}
 
 function formatAbsoluteDate(value: string | null) {
   if (!value) {
@@ -63,12 +93,35 @@ export function OpportunityDetailsPage() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [shareContacts, setShareContacts] = useState<Array<{ userId: number; username: string | null }>>([])
   const [selectedShareUserId, setSelectedShareUserId] = useState<number | null>(null)
+  const [favoriteIdsSnapshot, setFavoriteIdsSnapshot] = useState<FavoriteIdsSnapshot | null>(null)
 
   const opportunityId = Number(id)
   const preferredEntityType = useMemo(() => {
     const value = searchParams.get('entityType')
     return value === 'vacancy' || value === 'opportunity' ? (value as OpportunityEntityType) : null
   }, [searchParams])
+
+  useEffect(() => {
+    if (!session?.accessToken) {
+      setFavoriteIdsSnapshot(null)
+      return
+    }
+
+    const controller = new AbortController()
+    void fetchMyFavorites(controller.signal)
+      .then((response) => {
+        if (!controller.signal.aborted) {
+          setFavoriteIdsSnapshot(toFavoriteIdsSnapshot(response))
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setFavoriteIdsSnapshot(null)
+        }
+      })
+
+    return () => controller.abort()
+  }, [session?.accessToken, session?.user?.id])
 
   useEffect(() => {
     if (!Number.isFinite(opportunityId) || opportunityId <= 0) {
@@ -90,10 +143,15 @@ export function OpportunityDetailsPage() {
           return
         }
 
-        setOpportunity(detail)
+        const normalizedDetail = {
+          ...detail,
+          isFavoriteByMe: resolveDetailFavoriteFromSnapshot(detail, favoriteIdsSnapshot),
+        }
+
+        setOpportunity(normalizedDetail)
         setEventParticipating(Boolean(detail.isParticipating))
-        setIsFavorite(Boolean(detail.isFavoriteByMe))
-        upsertOpportunitySocialState(detail)
+        setIsFavorite(Boolean(normalizedDetail.isFavoriteByMe))
+        upsertOpportunitySocialState(normalizedDetail)
 
         const similarResponse = await fetchHomeOpportunities(
           {
@@ -109,8 +167,13 @@ export function OpportunityDetailsPage() {
           return
         }
 
-        setSimilarOpportunities(similarResponse.items.filter((item) => item.id !== detail.id).slice(0, 3))
-        upsertOpportunitySocialStates(similarResponse.items)
+        const normalizedSimilar = similarResponse.items
+          .map((item) => ({ ...item, isFavoriteByMe: resolveIsFavoriteFromSnapshot(item, favoriteIdsSnapshot) }))
+          .filter((item) => item.id !== detail.id)
+          .slice(0, 3)
+
+        setSimilarOpportunities(normalizedSimilar)
+        upsertOpportunitySocialStates(normalizedSimilar)
       } catch (error) {
         if (!controller.signal.aborted) {
           setErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить вакансию.')
@@ -125,7 +188,7 @@ export function OpportunityDetailsPage() {
     void loadData()
 
     return () => controller.abort()
-  }, [opportunityId, preferredEntityType])
+  }, [favoriteIdsSnapshot, opportunityId, preferredEntityType])
 
   const applied = useMemo(() => {
     if (!opportunity) {
@@ -148,25 +211,29 @@ export function OpportunityDetailsPage() {
     const nextValue = !isFavorite
 
     try {
-      if (entityType === 'vacancy') {
-        if (nextValue) {
-          await addVacancyToFavorites(opportunity.id)
-        } else {
-          await removeVacancyFromFavorites(opportunity.id)
-        }
-      } else {
-        if (nextValue) {
-          await addOpportunityToFavorites(opportunity.id)
-        } else {
-          await removeOpportunityFromFavorites(opportunity.id)
-        }
-      }
+      const snapshot =
+        entityType === 'vacancy'
+          ? nextValue
+            ? await addVacancyToFavorites(opportunity.id)
+            : await removeVacancyFromFavorites(opportunity.id)
+          : nextValue
+            ? await addOpportunityToFavorites(opportunity.id)
+            : await removeOpportunityFromFavorites(opportunity.id)
 
-      setIsFavorite(nextValue)
-      setOpportunity((current) => (current ? { ...current, isFavoriteByMe: nextValue } : current))
-      setOpportunityFavoriteState(entityType, opportunity.id, nextValue)
+      applyOpportunitySocialSnapshot(snapshot)
+      setIsFavorite(snapshot.isFavoriteByMe)
+      setOpportunity((current) =>
+        current && resolveOpportunitySocialEntityType(current) === snapshot.entityType && current.id === snapshot.id
+          ? {
+              ...current,
+              isFavoriteByMe: snapshot.isFavoriteByMe,
+              friendFavoritesCount: snapshot.friendFavoritesCount,
+              friendsAppliedCount: snapshot.friendApplicationsCount,
+            }
+          : current,
+      )
       setActionError(false)
-      setActionMessage(nextValue ? 'Добавлено в избранное.' : 'Удалено из избранного.')
+      setActionMessage(snapshot.isFavoriteByMe ? 'Добавлено в избранное.' : 'Удалено из избранного.')
     } catch (error) {
       setActionError(true)
       setActionMessage(error instanceof Error ? error.message : 'Не удалось обновить избранное.')

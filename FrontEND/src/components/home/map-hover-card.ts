@@ -1,4 +1,5 @@
 import type { Opportunity } from '../../types/opportunity'
+import { getFavoriteEntityType, isFavoriteEntity } from '../../utils/favorites'
 import { getOpportunityStateBadges } from '../../utils/opportunity-state'
 
 export type MapHoverCardMarker = {
@@ -9,7 +10,7 @@ export type MapHoverCardMarker = {
 }
 
 function resolveIsFavorite(item: Opportunity) {
-  return Boolean(item.isFavoriteByMe)
+  return Boolean(item.isFavoriteByMe) || isFavoriteEntity(getFavoriteEntityType(item), item.id)
 }
 
 export function buildMapHoverCardNode(marker: MapHoverCardMarker) {

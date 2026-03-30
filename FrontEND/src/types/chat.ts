@@ -12,6 +12,9 @@ export type VacancyCard = {
   salaryFrom: number | null
   salaryTo: number | null
   currencyCode: string | null
+  isFavoriteByMe: boolean
+  friendFavoritesCount: number
+  friendApplicationsCount: number
 }
 
 export type OpportunityCard = {
@@ -24,6 +27,9 @@ export type OpportunityCard = {
   priceType: number
   priceAmount: number | null
   priceCurrencyCode: string | null
+  isFavoriteByMe: boolean
+  friendFavoritesCount: number
+  friendApplicationsCount: number
 }
 
 export type ChatMessageAttachment = {

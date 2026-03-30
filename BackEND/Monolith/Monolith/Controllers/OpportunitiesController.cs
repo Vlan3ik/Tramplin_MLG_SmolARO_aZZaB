@@ -8,13 +8,17 @@ using Monolith.Models.Common;
 using Monolith.Models.Opportunities;
 using Monolith.Services.Chats;
 using Monolith.Services.Common;
+using Monolith.Services.Social;
 
 namespace Monolith.Controllers;
 
 [ApiController]
 [Route("opportunities")]
 [Produces("application/json")]
-public class OpportunitiesController(AppDbContext dbContext, IChatCacheService chatCache) : ControllerBase
+public class OpportunitiesController(
+    AppDbContext dbContext,
+    IChatCacheService chatCache,
+    IOpportunitySocialStateService socialStateService) : ControllerBase
 {
     /// <summary>
     /// Возвращает список активных возможностей с фильтрами и пагинацией.
@@ -70,43 +74,7 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
             .ToListAsync(cancellationToken);
 
         var opportunityIds = rows.Select(x => x.Id).ToArray();
-        var favoriteByMeIds = new HashSet<long>();
-        var friendFavoriteCounts = new Dictionary<long, int>();
-        var friendApplicationCounts = new Dictionary<long, int>();
-        if (currentUserId is not null && opportunityIds.Length > 0)
-        {
-            var favoriteList = await dbContext.UserOpportunityFavorites
-                .AsNoTracking()
-                .Where(x => x.UserId == currentUserId.Value && x.OpportunityId != null && opportunityIds.Contains(x.OpportunityId.Value))
-                .Select(x => x.OpportunityId!.Value)
-                .ToListAsync(cancellationToken);
-            favoriteByMeIds = favoriteList.ToHashSet();
-
-            var mutualFriendIds = await GetMutualFriendIds(currentUserId.Value, cancellationToken);
-            if (mutualFriendIds.Length > 0)
-            {
-                var visibleFavoritesFriendIds = await FilterVisibleFriendIdsForFavorites(mutualFriendIds, cancellationToken);
-                friendFavoriteCounts = await dbContext.UserOpportunityFavorites
-                    .AsNoTracking()
-                    .Where(x =>
-                        x.OpportunityId != null &&
-                        opportunityIds.Contains(x.OpportunityId.Value) &&
-                        visibleFavoritesFriendIds.Contains(x.UserId))
-                    .GroupBy(x => x.OpportunityId!.Value)
-                    .Select(x => new { OpportunityId = x.Key, Count = x.Count() })
-                    .ToDictionaryAsync(x => x.OpportunityId, x => x.Count, cancellationToken);
-
-                var visibleApplicationsFriendIds = await FilterVisibleFriendIdsForApplications(mutualFriendIds, cancellationToken);
-                friendApplicationCounts = await dbContext.OpportunityParticipants
-                    .AsNoTracking()
-                    .Where(x =>
-                        opportunityIds.Contains(x.OpportunityId) &&
-                        visibleApplicationsFriendIds.Contains(x.UserId))
-                    .GroupBy(x => x.OpportunityId)
-                    .Select(x => new { OpportunityId = x.Key, Count = x.Select(y => y.UserId).Distinct().Count() })
-                    .ToDictionaryAsync(x => x.OpportunityId, x => x.Count, cancellationToken);
-            }
-        }
+        var socialStates = await socialStateService.GetOpportunitySnapshots(currentUserId, opportunityIds, cancellationToken);
 
         var items = rows.Select(x => new OpportunityListItemDto(
             x.Id,
@@ -129,9 +97,9 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
             CompanyId = x.CompanyId,
             CompanyLogoUrl = x.CompanyLogoUrl,
             TagMatchCount = x.TagMatchCount,
-            IsFavoriteByMe = favoriteByMeIds.Contains(x.Id),
-            FriendFavoritesCount = friendFavoriteCounts.GetValueOrDefault(x.Id),
-            FriendApplicationsCount = friendApplicationCounts.GetValueOrDefault(x.Id)
+            IsFavoriteByMe = socialStates.GetValueOrDefault(x.Id).IsFavoriteByMe,
+            FriendFavoritesCount = socialStates.GetValueOrDefault(x.Id).FriendFavoritesCount,
+            FriendApplicationsCount = socialStates.GetValueOrDefault(x.Id).FriendApplicationsCount
         }).ToList();
 
         return Ok(new PagedResponse<OpportunityListItemDto>(items, totalCount, page, pageSize));
@@ -211,29 +179,14 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
                 .Select(x => x.TagId)
                 .ToArrayAsync(cancellationToken);
             var tagSet = viewerTagIds.ToHashSet();
-            var mutualFriendIds = await GetMutualFriendIds(currentUserId.Value, cancellationToken);
-            var visibleFavoritesFriendIds = await FilterVisibleFriendIdsForFavorites(mutualFriendIds, cancellationToken);
-            var visibleApplicationsFriendIds = await FilterVisibleFriendIdsForApplications(mutualFriendIds, cancellationToken);
+            var socialState = await socialStateService.GetOpportunitySnapshot(currentUserId, id, cancellationToken);
 
             dto = dto with
             {
                 TagMatchCount = viewerTagIds.Length == 0 ? 0 : opportunity.OpportunityTags.Count(t => tagSet.Contains(t.TagId)),
-                IsFavoriteByMe = await dbContext.UserOpportunityFavorites
-                    .AsNoTracking()
-                    .AnyAsync(x => x.UserId == currentUserId.Value && x.OpportunityId == id, cancellationToken),
-                FriendFavoritesCount = visibleFavoritesFriendIds.Length == 0
-                    ? 0
-                    : await dbContext.UserOpportunityFavorites
-                        .AsNoTracking()
-                        .CountAsync(x => x.OpportunityId == id && visibleFavoritesFriendIds.Contains(x.UserId), cancellationToken),
-                FriendApplicationsCount = visibleApplicationsFriendIds.Length == 0
-                    ? 0
-                    : await dbContext.OpportunityParticipants
-                        .AsNoTracking()
-                        .Where(x => x.OpportunityId == id && visibleApplicationsFriendIds.Contains(x.UserId))
-                        .Select(x => x.UserId)
-                        .Distinct()
-                        .CountAsync(cancellationToken)
+                IsFavoriteByMe = socialState.IsFavoriteByMe,
+                FriendFavoritesCount = socialState.FriendFavoritesCount,
+                FriendApplicationsCount = socialState.FriendApplicationsCount
             };
         }
 
@@ -422,69 +375,5 @@ public class OpportunitiesController(AppDbContext dbContext, IChatCacheService c
         return opportunities;
     }
 
-    private long? TryGetCurrentUserId()
-    {
-        var value = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        return long.TryParse(value, out var userId) ? userId : null;
-    }
-
-    private Task<long[]> GetMutualFriendIds(long userId, CancellationToken cancellationToken)
-    {
-        var following = dbContext.UserSubscriptions
-            .AsNoTracking()
-            .Where(x => x.FollowerUserId == userId);
-        var followers = dbContext.UserSubscriptions
-            .AsNoTracking()
-            .Where(x => x.FollowingUserId == userId);
-
-        var mutualSubscriptionIds = following
-            .Join(
-                followers,
-                left => left.FollowingUserId,
-                right => right.FollowerUserId,
-                (left, _) => left.FollowingUserId)
-            .Distinct();
-
-        var contactIds = dbContext.UserContacts
-            .AsNoTracking()
-            .Where(x => x.UserId == userId)
-            .Select(x => x.ContactUserId);
-
-        return mutualSubscriptionIds
-            .Union(contactIds)
-            .Distinct()
-            .ToArrayAsync(cancellationToken);
-    }
-
-    private async Task<long[]> FilterVisibleFriendIdsForFavorites(long[] candidateUserIds, CancellationToken cancellationToken)
-    {
-        if (candidateUserIds.Length == 0)
-        {
-            return [];
-        }
-
-        var hiddenUserIds = await dbContext.CandidatePrivacySettings
-            .AsNoTracking()
-            .Where(x => candidateUserIds.Contains(x.UserId) && !x.ShowInFriendsFavorites)
-            .Select(x => x.UserId)
-            .ToArrayAsync(cancellationToken);
-
-        return candidateUserIds.Except(hiddenUserIds).ToArray();
-    }
-
-    private async Task<long[]> FilterVisibleFriendIdsForApplications(long[] candidateUserIds, CancellationToken cancellationToken)
-    {
-        if (candidateUserIds.Length == 0)
-        {
-            return [];
-        }
-
-        var hiddenUserIds = await dbContext.CandidatePrivacySettings
-            .AsNoTracking()
-            .Where(x => candidateUserIds.Contains(x.UserId) && !x.ShowInFriendsApplications)
-            .Select(x => x.UserId)
-            .ToArrayAsync(cancellationToken);
-
-        return candidateUserIds.Except(hiddenUserIds).ToArray();
-    }
+    private long? TryGetCurrentUserId() => socialStateService.TryGetCurrentUserId(User);
 }

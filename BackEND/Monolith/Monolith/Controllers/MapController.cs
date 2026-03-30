@@ -5,13 +5,17 @@ using Monolith.Entities;
 using Monolith.Models.Map;
 using Monolith.Models.Opportunities;
 using Monolith.Services.Geo;
+using Monolith.Services.Social;
 
 namespace Monolith.Controllers;
 
 [ApiController]
 [Route("map")]
 [Produces("application/json")]
-public class MapController(AppDbContext dbContext, IEmployerLocationService employerLocationService) : ControllerBase
+public class MapController(
+    AppDbContext dbContext,
+    IEmployerLocationService employerLocationService,
+    IOpportunitySocialStateService socialStateService) : ControllerBase
 {
     /// <summary>
     /// Определяет адрес по координатам.
@@ -67,6 +71,7 @@ public class MapController(AppDbContext dbContext, IEmployerLocationService empl
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMapData([FromQuery] MapQuery query, CancellationToken cancellationToken)
     {
+        var currentUserId = socialStateService.TryGetCurrentUserId(User);
         var includeVacancies = query.EntityTypes is null || query.EntityTypes.Length == 0 || query.EntityTypes.Contains(MapEntityType.Vacancy);
         var includeOpportunities = query.EntityTypes is null || query.EntityTypes.Length == 0 || query.EntityTypes.Contains(MapEntityType.Opportunity);
 
@@ -101,10 +106,17 @@ public class MapController(AppDbContext dbContext, IEmployerLocationService empl
                     Tags = x.VacancyTags.Select(t => t.Tag.Name).ToArray()
                 })
                 .ToListAsync(cancellationToken);
+            var vacancySocialStates = await socialStateService.GetVacancySnapshots(
+                currentUserId,
+                vacancyRows.Select(x => x.Id).ToArray(),
+                cancellationToken);
 
-            features.AddRange(vacancyRows
-                .Where(x => x.Lat is not null && x.Lng is not null)
-                .Select(x => new
+        features.AddRange(vacancyRows
+            .Where(x => x.Lat is not null && x.Lng is not null)
+            .Select(x =>
+            {
+                var socialState = vacancySocialStates.GetValueOrDefault(x.Id);
+                return new
                 {
                     type = "Feature",
                     geometry = new
@@ -138,9 +150,13 @@ public class MapController(AppDbContext dbContext, IEmployerLocationService empl
                             street = x.Street,
                             houseNumber = x.House
                         },
-                        tags = x.Tags
+                        tags = x.Tags,
+                        isFavoriteByMe = socialState.IsFavoriteByMe,
+                        friendFavoritesCount = socialState.FriendFavoritesCount,
+                        friendApplicationsCount = socialState.FriendApplicationsCount
                     }
-                }));
+                };
+            }));
         }
 
         if (includeOpportunities)
@@ -174,10 +190,17 @@ public class MapController(AppDbContext dbContext, IEmployerLocationService empl
                     Tags = x.OpportunityTags.Select(t => t.Tag.Name).ToArray()
                 })
                 .ToListAsync(cancellationToken);
+            var opportunitySocialStates = await socialStateService.GetOpportunitySnapshots(
+                currentUserId,
+                opportunityRows.Select(x => x.Id).ToArray(),
+                cancellationToken);
 
-            features.AddRange(opportunityRows
-                .Where(x => x.Lat is not null && x.Lng is not null)
-                .Select(x => new
+        features.AddRange(opportunityRows
+            .Where(x => x.Lat is not null && x.Lng is not null)
+            .Select(x =>
+            {
+                var socialState = opportunitySocialStates.GetValueOrDefault(x.Id);
+                return new
                 {
                     type = "Feature",
                     geometry = new
@@ -213,9 +236,13 @@ public class MapController(AppDbContext dbContext, IEmployerLocationService empl
                             street = x.Street,
                             houseNumber = x.House
                         },
-                        tags = x.Tags
+                        tags = x.Tags,
+                        isFavoriteByMe = socialState.IsFavoriteByMe,
+                        friendFavoritesCount = socialState.FriendFavoritesCount,
+                        friendApplicationsCount = socialState.FriendApplicationsCount
                     }
-                }));
+                };
+            }));
         }
 
         return Ok(new

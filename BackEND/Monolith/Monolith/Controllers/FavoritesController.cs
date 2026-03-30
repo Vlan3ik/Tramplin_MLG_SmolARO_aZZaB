@@ -6,6 +6,7 @@ using Monolith.Entities;
 using Monolith.Models.Common;
 using Monolith.Models.Favorites;
 using Monolith.Services.Common;
+using Monolith.Services.Social;
 
 namespace Monolith.Controllers;
 
@@ -13,7 +14,7 @@ namespace Monolith.Controllers;
 [Authorize]
 [Route("favorites")]
 [Produces("application/json")]
-public class FavoritesController(AppDbContext dbContext) : ControllerBase
+public class FavoritesController(AppDbContext dbContext, IOpportunitySocialStateService socialStateService) : ControllerBase
 {
     /// <summary>
     /// Возвращает текущие избранные вакансии и возможности пользователя.
@@ -145,9 +146,9 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
     /// <param name="id">Идентификатор вакансии.</param>
     /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpPost("vacancies/{id:long}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(FavoriteEntitySocialSnapshotDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> AddVacancy(long id, CancellationToken cancellationToken)
+    public async Task<ActionResult<FavoriteEntitySocialSnapshotDto>> AddVacancy(long id, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (!await dbContext.Vacancies.AsNoTracking().AnyAsync(x => x.Id == id, cancellationToken))
@@ -167,7 +168,7 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return NoContent();
+        return Ok(await BuildVacancySocialSnapshot(userId, id, cancellationToken));
     }
 
     /// <summary>
@@ -176,14 +177,14 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
     /// <param name="id">Идентификатор вакансии.</param>
     /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpDelete("vacancies/{id:long}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> RemoveVacancy(long id, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(FavoriteEntitySocialSnapshotDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<FavoriteEntitySocialSnapshotDto>> RemoveVacancy(long id, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         await dbContext.UserOpportunityFavorites
             .Where(x => x.UserId == userId && x.VacancyId == id)
             .ExecuteDeleteAsync(cancellationToken);
-        return NoContent();
+        return Ok(await BuildVacancySocialSnapshot(userId, id, cancellationToken));
     }
 
     /// <summary>
@@ -192,9 +193,9 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
     /// <param name="id">Идентификатор возможности.</param>
     /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpPost("opportunities/{id:long}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(FavoriteEntitySocialSnapshotDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> AddOpportunity(long id, CancellationToken cancellationToken)
+    public async Task<ActionResult<FavoriteEntitySocialSnapshotDto>> AddOpportunity(long id, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (!await dbContext.Opportunities.AsNoTracking().AnyAsync(x => x.Id == id, cancellationToken))
@@ -214,7 +215,7 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return NoContent();
+        return Ok(await BuildOpportunitySocialSnapshot(userId, id, cancellationToken));
     }
 
     /// <summary>
@@ -223,13 +224,35 @@ public class FavoritesController(AppDbContext dbContext) : ControllerBase
     /// <param name="id">Идентификатор возможности.</param>
     /// <param name="cancellationToken">Токен отмены запроса.</param>
     [HttpDelete("opportunities/{id:long}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> RemoveOpportunity(long id, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(FavoriteEntitySocialSnapshotDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<FavoriteEntitySocialSnapshotDto>> RemoveOpportunity(long id, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         await dbContext.UserOpportunityFavorites
             .Where(x => x.UserId == userId && x.OpportunityId == id)
             .ExecuteDeleteAsync(cancellationToken);
-        return NoContent();
+        return Ok(await BuildOpportunitySocialSnapshot(userId, id, cancellationToken));
+    }
+
+    private async Task<FavoriteEntitySocialSnapshotDto> BuildVacancySocialSnapshot(long userId, long id, CancellationToken cancellationToken)
+    {
+        var snapshot = await socialStateService.GetVacancySnapshot(userId, id, cancellationToken);
+        return new FavoriteEntitySocialSnapshotDto(
+            "vacancy",
+            id,
+            snapshot.IsFavoriteByMe,
+            snapshot.FriendFavoritesCount,
+            snapshot.FriendApplicationsCount);
+    }
+
+    private async Task<FavoriteEntitySocialSnapshotDto> BuildOpportunitySocialSnapshot(long userId, long id, CancellationToken cancellationToken)
+    {
+        var snapshot = await socialStateService.GetOpportunitySnapshot(userId, id, cancellationToken);
+        return new FavoriteEntitySocialSnapshotDto(
+            "opportunity",
+            id,
+            snapshot.IsFavoriteByMe,
+            snapshot.FriendFavoritesCount,
+            snapshot.FriendApplicationsCount);
     }
 }

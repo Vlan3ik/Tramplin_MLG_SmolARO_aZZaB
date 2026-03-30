@@ -1,6 +1,6 @@
 import type { Opportunity } from '../types/opportunity'
 
-type OpportunitySocialEntityType = 'vacancy' | 'opportunity'
+export type OpportunitySocialEntityType = 'vacancy' | 'opportunity'
 
 type OpportunitySocialStateSnapshot = {
   isFavoriteByMe: boolean
@@ -11,6 +11,14 @@ type OpportunitySocialStateSnapshot = {
 type OpportunitySocialStateRecord = OpportunitySocialStateSnapshot & {
   id: number
   entityType: OpportunitySocialEntityType
+}
+
+export type OpportunitySocialSnapshotPayload = {
+  entityType: OpportunitySocialEntityType
+  id: number
+  isFavoriteByMe: boolean
+  friendFavoritesCount?: number | null
+  friendApplicationsCount?: number | null
 }
 
 export type OpportunitySocialStateSource = Pick<
@@ -168,6 +176,32 @@ export function setOpportunityFavoriteState(entityType: OpportunitySocialEntityT
   stateByKey.set(key, {
     ...existing,
     isFavoriteByMe: nextValue,
+  })
+  emitOpportunitySocialStateChange()
+}
+
+export function applyOpportunitySocialSnapshot(snapshot: OpportunitySocialSnapshotPayload) {
+  const key = buildKey(snapshot.entityType, snapshot.id)
+  const nextSnapshot: OpportunitySocialStateSnapshot = {
+    isFavoriteByMe: Boolean(snapshot.isFavoriteByMe),
+    friendFavoritesCount: normalizeCount(snapshot.friendFavoritesCount),
+    friendsAppliedCount: normalizeCount(snapshot.friendApplicationsCount),
+  }
+  const existing = stateByKey.get(key)
+
+  if (
+    existing &&
+    existing.isFavoriteByMe === nextSnapshot.isFavoriteByMe &&
+    existing.friendFavoritesCount === nextSnapshot.friendFavoritesCount &&
+    existing.friendsAppliedCount === nextSnapshot.friendsAppliedCount
+  ) {
+    return
+  }
+
+  stateByKey.set(key, {
+    id: snapshot.id,
+    entityType: snapshot.entityType,
+    ...nextSnapshot,
   })
   emitOpportunitySocialStateChange()
 }

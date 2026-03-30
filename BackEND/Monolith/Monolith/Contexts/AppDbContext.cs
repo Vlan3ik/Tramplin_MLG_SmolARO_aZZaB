@@ -29,6 +29,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<TagGroup> TagGroups => Set<TagGroup>();
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<Company> Companies => Set<Company>();
+    public DbSet<EmployerVerificationProfile> EmployerVerificationProfiles => Set<EmployerVerificationProfile>();
+    public DbSet<EmployerVerificationDocument> EmployerVerificationDocuments => Set<EmployerVerificationDocument>();
+    public DbSet<EmployerVerificationIndustry> EmployerVerificationIndustries => Set<EmployerVerificationIndustry>();
+    public DbSet<EmployerVerificationRequiredDocument> EmployerVerificationRequiredDocuments => Set<EmployerVerificationRequiredDocument>();
     public DbSet<CompanyLink> CompanyLinks => Set<CompanyLink>();
     public DbSet<CompanyMedia> CompanyMedia => Set<CompanyMedia>();
     public DbSet<CompanyMember> CompanyMembers => Set<CompanyMember>();
@@ -437,10 +441,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Id).HasColumnName("id");
             entity.Property(x => x.LegalName).HasColumnName("legal_name").HasMaxLength(300);
             entity.Property(x => x.BrandName).HasColumnName("brand_name").HasMaxLength(300);
-            entity.Property(x => x.LegalType).HasColumnName("legal_type");
-            entity.Property(x => x.TaxId).HasColumnName("tax_id").HasMaxLength(20);
-            entity.Property(x => x.RegistrationNumber).HasColumnName("registration_number").HasMaxLength(20);
-            entity.Property(x => x.Industry).HasColumnName("industry").HasMaxLength(200);
             entity.Property(x => x.Description).HasColumnName("description");
             entity.Property(x => x.LogoUrl).HasColumnName("logo_url").HasMaxLength(500);
             entity.Property(x => x.WebsiteUrl).HasColumnName("website_url").HasMaxLength(500);
@@ -450,9 +450,91 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Status).HasColumnName("status");
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-            entity.HasIndex(x => x.TaxId).IsUnique();
-            entity.HasIndex(x => x.RegistrationNumber).IsUnique();
             entity.HasOne(x => x.BaseCity).WithMany().HasForeignKey(x => x.BaseCityId);
+            entity.HasOne(x => x.VerificationProfile)
+                .WithOne(x => x.Company)
+                .HasForeignKey<EmployerVerificationProfile>(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<EmployerVerificationIndustry>(entity =>
+        {
+            entity.ToTable("employer_verification_industries");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.Slug).HasColumnName("slug").HasMaxLength(100);
+            entity.Property(x => x.Name).HasColumnName("name").HasMaxLength(200);
+            entity.Property(x => x.SortOrder).HasColumnName("sort_order");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => x.Slug).IsUnique();
+        });
+
+        modelBuilder.Entity<EmployerVerificationProfile>(entity =>
+        {
+            entity.ToTable("employer_verification_profiles");
+            entity.HasKey(x => x.CompanyId);
+            entity.Property(x => x.CompanyId).HasColumnName("company_id");
+            entity.Property(x => x.EmployerType).HasColumnName("employer_type");
+            entity.Property(x => x.OgrnOrOgrnip).HasColumnName("ogrn_or_ogrnip").HasMaxLength(20);
+            entity.Property(x => x.Inn).HasColumnName("inn").HasMaxLength(20);
+            entity.Property(x => x.Kpp).HasColumnName("kpp").HasMaxLength(20);
+            entity.Property(x => x.LegalAddress).HasColumnName("legal_address").HasMaxLength(500);
+            entity.Property(x => x.ActualAddress).HasColumnName("actual_address").HasMaxLength(500);
+            entity.Property(x => x.RepresentativeFullName).HasColumnName("representative_full_name").HasMaxLength(300);
+            entity.Property(x => x.RepresentativePosition).HasColumnName("representative_position").HasMaxLength(200);
+            entity.Property(x => x.MainIndustryId).HasColumnName("main_industry_id");
+            entity.Property(x => x.TaxOffice).HasColumnName("tax_office").HasMaxLength(200);
+            entity.Property(x => x.WorkEmail).HasColumnName("work_email").HasMaxLength(320);
+            entity.Property(x => x.WorkPhone).HasColumnName("work_phone").HasMaxLength(30);
+            entity.Property(x => x.SiteOrPublicLinks).HasColumnName("site_or_public_links").HasMaxLength(1000);
+            entity.Property(x => x.ReviewStatus).HasColumnName("review_status");
+            entity.Property(x => x.SubmittedAt).HasColumnName("submitted_at");
+            entity.Property(x => x.VerifiedAt).HasColumnName("verified_at");
+            entity.Property(x => x.VerifiedByUserId).HasColumnName("verified_by_user_id");
+            entity.Property(x => x.RejectReason).HasColumnName("reject_reason").HasMaxLength(2000);
+            entity.Property(x => x.MissingDocs).HasColumnName("missing_docs").HasMaxLength(4000);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasOne(x => x.MainIndustry).WithMany(x => x.Profiles).HasForeignKey(x => x.MainIndustryId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.VerifiedByUser).WithMany(x => x.VerifiedEmployerProfiles).HasForeignKey(x => x.VerifiedByUserId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<EmployerVerificationDocument>(entity =>
+        {
+            entity.ToTable("employer_verification_documents");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.CompanyId).HasColumnName("company_id");
+            entity.Property(x => x.DocumentType).HasColumnName("document_type");
+            entity.Property(x => x.FileName).HasColumnName("file_name").HasMaxLength(255);
+            entity.Property(x => x.ContentType).HasColumnName("content_type").HasMaxLength(200);
+            entity.Property(x => x.SizeBytes).HasColumnName("size_bytes");
+            entity.Property(x => x.StorageKey).HasColumnName("storage_key").HasMaxLength(500);
+            entity.Property(x => x.AccessUrl).HasColumnName("access_url").HasMaxLength(500);
+            entity.Property(x => x.Status).HasColumnName("status");
+            entity.Property(x => x.ModeratorComment).HasColumnName("moderator_comment").HasMaxLength(2000);
+            entity.Property(x => x.UploadedByUserId).HasColumnName("uploaded_by_user_id");
+            entity.Property(x => x.ReviewedByUserId).HasColumnName("reviewed_by_user_id");
+            entity.Property(x => x.ReviewedAt).HasColumnName("reviewed_at");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => new { x.CompanyId, x.DocumentType });
+            entity.HasOne(x => x.Profile).WithMany(x => x.Documents).HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.UploadedByUser).WithMany(x => x.UploadedVerificationDocuments).HasForeignKey(x => x.UploadedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.ReviewedByUser).WithMany(x => x.ReviewedVerificationDocuments).HasForeignKey(x => x.ReviewedByUserId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<EmployerVerificationRequiredDocument>(entity =>
+        {
+            entity.ToTable("employer_verification_required_documents");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.EmployerType).HasColumnName("employer_type");
+            entity.Property(x => x.DocumentType).HasColumnName("document_type");
+            entity.Property(x => x.IsRequired).HasColumnName("is_required");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => new { x.EmployerType, x.DocumentType }).IsUnique();
         });
 
         modelBuilder.Entity<CompanyLink>(entity =>

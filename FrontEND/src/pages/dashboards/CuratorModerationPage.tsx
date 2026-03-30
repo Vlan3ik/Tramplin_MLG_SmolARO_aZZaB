@@ -9,10 +9,13 @@ import {
   deleteAdminUser,
   deleteAdminVacancy,
   fetchAdminCompanies,
+  fetchAdminCompanyVerification,
   fetchAdminOpportunities,
   fetchAdminResumes,
   fetchAdminUsers,
   fetchAdminVacancies,
+  acceptAdminCompanyVerificationDocument,
+  rejectAdminCompanyVerificationDocument,
   rejectAdminCompany,
   updateAdminCompanyStatus,
   updateAdminOpportunityStatus,
@@ -20,6 +23,7 @@ import {
   updateAdminUserStatus,
   updateAdminVacancyStatus,
   verifyAdminCompany,
+  type AdminCompanyVerificationDetail,
   type AdminCompany,
   type AdminOpportunity,
   type AdminResume,
@@ -64,6 +68,19 @@ const moderationStatusLabel: Record<number, string> = {
   7: 'Archive',
 }
 
+const verificationReviewStatusLabel: Record<number, string> = {
+  1: 'Draft',
+  2: 'Pending review',
+  3: 'Approved',
+  4: 'Rejected',
+}
+
+const verificationDocumentStatusLabel: Record<number, string> = {
+  1: 'Uploaded',
+  2: 'Accepted',
+  3: 'Rejected',
+}
+
 export function CuratorModerationPage() {
   const [tab, setTab] = useState<ModerationTab>('users')
   const [loading, setLoading] = useState(true)
@@ -81,6 +98,10 @@ export function CuratorModerationPage() {
   const [vacancies, setVacancies] = useState<AdminVacancy[]>([])
   const [opportunities, setOpportunities] = useState<AdminOpportunity[]>([])
   const [companies, setCompanies] = useState<AdminCompany[]>([])
+  const [expandedCompanyId, setExpandedCompanyId] = useState<number | null>(null)
+  const [companyVerification, setCompanyVerification] = useState<AdminCompanyVerificationDetail | null>(null)
+  const [companyVerificationLoading, setCompanyVerificationLoading] = useState(false)
+  const [companyVerificationActionLoading, setCompanyVerificationActionLoading] = useState(false)
 
   async function loadUsers() {
     const response = await fetchAdminUsers({ page: 1, pageSize: 30, search: usersSearch })
@@ -141,6 +162,87 @@ export function CuratorModerationPage() {
       setSuccess(successMessage)
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : 'Moderation action failed.')
+    }
+  }
+
+  async function toggleCompanyVerification(companyId: number) {
+    if (expandedCompanyId === companyId) {
+      setExpandedCompanyId(null)
+      setCompanyVerification(null)
+      return
+    }
+
+    clearMessages()
+    setExpandedCompanyId(companyId)
+    setCompanyVerificationLoading(true)
+    try {
+      const detail = await fetchAdminCompanyVerification(companyId)
+      setCompanyVerification(detail)
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'Cannot load company verification.')
+      setExpandedCompanyId(null)
+      setCompanyVerification(null)
+    } finally {
+      setCompanyVerificationLoading(false)
+    }
+  }
+
+  async function reloadExpandedCompanyVerification() {
+    if (!expandedCompanyId) {
+      return
+    }
+
+    const detail = await fetchAdminCompanyVerification(expandedCompanyId)
+    setCompanyVerification(detail)
+  }
+
+  async function handleCompanyApproval(companyId: number) {
+    await handleAction(
+      () => verifyAdminCompany(companyId),
+      'Company verification approved.',
+      async () => {
+        await loadCompanies()
+        await reloadExpandedCompanyVerification()
+      },
+    )
+  }
+
+  async function handleCompanyReject(companyId: number) {
+    const reason = typeof window !== 'undefined'
+      ? (window.prompt('Reject reason (required):', 'Missing required data/documents') ?? '').trim()
+      : 'Missing required data/documents'
+    if (!reason) {
+      return
+    }
+
+    await handleAction(
+      () => rejectAdminCompany(companyId, reason, []),
+      'Company verification rejected.',
+      async () => {
+        await loadCompanies()
+        await reloadExpandedCompanyVerification()
+      },
+    )
+  }
+
+  async function handleVerificationDocumentReview(companyId: number, docId: number, accept: boolean) {
+    const comment = typeof window !== 'undefined'
+      ? (window.prompt('Comment for document review (optional):', '') ?? '').trim()
+      : ''
+    setCompanyVerificationActionLoading(true)
+    clearMessages()
+    try {
+      if (accept) {
+        await acceptAdminCompanyVerificationDocument(companyId, docId, comment)
+      } else {
+        await rejectAdminCompanyVerificationDocument(companyId, docId, comment)
+      }
+      await reloadExpandedCompanyVerification()
+      setSuccess(accept ? 'Document accepted.' : 'Document rejected.')
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'Cannot review document.')
+    } finally {
+      setCompanyVerificationActionLoading(false)
     }
   }
 
@@ -321,11 +423,64 @@ export function CuratorModerationPage() {
                   <div className="favorite-card__actions">
                     <Link className="btn btn--secondary" to={`/company/${item.id}`}>Open card</Link>
                     <Link className="btn btn--secondary" to={`/dashboard/curator/companies/create?companyId=${item.id}`} state={{ company: item }}>Edit</Link>
-                    <button type="button" className="btn btn--ghost" onClick={() => void handleAction(() => verifyAdminCompany(item.id), 'Company verified.', loadCompanies)}>Verify</button>
-                    <button type="button" className="btn btn--ghost" onClick={() => void handleAction(() => rejectAdminCompany(item.id), 'Company rejected.', loadCompanies)}>Reject</button>
+                    <button type="button" className="btn btn--ghost" onClick={() => void handleCompanyApproval(item.id)}>Approve verification</button>
+                    <button type="button" className="btn btn--ghost" onClick={() => void handleCompanyReject(item.id)}>Reject verification</button>
+                    <button type="button" className="btn btn--ghost" onClick={() => void toggleCompanyVerification(item.id)}>
+                      {expandedCompanyId === item.id ? 'Hide verification' : 'Open verification'}
+                    </button>
                     <button type="button" className="btn btn--ghost" onClick={() => void handleAction(() => updateAdminCompanyStatus(item.id, 5), 'Company blocked.', loadCompanies)}>Block</button>
                     <button type="button" className="btn btn--danger" onClick={() => void handleAction(() => deleteAdminCompany(item.id), 'Company deleted.', loadCompanies)}>Delete</button>
                   </div>
+                  {expandedCompanyId === item.id ? (
+                    <div className="admin-list-card__details">
+                      {companyVerificationLoading ? (
+                        <p>Loading verification...</p>
+                      ) : companyVerification ? (
+                        <>
+                          <p>Review status: {verificationReviewStatusLabel[companyVerification.reviewStatus] ?? companyVerification.reviewStatus}</p>
+                          <p>Employer type: {companyVerification.employerType}</p>
+                          <p>Representative: {companyVerification.representativeFullName || '-'}</p>
+                          <p>Industry: {companyVerification.mainIndustryName || '-'}</p>
+                          <p>Reject reason: {companyVerification.rejectReason || '-'}</p>
+                          <div className="admin-list-grid">
+                            {companyVerification.documents.map((doc) => (
+                              <article key={doc.id} className="favorite-card admin-list-card">
+                                <div className="favorite-card__head">
+                                  <div>
+                                    <h3>{doc.fileName}</h3>
+                                    <p>Type #{doc.documentType}</p>
+                                  </div>
+                                  <span className="status-chip">{verificationDocumentStatusLabel[doc.status] ?? doc.status}</span>
+                                </div>
+                                <p>{doc.contentType} | {(doc.sizeBytes / 1024 / 1024).toFixed(2)} MB</p>
+                                <p>{doc.moderatorComment || '-'}</p>
+                                <div className="favorite-card__actions">
+                                  <button
+                                    type="button"
+                                    className="btn btn--ghost"
+                                    disabled={companyVerificationActionLoading}
+                                    onClick={() => void handleVerificationDocumentReview(item.id, doc.id, true)}
+                                  >
+                                    Accept doc
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn--ghost"
+                                    disabled={companyVerificationActionLoading}
+                                    onClick={() => void handleVerificationDocumentReview(item.id, doc.id, false)}
+                                  >
+                                    Reject doc
+                                  </button>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <p>No verification data.</p>
+                      )}
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>

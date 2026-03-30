@@ -27,6 +27,9 @@ type VacancyCardApi = {
   salaryFrom?: number | null
   salaryTo?: number | null
   currencyCode?: string | null
+  isFavoriteByMe?: boolean | null
+  friendFavoritesCount?: number | null
+  friendApplicationsCount?: number | null
 }
 
 type ChatMessageAttachmentApi = {
@@ -50,6 +53,9 @@ type OpportunityCardApi = {
   priceType: number
   priceAmount?: number | null
   priceCurrencyCode?: string | null
+  isFavoriteByMe?: boolean | null
+  friendFavoritesCount?: number | null
+  friendApplicationsCount?: number | null
 }
 
 type ChatListItemApi = {
@@ -142,6 +148,9 @@ function mapVacancyCard(item: VacancyCardApi): VacancyCard {
     salaryFrom: item.salaryFrom ?? null,
     salaryTo: item.salaryTo ?? null,
     currencyCode: item.currencyCode ?? null,
+    isFavoriteByMe: Boolean(item.isFavoriteByMe),
+    friendFavoritesCount: item.friendFavoritesCount ?? 0,
+    friendApplicationsCount: item.friendApplicationsCount ?? 0,
   }
 }
 
@@ -156,6 +165,9 @@ function mapOpportunityCard(item: OpportunityCardApi): OpportunityCard {
     priceType: item.priceType,
     priceAmount: item.priceAmount ?? null,
     priceCurrencyCode: item.priceCurrencyCode ?? null,
+    isFavoriteByMe: Boolean(item.isFavoriteByMe),
+    friendFavoritesCount: item.friendFavoritesCount ?? 0,
+    friendApplicationsCount: item.friendApplicationsCount ?? 0,
   }
 }
 

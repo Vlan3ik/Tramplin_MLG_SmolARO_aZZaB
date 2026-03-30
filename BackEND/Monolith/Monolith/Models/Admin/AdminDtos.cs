@@ -29,16 +29,12 @@ public record AdminCompanyListItemDto(
     string? BrandName,
     CompanyStatus Status,
     long BaseCityId,
-    string Industry,
+    string? Industry,
     DateTimeOffset CreatedAt);
 
 public record AdminCompanyUpsertRequest(
     string LegalName,
     string? BrandName,
-    CompanyLegalType LegalType,
-    string TaxId,
-    string RegistrationNumber,
-    string Industry,
     string Description,
     long BaseCityId,
     string? WebsiteUrl,
@@ -47,6 +43,49 @@ public record AdminCompanyUpsertRequest(
     CompanyStatus Status);
 
 public record AdminCompanyStatusUpdateRequest(CompanyStatus Status);
+
+public record AdminCompanyVerificationDetailDto(
+    long CompanyId,
+    string LegalName,
+    string? BrandName,
+    CompanyStatus CompanyStatus,
+    EmployerType EmployerType,
+    VerificationReviewStatus ReviewStatus,
+    string OgrnOrOgrnip,
+    string Inn,
+    string? Kpp,
+    string LegalAddress,
+    string? ActualAddress,
+    string RepresentativeFullName,
+    string? RepresentativePosition,
+    long MainIndustryId,
+    string MainIndustryName,
+    string? TaxOffice,
+    string WorkEmail,
+    string WorkPhone,
+    string? SiteOrPublicLinks,
+    DateTimeOffset? SubmittedAt,
+    DateTimeOffset? VerifiedAt,
+    long? VerifiedByUserId,
+    string? RejectReason,
+    string[] MissingDocs,
+    IReadOnlyCollection<AdminCompanyVerificationDocumentDto> Documents);
+
+public record AdminCompanyVerificationDocumentDto(
+    long Id,
+    VerificationDocumentType DocumentType,
+    string FileName,
+    string ContentType,
+    long SizeBytes,
+    VerificationDocumentStatus Status,
+    string? ModeratorComment,
+    long UploadedByUserId,
+    long? ReviewedByUserId,
+    DateTimeOffset? ReviewedAt,
+    DateTimeOffset CreatedAt);
+
+public record AdminRejectVerificationRequest(string RejectReason, IReadOnlyCollection<VerificationDocumentType>? MissingDocuments);
+public record AdminReviewDocumentRequest(string? ModeratorComment);
 
 public record AdminResumeListItemDto(
     long UserId,

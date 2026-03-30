@@ -31,4 +31,7 @@ public class User
     public List<UserPublicLink> PublicLinks { get; set; } = new();
     public List<UserSubscription> FollowingSubscriptions { get; set; } = new();
     public List<UserSubscription> FollowerSubscriptions { get; set; } = new();
+    public List<EmployerVerificationProfile> VerifiedEmployerProfiles { get; set; } = new();
+    public List<EmployerVerificationDocument> UploadedVerificationDocuments { get; set; } = new();
+    public List<EmployerVerificationDocument> ReviewedVerificationDocuments { get; set; } = new();
 }
