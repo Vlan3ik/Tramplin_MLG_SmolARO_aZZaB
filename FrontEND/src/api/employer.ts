@@ -230,6 +230,27 @@ type EmployerCompanyLinkApi = {
   createdAt: string
 }
 
+type EmployerCompanyMemberApi = {
+  userId: number
+  email: string | null
+  username: string | null
+  displayName: string | null
+  avatarUrl: string | null
+  role: number | string
+  joinedAt: string | null
+}
+
+type CompanyInviteCreatedResponseApi = {
+  token: string | null
+  inviteLink: string | null
+  expiresAt: string | null
+  role: number | string
+}
+
+type CreateCompanyInviteApiRequest = {
+  expiresInDays: number
+}
+
 type UpsertEmployerCompanyLinkApiRequest = {
   linkKind: number
   url: string | null
@@ -574,6 +595,27 @@ export type EmployerCompanyLink = {
   createdAt: string
 }
 
+export type EmployerCompanyMember = {
+  userId: number
+  email: string
+  username: string
+  displayName: string
+  avatarUrl: string | null
+  role: string
+  joinedAt: string
+}
+
+export type CreateCompanyInviteRequest = {
+  expiresInDays: number
+}
+
+export type CompanyInviteCreatedResponse = {
+  token: string
+  inviteLink: string
+  expiresAt: string
+  role: string
+}
+
 export type UpsertEmployerCompanyLinkRequest = {
   linkKind: number
   url: string
@@ -916,6 +958,27 @@ function mapEmployerCompanyLink(response: EmployerCompanyLinkApi): EmployerCompa
   }
 }
 
+function mapEmployerCompanyMember(response: EmployerCompanyMemberApi): EmployerCompanyMember {
+  return {
+    userId: response.userId,
+    email: response.email ?? '',
+    username: response.username ?? '',
+    displayName: response.displayName ?? '',
+    avatarUrl: response.avatarUrl ?? null,
+    role: parseMemberRole(response.role),
+    joinedAt: response.joinedAt ?? '',
+  }
+}
+
+function mapCompanyInviteCreatedResponse(response: CompanyInviteCreatedResponseApi): CompanyInviteCreatedResponse {
+  return {
+    token: response.token ?? '',
+    inviteLink: response.inviteLink ?? '',
+    expiresAt: response.expiresAt ?? '',
+    role: parseMemberRole(response.role),
+  }
+}
+
 function toIsoDateOrNow(value?: string) {
   if (value && value.trim()) {
     return value
@@ -1098,6 +1161,34 @@ export function updateEmployerCompanyChatSettings(payload: UpdateEmployerCompany
 
 export function submitEmployerCompanyVerification() {
   return postJson<unknown, Record<string, never>>('/employer/company/submit-verification', {})
+}
+
+export async function fetchEmployerCompanyMembers(signal?: AbortSignal) {
+  const response = await getJson<EmployerCompanyMemberApi[]>('/employer/company/members', { signal })
+  return (Array.isArray(response) ? response : []).map(mapEmployerCompanyMember)
+}
+
+export async function createEmployerCompanyInvite(payload: CreateCompanyInviteRequest) {
+  const normalizedDays = Math.trunc(payload.expiresInDays)
+  const expiresInDays = normalizedDays === 0
+    ? 0
+    : Math.min(Math.max(Number.isFinite(normalizedDays) ? normalizedDays : 7, 1), 30)
+
+  const request: CreateCompanyInviteApiRequest = {
+    expiresInDays,
+  }
+
+  const response = await postJson<CompanyInviteCreatedResponseApi, CreateCompanyInviteApiRequest>('/employer/company/invites', request)
+  return mapCompanyInviteCreatedResponse(response)
+}
+
+export function deleteEmployerCompanyMember(userId: number) {
+  return deleteJson<unknown>(`/employer/company/members/${userId}`)
+}
+
+export function acceptEmployerCompanyInvite(token: string) {
+  const normalizedToken = token.trim()
+  return postJson<unknown, Record<string, never>>(`/employer/company/invites/${encodeURIComponent(normalizedToken)}/accept`, {})
 }
 
 function mapVerificationProfile(response: EmployerVerificationProfileApi): EmployerVerificationProfile {

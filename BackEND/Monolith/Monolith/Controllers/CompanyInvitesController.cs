@@ -40,14 +40,17 @@ public class CompanyInvitesController(AppDbContext dbContext) : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse("companies.invites.forbidden", "Insufficient permissions for invite creation."));
         }
 
-        var expiresDays = request.ExpiresInDays <= 0 ? 7 : Math.Min(request.ExpiresInDays, 30);
+        var isPermanentInvite = request.ExpiresInDays == 0;
+        var expiresAt = isPermanentInvite
+            ? DateTimeOffset.UtcNow.AddYears(100)
+            : DateTimeOffset.UtcNow.AddDays(request.ExpiresInDays <= 0 ? 7 : Math.Min(request.ExpiresInDays, 30));
         var invite = new CompanyInvite
         {
             CompanyId = membership.CompanyId,
             InvitedByUserId = userId,
             Role = CompanyMemberRole.Admin,
             Token = Guid.NewGuid().ToString("N"),
-            ExpiresAt = DateTimeOffset.UtcNow.AddDays(expiresDays)
+            ExpiresAt = expiresAt
         };
 
         dbContext.CompanyInvites.Add(invite);

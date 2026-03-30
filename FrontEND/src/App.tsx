@@ -10,6 +10,7 @@ import { useAuth } from './hooks/useAuth'
 import { AboutPlatformPage } from './pages/AboutPlatformPage'
 import { CompaniesListPage } from './pages/CompaniesListPage'
 import { CompanyPage } from './pages/CompanyPage'
+import { CompanyInviteAcceptPage } from './pages/CompanyInviteAcceptPage'
 import { EmployerVerificationPage } from './pages/EmployerVerificationPage'
 import { EventsPage } from './pages/EventsPage'
 import { HomePage } from './pages/HomePage'
@@ -90,6 +91,7 @@ function App() {
         <Route element={<ProtectedRoute allowedRoles={[PlatformRole.Employer]} />}>
           <Route path="verification/employer" element={<EmployerVerificationPage />} />
           <Route path="dashboard/employer" element={<EmployerDashboardPage />} />
+          <Route path="company-invite/:token" element={<CompanyInviteAcceptPage />} />
           <Route path="vacancy-flow" element={<VacancyFlowPage />} />
           <Route path="vacancy-flow/:step" element={<VacancyFlowPage />} />
         </Route>

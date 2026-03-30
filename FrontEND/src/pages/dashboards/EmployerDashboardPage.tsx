@@ -4,15 +4,18 @@ import { useNavigate } from 'react-router-dom'
 import { fetchCities, fetchLocations, fetchTags } from '../../api/catalog'
 import { fetchEmployerChats } from '../../api/chats'
 import {
+  createEmployerCompanyInvite,
   createEmployerCompanyLink,
   createEmployerTechnologyTag,
   createEmployerCompany,
   createEmployerOpportunity,
   createEmployerVacancy,
+  deleteEmployerCompanyMember,
   deleteEmployerCompanyLink,
   deleteEmployerTechnologyTag,
   deleteEmployerOpportunity,
   deleteEmployerVacancy,
+  fetchEmployerCompanyMembers,
   fetchEmployerApplicationDetail,
   fetchEmployerApplications,
   fetchEmployerCompany,
@@ -38,7 +41,9 @@ import {
   type EmployerApplication,
   type EmployerApplicationDetail,
   type EmployerCompany,
+  type EmployerCompanyMember,
   type EmployerCompanyLink,
+  type CompanyInviteCreatedResponse,
   type EmployerOpportunity,
   type EmployerTechnologyTag,
   type EmployerVerificationDocument,
@@ -53,16 +58,18 @@ import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
 import { DateInput } from '../../components/forms/DateInput'
 import { TagPicker } from '../../components/forms/TagPicker'
+import { useAuth } from '../../hooks/useAuth'
 import type { City, Location, TagListItem } from '../../types/catalog'
 import { formatSkillLevelDisplay } from '../../utils/skill-levels'
 
-type EmployerTabId = 'overview' | 'company' | 'create' | 'opportunities' | 'applications' | 'verification' | 'settings' | 'technologies'
+type EmployerTabId = 'overview' | 'company' | 'create' | 'opportunities' | 'applications' | 'verification' | 'settings' | 'technologies' | 'team'
 
 const employerTabs: Array<{ id: EmployerTabId; label: string }> = [
   { id: 'overview', label: 'Обзор' },
   { id: 'company', label: 'Профиль компании' },
   { id: 'opportunities', label: 'Мои возможности' },
   { id: 'applications', label: 'Отклики' },
+  { id: 'team', label: 'Команда' },
   { id: 'verification', label: 'Верификация' },
   { id: 'settings', label: 'Настройки чата' },
   { id: 'technologies', label: '\u0422\u0435\u0433\u0438 \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0438\u0439' },
@@ -144,6 +151,12 @@ const companyLinkKindOptions: Array<{ value: number; label: string }> = [
 ]
 
 const companyLinkKindLabel = Object.fromEntries(companyLinkKindOptions.map((item) => [item.value, item.label])) as Record<number, string>
+
+const companyMemberRoleLabel: Record<string, string> = {
+  owner: 'Владелец',
+  admin: 'Администратор',
+  staff: 'Сотрудник',
+}
 
 const employerTypeOptions: Array<{ value: number; label: string }> = [
   { value: 1, label: '\u042e\u0440\u0438\u0434\u0438\u0447\u0435\u0441\u043a\u043e\u0435 \u043b\u0438\u0446\u043e' },
@@ -370,6 +383,76 @@ function formatDate(value: string) {
   return date.toLocaleDateString('ru-RU')
 }
 
+function memberPrimaryLabel(member: EmployerCompanyMember) {
+  const displayName = member.displayName.trim()
+  if (displayName) {
+    return displayName
+  }
+
+  const username = member.username.trim()
+  if (username) {
+    return `@${username}`
+  }
+
+  const email = member.email.trim()
+  if (email) {
+    return email
+  }
+
+  return `User #${member.userId}`
+}
+
+function memberAvatarLabel(member: EmployerCompanyMember) {
+  const source =
+    member.displayName.trim() ||
+    member.username.trim() ||
+    member.email.trim() ||
+    `U${member.userId}`
+  const normalized = source.replace(/^@/, '').trim()
+  return normalized.slice(0, 2).toUpperCase() || 'U'
+}
+
+function canDeleteCompanyMember(currentRole: string, targetRole: string, targetUserId: number, currentUserId: number | null) {
+  if (currentUserId != null && targetUserId === currentUserId) {
+    return false
+  }
+
+  if (currentRole === 'owner') {
+    return targetRole === 'admin' || targetRole === 'staff'
+  }
+
+  if (currentRole === 'admin') {
+    return targetRole === 'staff'
+  }
+
+  return false
+}
+
+function memberRoleTone(role: string) {
+  if (role === 'owner') return 'owner'
+  if (role === 'admin') return 'admin'
+  return 'staff'
+}
+
+function buildFrontendInvitePath(invite: CompanyInviteCreatedResponse) {
+  const token = invite.token.trim()
+  if (token) {
+    return `/company-invite/${encodeURIComponent(token)}`
+  }
+
+  const rawLink = invite.inviteLink.trim()
+  if (!rawLink) {
+    return ''
+  }
+
+  const tokenMatch = rawLink.match(/\/invites\/([^/]+)\/accept/i)
+  if (!tokenMatch?.[1]) {
+    return ''
+  }
+
+  return `/company-invite/${encodeURIComponent(tokenMatch[1])}`
+}
+
 function formatMoneyRange(min: number | null | undefined, max: number | null | undefined, currencyCode: string | null | undefined) {
   if (min == null && max == null) {
     return 'По договоренности'
@@ -455,6 +538,7 @@ function formatProjectPeriod(startDate: string, endDate: string) {
 
 export function EmployerDashboardPage() {
   const navigate = useNavigate()
+  const { session } = useAuth()
   const [tab, setTab] = useState<EmployerTabId>('overview')
   const [company, setCompany] = useState<EmployerCompany | null>(null)
   const [companyMissing, setCompanyMissing] = useState(false)
@@ -465,6 +549,7 @@ export function EmployerDashboardPage() {
   const [opportunityLocations, setOpportunityLocations] = useState<Location[]>([])
   const [opportunities, setOpportunities] = useState<EmployerOpportunity[]>([])
   const [applications, setApplications] = useState<EmployerApplication[]>([])
+  const [companyMembers, setCompanyMembers] = useState<EmployerCompanyMember[]>([])
   const [companyLinks, setCompanyLinks] = useState<EmployerCompanyLink[]>([])
   const [applicationChats, setApplicationChats] = useState<Array<{ id: number; title: string; lastMessageText: string; lastMessageAt: string }>>([])
 
@@ -472,6 +557,7 @@ export function EmployerDashboardPage() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingChatSettings, setSavingChatSettings] = useState(false)
   const [savingCompanyLink, setSavingCompanyLink] = useState(false)
+  const [creatingInvite, setCreatingInvite] = useState(false)
   const [submittingVerification, setSubmittingVerification] = useState(false)
   const [creatingCompany, setCreatingCompany] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -487,7 +573,12 @@ export function EmployerDashboardPage() {
   const [loadingOpportunityEditorKey, setLoadingOpportunityEditorKey] = useState<string | null>(null)
   const [deletingOpportunityKey, setDeletingOpportunityKey] = useState<string | null>(null)
   const [deletingCompanyLinkId, setDeletingCompanyLinkId] = useState<number | null>(null)
+  const [deletingCompanyMemberId, setDeletingCompanyMemberId] = useState<number | null>(null)
   const [editingCompanyLinkId, setEditingCompanyLinkId] = useState<number | null>(null)
+  const [inviteIsPermanent, setInviteIsPermanent] = useState(false)
+  const [inviteExpiresInDays, setInviteExpiresInDays] = useState(7)
+  const [latestInvite, setLatestInvite] = useState<CompanyInviteCreatedResponse | null>(null)
+  const [latestInviteIsPermanent, setLatestInviteIsPermanent] = useState(false)
   const [opportunitySearch, setOpportunitySearch] = useState('')
   const [opportunitySourceFilter, setOpportunitySourceFilter] = useState<'all' | 'vacancy' | 'opportunity'>('all')
   const [opportunityStatusesFilter, setOpportunityStatusesFilter] = useState<number[]>([])
@@ -675,9 +766,10 @@ export function EmployerDashboardPage() {
         setVerificationDocuments([])
       }
 
-      const [companyOpportunitiesResult, companyLinksResult] = await Promise.allSettled([
+      const [companyOpportunitiesResult, companyLinksResult, companyMembersResult] = await Promise.allSettled([
         fetchEmployerCompanyOpportunities(),
         fetchEmployerCompanyLinks(),
+        fetchEmployerCompanyMembers(),
       ])
 
       if (companyOpportunitiesResult.status === 'fulfilled') {
@@ -690,7 +782,15 @@ export function EmployerDashboardPage() {
         setCompanyLinks([])
       }
 
+      if (companyMembersResult.status === 'fulfilled') {
+        setCompanyMembers(companyMembersResult.value)
+      } else {
+        setCompanyMembers([])
+      }
+
       setEditingCompanyLinkId(null)
+      setLatestInvite(null)
+      setLatestInviteIsPermanent(false)
       setCompanyLinkForm({
         linkKind: 1,
         url: '',
@@ -709,6 +809,7 @@ export function EmployerDashboardPage() {
         setCompanyMissing(true)
         setOpportunities([])
         setCompanyLinks([])
+        setCompanyMembers([])
       } else {
         setError(message)
       }
@@ -775,6 +876,30 @@ export function EmployerDashboardPage() {
   const companyStatusText = companyStatusLabel[statusCode] ?? 'Статус не определен'
   const companyStatusToneClass = companyStatusTone[statusCode] ?? 'warning'
   const companyName = company?.brandName.trim() || company?.legalName.trim() || 'Компания'
+  const currentUserId = session?.user?.id ?? null
+  const currentMemberRole = toLowerSafe(company?.membershipRole)
+  const sortedCompanyMembers = useMemo(
+    () =>
+      [...companyMembers].sort((a, b) => {
+        const roleWeight = (role: string) => {
+          if (role === 'owner') return 0
+          if (role === 'admin') return 1
+          return 2
+        }
+
+        const byRole = roleWeight(a.role) - roleWeight(b.role)
+        if (byRole !== 0) {
+          return byRole
+        }
+
+        const aTs = Date.parse(a.joinedAt)
+        const bTs = Date.parse(b.joinedAt)
+        const safeATs = Number.isNaN(aTs) ? 0 : aTs
+        const safeBTs = Number.isNaN(bTs) ? 0 : bTs
+        return safeATs - safeBTs
+      }),
+    [companyMembers],
+  )
 
   const overview = useMemo(() => {
     const now = Date.now()
@@ -1627,6 +1752,81 @@ export function EmployerDashboardPage() {
     }
   }
 
+  async function onCreateCompanyInvite() {
+    if (!company) {
+      return
+    }
+
+    const expiresInDays = inviteIsPermanent
+      ? 0
+      : Math.min(Math.max(Math.trunc(inviteExpiresInDays), 1), 30)
+
+    setError('')
+    setSuccess('')
+    setCreatingInvite(true)
+
+    try {
+      const createdInvite = await createEmployerCompanyInvite({ expiresInDays })
+      setLatestInvite(createdInvite)
+      setLatestInviteIsPermanent(expiresInDays === 0)
+      setSuccess(expiresInDays === 0 ? 'Бессрочная пригласительная ссылка создана.' : 'Пригласительная ссылка создана.')
+    } catch (inviteError) {
+      setError(inviteError instanceof Error ? inviteError.message : 'Не удалось создать пригласительную ссылку.')
+    } finally {
+      setCreatingInvite(false)
+    }
+  }
+
+  async function onCopyInviteLink() {
+    if (!latestInvite) {
+      return
+    }
+
+    const sharePath = buildFrontendInvitePath(latestInvite)
+    if (!sharePath) {
+      setError('Не удалось подготовить ссылку приглашения.')
+      return
+    }
+
+    const inviteUrl = `${window.location.origin}${sharePath}`
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(inviteUrl)
+      } else {
+        throw new Error('clipboard_not_available')
+      }
+      setSuccess('Ссылка скопирована в буфер обмена.')
+    } catch {
+      setError('Не удалось скопировать ссылку автоматически. Скопируйте вручную.')
+    }
+  }
+
+  async function onDeleteCompanyMember(member: EmployerCompanyMember) {
+    if (!company) {
+      return
+    }
+
+    const memberLabel = memberPrimaryLabel(member)
+    if (typeof window !== 'undefined' && !window.confirm(`Удалить участника ${memberLabel}?`)) {
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setDeletingCompanyMemberId(member.userId)
+
+    try {
+      await deleteEmployerCompanyMember(member.userId)
+      setCompanyMembers((state) => state.filter((item) => item.userId !== member.userId))
+      setSuccess('Участник удален из компании.')
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Не удалось удалить участника.')
+    } finally {
+      setDeletingCompanyMemberId(null)
+    }
+  }
+
 
 
   async function onCreateTechnologyTag() {
@@ -1882,6 +2082,108 @@ export function EmployerDashboardPage() {
                   </button>
                 ))}
               </nav>
+
+              {tab === 'team' ? <section className="dashboard-section card seeker-profile-panel">
+        <h2>Команда</h2>
+        <div className="employer-team-grid">
+          <section className="admin-form-card employer-team-card">
+            <div className="employer-team-card__intro">
+              <h3>Пригласительная ссылка</h3>
+              <p>Создайте одноразовую ссылку для приглашения нового участника в компанию.</p>
+            </div>
+            <div className="form-grid employer-team-form">
+              <label className="employer-checkbox">
+                <input
+                  type="checkbox"
+                  checked={inviteIsPermanent}
+                  onChange={(event) => setInviteIsPermanent(event.target.checked)}
+                />
+                Бессрочное приглашение
+              </label>
+              <label>
+                Срок действия (дней)
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  disabled={inviteIsPermanent}
+                  value={inviteExpiresInDays}
+                  onChange={(event) => setInviteExpiresInDays(Math.min(Math.max(Number(event.target.value) || 1, 1), 30))}
+                />
+              </label>
+              <button type="button" className="btn btn--primary employer-team-form__submit" onClick={() => void onCreateCompanyInvite()} disabled={creatingInvite}>
+                {creatingInvite ? 'Создаем...' : 'Создать ссылку'}
+              </button>
+            </div>
+            {latestInvite ? (
+              <div className="employer-team-invite">
+                <label>
+                  Ссылка
+                  <input
+                    type="text"
+                    readOnly
+                    value={(() => {
+                      const sharePath = buildFrontendInvitePath(latestInvite)
+                      return sharePath ? `${window.location.origin}${sharePath}` : ''
+                    })()}
+                  />
+                </label>
+                <p>{latestInviteIsPermanent ? 'Срок действия: бессрочно' : `Действует до: ${formatDate(latestInvite.expiresAt)}`}</p>
+                <div className="favorite-card__actions employer-team-invite__actions">
+                  <button type="button" className="btn btn--secondary" onClick={() => void onCopyInviteLink()}>
+                    Копировать ссылку
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="admin-form-card employer-team-card">
+            <h3>Участники компании</h3>
+            <div className="admin-list-grid employer-team-members">
+              {sortedCompanyMembers.length ? (
+                sortedCompanyMembers.map((member) => {
+                  const memberRole = toLowerSafe(member.role)
+                  const roleTone = memberRoleTone(memberRole)
+                  const canDelete = canDeleteCompanyMember(currentMemberRole, memberRole, member.userId, currentUserId)
+                  const isDeleting = deletingCompanyMemberId === member.userId
+
+                  return (
+                    <article key={member.userId} className="admin-list-card employer-team-member-card">
+                      <div className="employer-team-member-card__head">
+                        <div className="employer-team-member-card__avatar">
+                          {member.avatarUrl ? <img src={member.avatarUrl} alt={memberPrimaryLabel(member)} /> : <span>{memberAvatarLabel(member)}</span>}
+                        </div>
+                        <div className="employer-team-member-card__identity">
+                          <strong>{memberPrimaryLabel(member)}</strong>
+                          <p>{member.email || member.username || `ID: ${member.userId}`}</p>
+                        </div>
+                        <span className={`employer-team-role employer-team-role--${roleTone}`}>{companyMemberRoleLabel[memberRole] ?? member.role}</span>
+                      </div>
+                      <div className="employer-team-member-card__meta">
+                        <span>В команде с: {formatDate(member.joinedAt)}</span>
+                        <span>ID: {member.userId}</span>
+                      </div>
+                      <div className="favorite-card__actions">
+                        <button
+                          type="button"
+                          className="btn btn--danger"
+                          onClick={() => void onDeleteCompanyMember(member)}
+                          disabled={!canDelete || isDeleting}
+                        >
+                          {isDeleting ? 'Удаляем...' : 'Удалить'}
+                        </button>
+                      </div>
+                    </article>
+                  )
+                })
+              ) : (
+                <p>Участников пока нет.</p>
+              )}
+            </div>
+          </section>
+        </div>
+              </section> : null}
 
               {tab === 'overview' ? <section className="dashboard-section card seeker-profile-panel">
         <h2>Обзор</h2>

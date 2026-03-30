@@ -516,6 +516,46 @@ public class EmployerCompaniesController(AppDbContext dbContext, IObjectStorageS
         return Ok(members);
     }
 
+    [HttpDelete("members/{userId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteMember(long userId, CancellationToken cancellationToken)
+    {
+        var currentUserId = User.GetUserId();
+        if (userId == currentUserId)
+        {
+            return this.ToBadRequestError("companies.members.delete.self_forbidden", "You cannot remove yourself from company.");
+        }
+
+        var actorMembership = await dbContext.CompanyMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == currentUserId, cancellationToken);
+        if (actorMembership is null)
+        {
+            return this.ToNotFoundError("companies.membership.not_found", "Company membership not found.");
+        }
+
+        var targetMembership = await dbContext.CompanyMembers
+            .FirstOrDefaultAsync(x => x.CompanyId == actorMembership.CompanyId && x.UserId == userId, cancellationToken);
+        if (targetMembership is null)
+        {
+            return this.ToNotFoundError("companies.members.target_not_found", "Target user is not a company member.");
+        }
+
+        if (!CanRemoveMember(actorMembership.Role, targetMembership.Role))
+        {
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new ErrorResponse("companies.members.delete.forbidden", "Insufficient permissions to remove this member."));
+        }
+
+        dbContext.CompanyMembers.Remove(targetMembership);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("owner/transfer")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -586,6 +626,16 @@ public class EmployerCompaniesController(AppDbContext dbContext, IObjectStorageS
             "image/png" => "png",
             "image/webp" => "webp",
             _ => "bin"
+        };
+    }
+
+    private static bool CanRemoveMember(CompanyMemberRole actorRole, CompanyMemberRole targetRole)
+    {
+        return actorRole switch
+        {
+            CompanyMemberRole.Owner => targetRole is CompanyMemberRole.Admin or CompanyMemberRole.Staff,
+            CompanyMemberRole.Admin => targetRole == CompanyMemberRole.Staff,
+            _ => false
         };
     }
 
