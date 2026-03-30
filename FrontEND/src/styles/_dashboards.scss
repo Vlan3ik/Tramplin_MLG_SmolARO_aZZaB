@@ -624,13 +624,31 @@
   gap: 1rem;
 }
 
+.seeker-project-page--redesign {
+  background: #f0f8ff;
+  border: 1px solid #d7e8fb;
+  border-radius: 20px;
+  box-shadow: 0 8px 20px rgba(22, 58, 109, 0.08);
+  padding: 1.4rem;
+}
+
 .seeker-project-page__header {
   display: grid;
   gap: 0.5rem;
+  margin-bottom: 0.3rem;
 
   h1 {
     margin: 0;
-    color: #15325b;
+    color: #0171e1;
+    font-size: clamp(1.85rem, 3vw, 3rem);
+    line-height: 1.12;
+    text-align: center;
+  }
+
+  > a {
+    color: #0171e1;
+    font-weight: 600;
+    width: fit-content;
   }
 }
 
@@ -643,12 +661,36 @@
 .seeker-project-page__layout {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
-  gap: 1rem;
+  gap: 1.2rem;
 }
 
 .seeker-project-gallery {
   display: grid;
-  gap: 0.8rem;
+  gap: 0.85rem;
+}
+
+.seeker-project-page__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.seeker-project-page__chip {
+  color: #fff;
+  border: 0;
+  font-weight: 600;
+}
+
+.seeker-project-page__chip--role {
+  background: #ffb472;
+}
+
+.seeker-project-page__chip--status {
+  background: #72d0ff;
+}
+
+.seeker-project-page__chip--team {
+  background: #ff7272;
 }
 
 .seeker-project-gallery__main {
@@ -708,18 +750,54 @@
 .seeker-project-description {
   border: 1px solid rgba(21, 50, 91, 0.15);
   border-radius: 14px;
-  padding: 0.9rem 1rem;
+  padding: 0.85rem 1rem;
   background: #fff;
-
-  h2 {
-    margin: 0 0 0.45rem;
-    font-size: 1.05rem;
-  }
 
   p {
     margin: 0;
     color: #334c6b;
     line-height: 1.55;
+  }
+}
+
+.seeker-project-meta-grid {
+  border: 1px solid rgba(21, 50, 91, 0.15);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.seeker-project-meta-grid__item {
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid rgba(21, 50, 91, 0.1);
+  display: grid;
+  gap: 0.3rem;
+
+  &:nth-child(2n + 1) {
+    border-right: 1px solid rgba(21, 50, 91, 0.1);
+  }
+
+  &:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+
+  span {
+    color: #5f7898;
+    font-size: 0.82rem;
+  }
+
+  strong,
+  a {
+    color: #1d3452;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: #0171e1;
+    text-decoration: underline;
   }
 }
 
@@ -883,7 +961,7 @@
 
 .seeker-project-sidebar {
   display: grid;
-  gap: 0.8rem;
+  gap: 0.9rem;
 }
 
 .seeker-project-sidebar__card {
@@ -921,7 +999,48 @@
   }
 }
 
+.seeker-project-sidebar__card--single {
+  background: #dbe9f8;
+  border-color: rgba(1, 113, 225, 0.16);
+  border-radius: 16px;
+  padding: 1rem;
+  display: grid;
+  gap: 0.85rem;
+
+  h3 {
+    margin-bottom: 0.2rem;
+    color: #0f5ea7;
+  }
+}
+
 .seeker-project-sidebar__author {
+  margin-top: 0.35rem;
+}
+
+.seeker-project-sidebar__cta {
+  display: grid;
+  gap: 0.45rem;
+
+  .btn {
+    width: 100%;
+    min-height: 40px;
+    border-radius: 999px;
+    justify-content: center;
+  }
+
+  .btn--ghost {
+    background: #f7fbff;
+    border-color: #6ba9e6;
+    color: #0f5ea7;
+  }
+
+  .btn--primary {
+    border: 0;
+    background: linear-gradient(45deg, #0171e1 0%, #87c3ff 100%);
+  }
+}
+
+.seeker-project-sidebar__team-title {
   margin-top: 0.35rem;
 }
 
@@ -2850,6 +2969,18 @@
 
   .seeker-project-page__layout {
     grid-template-columns: 1fr;
+  }
+
+  .seeker-project-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .seeker-project-meta-grid__item {
+    border-right: 0 !important;
+
+    &:not(:last-child) {
+      border-bottom: 1px solid rgba(21, 50, 91, 0.1);
+    }
   }
 
   .seeker-project-gallery__thumbs {

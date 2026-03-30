@@ -297,6 +297,10 @@ export function SeekerPortfolioProjectPage() {
   const authorRoleView = project?.authorRole || projectCard?.primaryRole || 'Роль не указана'
   const authorAvatarUrl = resolveMediaUrl(project?.authorAvatarUrl || projectCard?.authorAvatarUrl)
   const authorFallback = getAvatarFallback(authorView)
+  const authorUsernameView = project?.authorUsername || username || session?.user?.username || ''
+  const authorProfileHref = authorUsernameView
+    ? `/dashboard/seeker/${encodeURIComponent(authorUsernameView)}`
+    : '/dashboard/seeker'
 
   const participantItems = useMemo(
     () =>
@@ -333,6 +337,13 @@ export function SeekerPortfolioProjectPage() {
     () => (project?.collaborations ?? []).filter((item) => item.type === 3 && item.opportunityId),
     [project],
   )
+  const teammates = useMemo(() => [...participantItems, ...userCollaborationItems], [participantItems, userCollaborationItems])
+  const totalCollaborators = teammates.length
+  const roleChipLabel = project?.authorRole?.trim() || projectCard?.primaryRole?.trim() || 'Командный проект'
+  const projectStatusChipLabel = isPrivate ? 'Приватный' : 'Публичный'
+  const projectSummaryText = project?.description || projectCard?.shortDescription || 'Описание не добавлено.'
+  const hasRepo = Boolean(project?.repoUrl?.trim())
+  const hasDemo = Boolean(project?.demoUrl?.trim())
 
   function openModal() {
     if (!project) return
@@ -522,7 +533,7 @@ export function SeekerPortfolioProjectPage() {
       <MainHeader />
 
       <main className="seeker-profile-page seeker-project-page-shell">
-        <section className="card seeker-project-page">
+        <section className="card seeker-project-page seeker-project-page--redesign">
           <div className="seeker-project-page__header">
             <Link to={backHref}>← Назад в профиль</Link>
             <h1>{titleView}</h1>
@@ -542,6 +553,14 @@ export function SeekerPortfolioProjectPage() {
           {!loading && !error && project ? (
             <div className="seeker-project-page__layout">
               <section className="seeker-project-gallery">
+                <div className="seeker-project-page__chips">
+                  <span className="tag seeker-project-page__chip seeker-project-page__chip--role">{roleChipLabel}</span>
+                  <span className="tag seeker-project-page__chip seeker-project-page__chip--status">{projectStatusChipLabel}</span>
+                  <span className="tag seeker-project-page__chip seeker-project-page__chip--team">
+                    Участников: {totalCollaborators || 1}
+                  </span>
+                </div>
+
                 <div className="seeker-project-gallery__main">
                   {active ? (
                     <img src={active.url} alt={titleView} />
@@ -572,57 +591,70 @@ export function SeekerPortfolioProjectPage() {
                 ) : null}
 
                 <article className="seeker-project-description">
-                  <h2>Описание проекта</h2>
-                  <p>{project.description || projectCard?.shortDescription || 'Описание не добавлено.'}</p>
+                  <p>{projectSummaryText}</p>
                 </article>
+
+                <section className="seeker-project-meta-grid">
+                  <article className="seeker-project-meta-grid__item">
+                    <span>Дата начала:</span>
+                    <strong>{fmtDate(project.startDate)}</strong>
+                  </article>
+                  <article className="seeker-project-meta-grid__item">
+                    <span>Дата окончания:</span>
+                    <strong>{fmtDate(project.endDate)}</strong>
+                  </article>
+                  <article className="seeker-project-meta-grid__item">
+                    <span>Репозиторий:</span>
+                    {hasRepo ? (
+                      <a href={project.repoUrl!} target="_blank" rel="noreferrer">
+                        GitHub
+                      </a>
+                    ) : (
+                      <strong>Не указан</strong>
+                    )}
+                  </article>
+                  <article className="seeker-project-meta-grid__item">
+                    <span>Демо:</span>
+                    {hasDemo ? (
+                      <a href={project.demoUrl!} target="_blank" rel="noreferrer">
+                        Открыть
+                      </a>
+                    ) : (
+                      <strong>Не указано</strong>
+                    )}
+                  </article>
+                </section>
               </section>
 
               <aside className="seeker-project-sidebar">
-                <article className="seeker-project-sidebar__card">
-                  <h3>Автор проекта</h3>
+                <article className="seeker-project-sidebar__card seeker-project-sidebar__card--single">
+                  <h3>Автор</h3>
                   <div className="portfolio-card__author seeker-project-sidebar__author">
                     <div className="portfolio-card__avatar">
                       {authorAvatarUrl ? <img src={authorAvatarUrl} alt={authorView} /> : <span>{authorFallback}</span>}
                     </div>
                     <div>
                       <strong>{authorView}</strong>
-                      <span>{authorRoleView}</span>
+                      <span>Роль: {authorRoleView}</span>
                     </div>
                   </div>
-                </article>
 
-                <article className="seeker-project-sidebar__card">
-                  <h3>Информация</h3>
-                  <dl>
-                    <div>
-                      <dt>Начало</dt>
-                      <dd>{fmtDate(project.startDate)}</dd>
-                    </div>
-                    <div>
-                      <dt>Завершение</dt>
-                      <dd>{fmtDate(project.endDate)}</dd>
-                    </div>
-                  </dl>
-                </article>
+                  <div className="seeker-project-sidebar__cta">
+                    <Link className="btn btn--ghost" to="/vacancy-flow">
+                      Предложить вакансию
+                    </Link>
+                    <Link className="btn btn--ghost" to="/vacancy-flow">
+                      Предложить мероприятие
+                    </Link>
+                    <Link className="btn btn--primary" to={authorProfileHref}>
+                      Связаться
+                    </Link>
+                  </div>
 
-                <article className="seeker-project-sidebar__card">
-                  <h3>Коллаборации</h3>
-
-                  {participantItems.length || userCollaborationItems.length ? (
+                  <h3 className="seeker-project-sidebar__team-title">Совместно с</h3>
+                  {teammates.length ? (
                     <div className="seeker-project-sidebar__people">
-                      {participantItems.map((item) => (
-                        <div key={item.id} className="portfolio-card__author seeker-project-sidebar__author">
-                          <div className="portfolio-card__avatar">
-                            {item.avatarUrl ? <img src={item.avatarUrl} alt={item.name} /> : <span>{getAvatarFallback(item.name)}</span>}
-                          </div>
-                          <div>
-                            <strong>{item.name}</strong>
-                            <span>{item.role}</span>
-                          </div>
-                        </div>
-                      ))}
-
-                      {userCollaborationItems.map((item) => (
+                      {teammates.map((item) => (
                         <div key={item.id} className="portfolio-card__author seeker-project-sidebar__author">
                           <div className="portfolio-card__avatar">
                             {item.avatarUrl ? <img src={item.avatarUrl} alt={item.name} /> : <span>{getAvatarFallback(item.name)}</span>}
@@ -635,22 +667,17 @@ export function SeekerPortfolioProjectPage() {
                       ))}
                     </div>
                   ) : (
-                    <p>Пользователи не добавлены.</p>
+                    <p>Пока без команды.</p>
                   )}
 
-                  {vacancyCollaborationItems.length ? (
+                  {vacancyCollaborationItems.length || opportunityCollaborationItems.length ? (
                     <ul className="seeker-project-sidebar__marks">
-                      {vacancyCollaborationItems.map((item) => (
+                      {vacancyCollaborationItems.slice(0, 2).map((item) => (
                         <li key={`vacancy-${item.id}`}>
                           <strong>Вакансия:</strong> {item.vacancyTitle || `#${item.vacancyId}`}
                         </li>
                       ))}
-                    </ul>
-                  ) : null}
-
-                  {opportunityCollaborationItems.length ? (
-                    <ul className="seeker-project-sidebar__marks">
-                      {opportunityCollaborationItems.map((item) => (
+                      {opportunityCollaborationItems.slice(0, 2).map((item) => (
                         <li key={`opportunity-${item.id}`}>
                           <strong>Мероприятие:</strong> {item.opportunityTitle || `#${item.opportunityId}`}
                         </li>

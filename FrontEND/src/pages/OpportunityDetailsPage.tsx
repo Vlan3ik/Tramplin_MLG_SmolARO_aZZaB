@@ -1,6 +1,6 @@
-﻿import { CalendarClock, CheckCircle2, Clock3, Link2, MapPin, Share2 } from 'lucide-react'
+﻿import { Bookmark, CalendarClock, CheckCircle2, ChevronLeft, Clock3, MapPin, Share2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { createApplication } from '../api/applications'
 import { shareOpportunityToUser, shareVacancyToUser } from '../api/chats'
 import { fetchMyContacts } from '../api/contacts'
@@ -8,13 +8,11 @@ import { addOpportunityToFavorites, addVacancyToFavorites, fetchMyFavorites, rem
 import { fetchHomeOpportunities, fetchOpportunityDetailById, participateInOpportunity } from '../api/opportunities'
 import { fetchMyFollowerSubscriptions, fetchMyFollowingSubscriptions } from '../api/subscriptions'
 import { OpportunityLocationMap } from '../components/home/OpportunityLocationMap'
-import { OpportunityCard } from '../components/home/OpportunityCard'
-import { OpportunityStateBadges } from '../components/home/OpportunityStateBadges'
 import { useApplications } from '../hooks/useApplications'
 import { useAuth } from '../hooks/useAuth'
 import type { Opportunity, OpportunityDetail } from '../types/opportunity'
 import { typeLabel } from '../types/opportunity'
-import type { OpportunityEntityType } from '../utils/opportunity-routing'
+import { buildOpportunityDetailsPath, type OpportunityEntityType } from '../utils/opportunity-routing'
 import { applyOpportunitySocialSnapshot, resolveOpportunitySocialEntityType, upsertOpportunitySocialState, upsertOpportunitySocialStates } from '../utils/opportunity-social-state'
 import { getTagDisplayLabel } from '../utils/tag-labels'
 
@@ -66,18 +64,65 @@ function formatAbsoluteDate(value: string | null) {
   })
 }
 
-function buildMapLink(opportunity: OpportunityDetail) {
-  if (typeof opportunity.latitude === 'number' && typeof opportunity.longitude === 'number') {
-    return `https://yandex.ru/maps/?ll=${opportunity.longitude}%2C${opportunity.latitude}&z=14&pt=${opportunity.longitude},${opportunity.latitude},pm2blm`
+function normalizeTag(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function calculateSimilarityScore(base: OpportunityDetail, candidate: Opportunity, baseTagSet: Set<string>) {
+  let score = 0
+
+  if (candidate.type === base.type) {
+    score += 35
+  } else if (
+    (base.type === 'vacancy' || base.type === 'internship')
+    && (candidate.type === 'vacancy' || candidate.type === 'internship')
+  ) {
+    score += 20
   }
 
-  return `https://yandex.ru/maps/?text=${encodeURIComponent(opportunity.address || opportunity.location)}`
+  const candidateTagSet = new Set(candidate.tags.map(normalizeTag))
+  let sharedTags = 0
+  for (const tag of candidateTagSet) {
+    if (baseTagSet.has(tag)) {
+      sharedTags += 1
+    }
+  }
+
+  score += sharedTags * 18
+  if (sharedTags === 0) {
+    score -= 8
+  }
+
+  if (candidate.workFormat === base.workFormat) {
+    score += 8
+  }
+
+  if (candidate.location === base.location) {
+    score += 7
+  }
+
+  if (candidate.company === base.company) {
+    score += 4
+  }
+
+  if (candidate.verified === base.verified) {
+    score += 2
+  }
+
+  score += Math.min(candidate.tagMatchCount, 5)
+
+  return score
+}
+
+function formatSimilarCompensation(value: string) {
+  return value.replace(/руб\.?/gi, 'RUB')
 }
 
 export function OpportunityDetailsPage() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const { session } = useAuth()
+  const navigate = useNavigate()
   const { hasApplied } = useApplications()
 
   const [opportunity, setOpportunity] = useState<OpportunityDetail | null>(null)
@@ -153,12 +198,30 @@ export function OpportunityDetailsPage() {
         setIsFavorite(Boolean(normalizedDetail.isFavoriteByMe))
         upsertOpportunitySocialState(normalizedDetail)
 
+        const baseEntityType = resolveOpportunitySocialEntityType(detail)
+        const baseTagSet = new Set(detail.tags.map(normalizeTag))
+
         const similarResponse = await fetchHomeOpportunities(
           {
             page: 1,
-            pageSize: 4,
-            search: detail.company,
-            filters: { types: [], formats: [], tagIds: [], salaryFrom: null, salaryTo: null, statuses: [], verifiedOnly: false },
+            pageSize: 48,
+            search: '',
+            filters: {
+              types:
+                detail.type === 'event'
+                  ? ['event']
+                  : detail.type === 'vacancy'
+                    ? ['vacancy', 'internship']
+                    : detail.type === 'internship'
+                      ? ['internship', 'vacancy']
+                      : [detail.type],
+              formats: [],
+              tagIds: [],
+              salaryFrom: null,
+              salaryTo: null,
+              statuses: [],
+              verifiedOnly: false,
+            },
           },
           controller.signal,
         )
@@ -167,10 +230,29 @@ export function OpportunityDetailsPage() {
           return
         }
 
-        const normalizedSimilar = similarResponse.items
+        const rankedSimilar = similarResponse.items
           .map((item) => ({ ...item, isFavoriteByMe: resolveIsFavoriteFromSnapshot(item, favoriteIdsSnapshot) }))
-          .filter((item) => item.id !== detail.id)
+          .filter((item) => !(item.id === detail.id && resolveOpportunitySocialEntityType(item) === baseEntityType))
+          .map((item) => ({
+            item,
+            score: calculateSimilarityScore(detail, item, baseTagSet),
+          }))
+          .sort((a, b) => {
+            if (b.score !== a.score) {
+              return b.score - a.score
+            }
+
+            if (b.item.tagMatchCount !== a.item.tagMatchCount) {
+              return b.item.tagMatchCount - a.item.tagMatchCount
+            }
+
+            return b.item.id - a.item.id
+          })
+
+        const positiveRanked = rankedSimilar.filter((entry) => entry.score > 0)
+        const normalizedSimilar = (positiveRanked.length ? positiveRanked : rankedSimilar)
           .slice(0, 3)
+          .map((entry) => entry.item)
 
         setSimilarOpportunities(normalizedSimilar)
         upsertOpportunitySocialStates(normalizedSimilar)
@@ -366,7 +448,7 @@ export function OpportunityDetailsPage() {
   if (isLoading) {
     return (
       <section className="container opportunity-page">
-        <div className="state-card">Загружаем вакансию...</div>
+        <div className="state-card">Загружаем возможность...</div>
       </section>
     )
   }
@@ -374,49 +456,82 @@ export function OpportunityDetailsPage() {
   if (!opportunity || errorMessage) {
     return (
       <section className="container opportunity-page">
-        <div className="state-card state-card--error">{errorMessage || 'Вакансия не найдена.'}</div>
+        <div className="state-card state-card--error">{errorMessage || 'Возможность не найдена.'}</div>
       </section>
     )
   }
+  const descriptionText = opportunity.fullDescription || opportunity.shortDescription || opportunity.description
 
   return (
-    <section className="container opportunity-page">
-      <nav className="breadcrumbs">
-        <Link to="/">Главная</Link>
-        <span>/</span>
-        <span>{typeLabel[opportunity.type]}</span>
-        <span>/</span>
-        <span>{opportunity.title}</span>
-      </nav>
+    <section className="container opportunity-page opportunity-event-card-page">
+      <div className="opportunity-event-card-page__back">
+        <button className="btn btn--ghost" type="button" onClick={() => navigate(-1)}>
+          <ChevronLeft size={16} />
+          Назад
+        </button>
+      </div>
 
       {actionMessage ? <div className={`state-card ${actionError ? 'state-card--error' : ''}`}>{actionMessage}</div> : null}
 
-      <div className="opportunity-page__top card">
-        <div>
+      <div className="opportunity-page__top">
+        <article className="card opportunity-event-card">
           <span className={`badge badge--${opportunity.type}`}>{typeLabel[opportunity.type]}</span>
           <h1>{opportunity.title}</h1>
-          <div className="opportunity-key-metrics">
-            <span>{opportunity.company}</span>
-            <span>{opportunity.compensation}</span>
-            <span>{opportunity.workFormat}</span>
-            <span>
+          <div className="opportunity-event-card__chips">
+            <span className="tag opportunity-event-card__chip opportunity-event-card__chip--company">{opportunity.company}</span>
+            <span className="tag opportunity-event-card__chip opportunity-event-card__chip--salary">{opportunity.compensation}</span>
+            <span className="tag opportunity-event-card__chip opportunity-event-card__chip--format">{opportunity.workFormat}</span>
+            <span className="tag opportunity-event-card__chip opportunity-event-card__chip--location">
               <MapPin size={14} />
               {opportunity.location}
             </span>
           </div>
-        </div>
+          <p className="opportunity-event-card__description">{descriptionText}</p>
 
-        <aside className="sticky-action card">
+          <div className="opportunity-event-card__section">
+            <h2>Навыки и теги</h2>
+            <div className="tag-row">
+              {opportunity.tags.length ? (
+                opportunity.tags.map((tag) => (
+                  <span key={tag} className="tag">
+                    {getTagDisplayLabel(tag)}
+                  </span>
+                ))
+              ) : (
+                <p>Теги не указаны.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="opportunity-event-card__section">
+            <h2>Контакты</h2>
+            <p>{opportunity.companyPublicEmail ? `Email: ${opportunity.companyPublicEmail}` : 'Email не указан'}</p>
+          </div>
+
+          <div className="opportunity-event-card__section">
+            <h2>Ссылки</h2>
+            {opportunity.companyWebsiteUrl ? (
+              <a href={opportunity.companyWebsiteUrl} target="_blank" rel="noreferrer">
+                Профиль компании на сайте
+              </a>
+            ) : (
+              <p>Ссылки не указаны.</p>
+            )}
+          </div>
+
+          <div className="opportunity-event-card__section">
+            <h2>Формат и адрес</h2>
+            <p>{`${opportunity.workFormat}, ${opportunity.address || opportunity.location}`}</p>
+          </div>
+        </article>
+
+        <aside className="card sticky-action opportunity-event-card__actions">
           <button className="btn btn--primary" type="button" disabled={isApplying || applied} onClick={() => void handleApply()}>
             {isApplying ? 'Отправляем...' : applied ? 'Отклик отправлен' : opportunity.type !== 'vacancy' && opportunity.type !== 'internship' ? 'Записаться' : 'Откликнуться'}
           </button>
-          <button className={`btn ${isFavorite ? 'btn--primary' : 'btn--ghost'}`} type="button" onClick={() => void handleToggleFavorite()}>
+          <button className="btn btn--ghost" type="button" onClick={() => void handleToggleFavorite()}>
             {isFavorite ? 'В избранном' : 'В избранное'}
           </button>
-          <OpportunityStateBadges opportunity={opportunity} isFavorite={isFavorite} />
-          <a className="btn btn--ghost" href={buildMapLink(opportunity)} target="_blank" rel="noreferrer">
-            Открыть карту
-          </a>
           <button className="btn btn--ghost" type="button" onClick={() => void handleShare()} disabled={isSharing}>
             {isSharing ? 'Загрузка...' : 'Поделиться'}
           </button>
@@ -440,73 +555,38 @@ export function OpportunityDetailsPage() {
       </div>
 
       <div className="opportunity-page__body">
-        <section className="card">
-          <h2>Описание</h2>
-          <p>{opportunity.fullDescription || opportunity.shortDescription || opportunity.description}</p>
-        </section>
-
-        <section className="card two-col-grid">
-          <div>
-            <h2>Навыки и теги</h2>
-            <div className="tag-row">
-              {opportunity.tags.length ? (
-                opportunity.tags.map((tag) => (
-                  <span key={tag} className="tag">
-                    {getTagDisplayLabel(tag)}
-                  </span>
-                ))
-              ) : (
-                <p>Теги не указаны.</p>
-              )}
-            </div>
-          </div>
-          <div>
-            <h2>Формат и адрес</h2>
-            <p>{opportunity.workFormat}</p>
-            <p>{opportunity.address}</p>
-          </div>
-        </section>
-
-        <section className="card two-col-grid">
-          <div>
-            <h2>Контакты</h2>
-            <p>{opportunity.companyPublicEmail ? `Email: ${opportunity.companyPublicEmail}` : 'Email не указан'}</p>
-            {opportunity.companyWebsiteUrl ? (
-              <a href={opportunity.companyWebsiteUrl} target="_blank" rel="noreferrer">
-                {opportunity.companyWebsiteUrl}
-              </a>
-            ) : (
-              <p>Сайт компании не указан</p>
-            )}
-          </div>
-          <div>
-            <h2>Ссылки</h2>
-            <div className="status-line">
-              <Link2 size={14} />
-              <Link to="/">К списку возможностей</Link>
-            </div>
-            {opportunity.companyWebsiteUrl ? (
-              <div className="status-line">
-                <Link2 size={14} />
-                <a href={opportunity.companyWebsiteUrl} target="_blank" rel="noreferrer">
-                  Профиль компании на сайте
-                </a>
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="card">
+        <section className="card opportunity-event-card-page__map">
           <h2>Карта места</h2>
           <OpportunityLocationMap latitude={opportunity.latitude ?? null} longitude={opportunity.longitude ?? null} title={opportunity.title} />
         </section>
 
-        <section className="card">
+        <section className="card opportunity-event-card-page__similar">
           <h2>Похожие возможности</h2>
           {similarOpportunities.length ? (
             <div className="similar-list">
               {similarOpportunities.map((item) => (
-                <OpportunityCard key={item.id} opportunity={item} compact />
+                <article key={item.id} className="opportunity-event-similar-card">
+                  <div className="opportunity-event-similar-card__left">
+                    <span className={`badge badge--${item.type}`}>{typeLabel[item.type]}</span>
+                    <h3>
+                      <Link to={buildOpportunityDetailsPath(item)}>{item.title}</Link>
+                    </h3>
+                    <p>{item.description || 'Описание добавляется в карточке вакансии.'}</p>
+                    <div className="tag-row">
+                      {item.tags.slice(0, 2).map((tag) => (
+                        <span key={`${item.id}-${tag}`} className="tag">
+                          {getTagDisplayLabel(tag)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="opportunity-event-similar-card__right">
+                    <strong>{formatSimilarCompensation(item.compensation)}</strong>
+                    <Link className="btn btn--icon" aria-label="Открыть карточку" to={buildOpportunityDetailsPath(item)}>
+                      <Bookmark size={16} />
+                    </Link>
+                  </div>
+                </article>
               ))}
             </div>
           ) : (
@@ -514,6 +594,7 @@ export function OpportunityDetailsPage() {
           )}
         </section>
       </div>
+      <div className="opportunity-event-card-page__footer-spacer" aria-hidden="true" />
 
       {isShareModalOpen ? (
         <div className="profile-settings-modal" role="dialog" aria-modal="true" aria-labelledby="share-vacancy-title">
@@ -543,3 +624,9 @@ export function OpportunityDetailsPage() {
     </section>
   )
 }
+
+
+
+
+
+
