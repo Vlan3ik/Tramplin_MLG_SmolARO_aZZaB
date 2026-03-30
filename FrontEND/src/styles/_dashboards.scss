@@ -2370,6 +2370,22 @@
   gap: 0.6rem;
 }
 
+.admin-company-actions-help {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 0.35rem;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    line-height: 1.2;
+  }
+}
+
 .admin-checkbox-row {
   display: inline-flex;
   flex-wrap: wrap;

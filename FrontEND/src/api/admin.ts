@@ -304,6 +304,14 @@ export type AdminResume = {
   userStatus: number
 }
 
+type TechnologyTagApi = {
+  id: number
+  groupId: number
+  groupCode: string
+  name: string
+  slug: string
+}
+
 export type AdminResumeDetail = {
   userId: number
   username: string
@@ -314,6 +322,14 @@ export type AdminResumeDetail = {
   updatedAt: string
   isArchived: boolean
   userStatus: number
+}
+
+export type AdminTechnologyTag = {
+  id: number
+  groupId: number
+  groupCode: string
+  name: string
+  slug: string
 }
 
 export type AdminVacancyDetail = {
@@ -762,6 +778,16 @@ export function fetchAdminVacancyById(id: number, signal?: AbortSignal) {
     })
 }
 
+function mapTechnologyTag(item: TechnologyTagApi): AdminTechnologyTag {
+  return {
+    id: item.id,
+    groupId: item.groupId,
+    groupCode: item.groupCode ?? 'technology',
+    name: item.name ?? '',
+    slug: item.slug ?? '',
+  }
+}
+
 export function updateAdminVacancyStatus(id: number, status: number) {
   return patchJson<unknown, { status: number }>(`/admin/vacancies/${id}/status`, { status })
 }
@@ -954,4 +980,21 @@ export async function deleteAdminResume(userId: number) {
       roles: roleIds,
     })
   }
+}
+
+export async function fetchAdminTechnologyTags(signal?: AbortSignal) {
+  const response = await getJson<TechnologyTagApi[]>('/admin/tags/technology', { signal })
+  return (Array.isArray(response) ? response : []).map(mapTechnologyTag)
+}
+
+export function createAdminTechnologyTag(name: string) {
+  return postJson<TechnologyTagApi, { name: string }>('/admin/tags/technology', { name: name.trim() }).then(mapTechnologyTag)
+}
+
+export function updateAdminTechnologyTag(id: number, name: string) {
+  return patchJson<TechnologyTagApi, { name: string }>(`/admin/tags/technology/${id}`, { name: name.trim() }).then(mapTechnologyTag)
+}
+
+export function deleteAdminTechnologyTag(id: number) {
+  return deleteJson<unknown>(`/admin/tags/technology/${id}`)
 }

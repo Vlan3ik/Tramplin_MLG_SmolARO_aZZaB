@@ -1,20 +1,25 @@
 import { Building2, CheckCircle2, FileWarning, ShieldCheck, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import {
+  createAdminTechnologyTag,
   deleteAdminCompany,
+  deleteAdminTechnologyTag,
   deleteAdminOpportunity,
   deleteAdminUser,
   deleteAdminVacancy,
   fetchAdminCompanies,
   fetchAdminOpportunities,
+  fetchAdminTechnologyTags,
   fetchAdminUsers,
   fetchAdminVacancies,
+  updateAdminTechnologyTag,
   rejectAdminCompany,
   updateAdminOpportunityStatus,
   updateAdminVacancyStatus,
   verifyAdminCompany,
   type AdminCompany,
   type AdminOpportunity,
+  type AdminTechnologyTag,
   type AdminUser,
   type AdminVacancy,
 } from '../../api/admin'
@@ -23,7 +28,7 @@ import { MainHeader } from '../../components/layout/MainHeader'
 import { TopServiceBar } from '../../components/layout/TopServiceBar'
 import { Link } from 'react-router-dom'
 
-type AdminTabId = 'overview' | 'users' | 'companies' | 'vacancies' | 'opportunities'
+type AdminTabId = 'overview' | 'users' | 'companies' | 'vacancies' | 'opportunities' | 'technologies'
 
 const adminTabs: Array<{ id: AdminTabId; label: string }> = [
   { id: 'overview', label: 'Обзор' },
@@ -31,6 +36,7 @@ const adminTabs: Array<{ id: AdminTabId; label: string }> = [
   { id: 'companies', label: 'Компании' },
   { id: 'vacancies', label: 'Вакансии' },
   { id: 'opportunities', label: 'Мероприятия' },
+  { id: 'technologies', label: 'Теги технологий' },
 ]
 
 const accountStatusLabel: Record<number, string> = {
@@ -82,6 +88,7 @@ export function CuratorDashboardPage() {
   const [companies, setCompanies] = useState<AdminCompany[]>([])
   const [vacancies, setVacancies] = useState<AdminVacancy[]>([])
   const [opportunities, setOpportunities] = useState<AdminOpportunity[]>([])
+  const [technologyTags, setTechnologyTags] = useState<AdminTechnologyTag[]>([])
 
   const [usersTotal, setUsersTotal] = useState(0)
   const [companiesTotal, setCompaniesTotal] = useState(0)
@@ -97,6 +104,10 @@ export function CuratorDashboardPage() {
   const [processingCompanyId, setProcessingCompanyId] = useState<number | null>(null)
   const [processingVacancyId, setProcessingVacancyId] = useState<number | null>(null)
   const [processingOpportunityId, setProcessingOpportunityId] = useState<number | null>(null)
+  const [processingTechnologyId, setProcessingTechnologyId] = useState<number | null>(null)
+  const [technologyCreateName, setTechnologyCreateName] = useState('')
+  const [technologyEditId, setTechnologyEditId] = useState<number | null>(null)
+  const [technologyEditName, setTechnologyEditName] = useState('')
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -126,11 +137,16 @@ export function CuratorDashboardPage() {
     setOpportunitiesTotal(response.totalCount)
   }
 
+  async function loadTechnologyTags() {
+    const response = await fetchAdminTechnologyTags()
+    setTechnologyTags(response)
+  }
+
   useEffect(() => {
     let active = true
     setLoading(true)
 
-    Promise.allSettled([loadUsers(), loadCompanies(), loadVacancies(), loadOpportunities()])
+    Promise.allSettled([loadUsers(), loadCompanies(), loadVacancies(), loadOpportunities(), loadTechnologyTags()])
       .then((results) => {
         if (!active) return
 
@@ -272,6 +288,61 @@ export function CuratorDashboardPage() {
       setError(rejectError instanceof Error ? rejectError.message : 'Не удалось отклонить компанию.')
     } finally {
       setProcessingCompanyId(null)
+    }
+  }
+
+  async function onCreateTechnologyTag() {
+    const name = technologyCreateName.trim()
+    if (!name) return
+    clearMessages()
+    setProcessingTechnologyId(0)
+    try {
+      const created = await createAdminTechnologyTag(name)
+      setTechnologyTags((state) => [...state, created].sort((a, b) => a.name.localeCompare(b.name, 'ru')))
+      setTechnologyCreateName('')
+      setSuccess('Технология добавлена.')
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Не удалось добавить технологию.')
+    } finally {
+      setProcessingTechnologyId(null)
+    }
+  }
+
+  async function onSaveTechnologyTag() {
+    if (!technologyEditId) return
+    const name = technologyEditName.trim()
+    if (!name) return
+    clearMessages()
+    setProcessingTechnologyId(technologyEditId)
+    try {
+      const updated = await updateAdminTechnologyTag(technologyEditId, name)
+      setTechnologyTags((state) => state.map((item) => (item.id === updated.id ? updated : item)).sort((a, b) => a.name.localeCompare(b.name, 'ru')))
+      setTechnologyEditId(null)
+      setTechnologyEditName('')
+      setSuccess('Технология обновлена.')
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Не удалось обновить технологию.')
+    } finally {
+      setProcessingTechnologyId(null)
+    }
+  }
+
+  async function onDeleteTechnologyTag(item: AdminTechnologyTag) {
+    if (typeof window !== 'undefined' && !window.confirm(`Удалить тег "${item.name}"?`)) return
+    clearMessages()
+    setProcessingTechnologyId(item.id)
+    try {
+      await deleteAdminTechnologyTag(item.id)
+      setTechnologyTags((state) => state.filter((tag) => tag.id !== item.id))
+      if (technologyEditId === item.id) {
+        setTechnologyEditId(null)
+        setTechnologyEditName('')
+      }
+      setSuccess('Технология удалена.')
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Не удалось удалить технологию.')
+    } finally {
+      setProcessingTechnologyId(null)
     }
   }
 
@@ -478,8 +549,63 @@ export function CuratorDashboardPage() {
             </div>
           </section>
         ) : null}
+
+        {tab === 'technologies' ? (
+          <section className="dashboard-section card seeker-profile-panel">
+            <div className="seeker-profile-panel__head">
+              <h2>Теги технологий</h2>
+              <div className="admin-toolbar">
+                <input
+                  value={technologyCreateName}
+                  onChange={(event) => setTechnologyCreateName(event.target.value)}
+                  placeholder="Новая технология"
+                />
+                <button type="button" className="btn btn--ghost" onClick={() => void onCreateTechnologyTag()} disabled={processingTechnologyId === 0}>
+                  Добавить
+                </button>
+              </div>
+            </div>
+            <div className="admin-list-grid">
+              {technologyTags.map((item) => (
+                <article key={item.id} className="favorite-card admin-list-card">
+                  <div className="favorite-card__head">
+                    <div>
+                      {technologyEditId === item.id ? (
+                        <input value={technologyEditName} onChange={(event) => setTechnologyEditName(event.target.value)} />
+                      ) : (
+                        <h3>{item.name}</h3>
+                      )}
+                      <p>{item.slug}</p>
+                    </div>
+                  </div>
+                  <div className="favorite-card__actions">
+                    {technologyEditId === item.id ? (
+                      <>
+                        <button type="button" className="btn btn--secondary" onClick={() => void onSaveTechnologyTag()} disabled={processingTechnologyId === item.id}>
+                          Сохранить
+                        </button>
+                        <button type="button" className="btn btn--ghost" onClick={() => { setTechnologyEditId(null); setTechnologyEditName('') }}>
+                          Отмена
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" className="btn btn--secondary" onClick={() => { setTechnologyEditId(item.id); setTechnologyEditName(item.name) }}>
+                        Редактировать
+                      </button>
+                    )}
+                    <button type="button" className="btn btn--danger" onClick={() => void onDeleteTechnologyTag(item)} disabled={processingTechnologyId === item.id}>
+                      Удалить
+                    </button>
+                  </div>
+                </article>
+              ))}
+              {!technologyTags.length ? <p>Список технологий пуст.</p> : null}
+            </div>
+          </section>
+        ) : null}
       </main>
       <Footer />
     </div>
   )
 }
+

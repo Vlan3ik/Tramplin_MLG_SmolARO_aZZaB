@@ -1,19 +1,22 @@
 import { Building2, Clock3, Globe, Mail, MapPin, MessageSquare, Phone, ShieldCheck, UploadCloud } from 'lucide-react'
-import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchCities, fetchLocations, fetchTags } from '../../api/catalog'
 import { fetchEmployerChats } from '../../api/chats'
 import {
   createEmployerCompanyLink,
+  createEmployerTechnologyTag,
   createEmployerCompany,
   createEmployerOpportunity,
   createEmployerVacancy,
   deleteEmployerCompanyLink,
+  deleteEmployerTechnologyTag,
   deleteEmployerOpportunity,
   deleteEmployerVacancy,
   fetchEmployerApplicationDetail,
   fetchEmployerApplications,
   fetchEmployerCompany,
+  fetchEmployerTechnologyTags,
   fetchEmployerVerificationDocuments,
   fetchEmployerVerificationIndustries,
   fetchEmployerVerificationProfile,
@@ -25,6 +28,7 @@ import {
   submitEmployerCompanyVerification,
   uploadEmployerVerificationDocument,
   updateEmployerCompanyLink,
+  updateEmployerTechnologyTag,
   updateEmployerOpportunity,
   updateEmployerApplicationStatus,
   updateEmployerCompanyChatSettings,
@@ -36,6 +40,7 @@ import {
   type EmployerCompany,
   type EmployerCompanyLink,
   type EmployerOpportunity,
+  type EmployerTechnologyTag,
   type EmployerVerificationDocument,
   type EmployerVerificationIndustry,
   type EmployerVerificationProfile,
@@ -51,7 +56,7 @@ import { TagPicker } from '../../components/forms/TagPicker'
 import type { City, Location, TagListItem } from '../../types/catalog'
 import { formatSkillLevelDisplay } from '../../utils/skill-levels'
 
-type EmployerTabId = 'overview' | 'company' | 'create' | 'opportunities' | 'applications' | 'verification' | 'settings'
+type EmployerTabId = 'overview' | 'company' | 'create' | 'opportunities' | 'applications' | 'verification' | 'settings' | 'technologies'
 
 const employerTabs: Array<{ id: EmployerTabId; label: string }> = [
   { id: 'overview', label: 'Обзор' },
@@ -60,6 +65,7 @@ const employerTabs: Array<{ id: EmployerTabId; label: string }> = [
   { id: 'applications', label: 'Отклики' },
   { id: 'verification', label: 'Верификация' },
   { id: 'settings', label: 'Настройки чата' },
+  { id: 'technologies', label: '\u0422\u0435\u0433\u0438 \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0438\u0439' },
 ]
 
 const companyStatusLabel: Record<string, string> = {
@@ -149,11 +155,23 @@ const employerTypeOptions: Array<{ value: number; label: string }> = [
 ]
 
 const verificationDocumentTypeLabel: Record<number, string> = {
-  1: '\u0423\u0441\u0442\u0430\u0432\u043d\u044b\u0435 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b',
-  2: '\u0412\u044b\u043f\u0438\u0441\u043a\u0430 \u0415\u0413\u0420\u042e\u041b/\u0415\u0413\u0420\u0418\u041f',
-  3: '\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442 \u043f\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u0438\u0442\u0435\u043b\u044f',
-  4: '\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u0440\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b',
-  5: '\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 \u043f\u0443\u0431\u043b\u0438\u0447\u043d\u043e\u0441\u0442\u0438',
+  1: '\u0412\u044b\u043f\u0438\u0441\u043a\u0430 \u0415\u0413\u0420\u042e\u041b',
+  2: '\u0412\u044b\u043f\u0438\u0441\u043a\u0430 \u0415\u0413\u0420\u0418\u041f',
+  3: '\u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0430 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438 \u0441 \u0440\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u0430\u043c\u0438',
+  4: '\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442 \u043e \u043f\u043e\u043b\u043d\u043e\u043c\u043e\u0447\u0438\u044f\u0445 \u043f\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u0438\u0442\u0435\u043b\u044f',
+  5: '\u0424\u043e\u0442\u043e \u043e\u0444\u0438\u0441\u0430',
+  6: '\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 \u0434\u043e\u043c\u0435\u043d\u043d\u043e\u0439 \u043f\u043e\u0447\u0442\u044b',
+  7: '\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 \u0418\u041d\u041d (\u043f\u043e\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430 \u043d\u0430 \u0443\u0447\u0435\u0442)',
+  8: '\u0424\u043e\u0442\u043e \u0440\u0430\u0431\u043e\u0447\u0435\u0433\u043e \u043c\u0435\u0441\u0442\u0430',
+  9: '\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u0430 \u0441\u0430\u043c\u043e\u0437\u0430\u043d\u044f\u0442\u043e\u0433\u043e (\u041d\u041f\u0414)',
+  10: '\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442, \u0443\u0434\u043e\u0441\u0442\u043e\u0432\u0435\u0440\u044f\u044e\u0449\u0438\u0439 \u043b\u0438\u0447\u043d\u043e\u0441\u0442\u044c',
+  11: '\u041f\u043e\u0440\u0442\u0444\u043e\u043b\u0438\u043e \u0438\u043b\u0438 \u0441\u0430\u0439\u0442',
+  12: '\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 HR-\u0434\u0435\u044f\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u0438',
+  13: '\u041e\u0444\u0435\u0440\u0442\u0430 \u0438\u043b\u0438 \u0434\u043e\u0433\u043e\u0432\u043e\u0440 \u043d\u0430 \u0443\u0441\u043b\u0443\u0433\u0438',
+  14: '\u0411\u0440\u0435\u043d\u0434-\u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u044b',
+  15: '\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 \u0440\u0435\u043a\u0440\u0443\u0442\u0438\u043d\u0433\u043e\u0432\u043e\u0439 \u0434\u0435\u044f\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u0438',
+  16: '\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 \u043f\u043e\u043b\u043d\u043e\u043c\u043e\u0447\u0438\u0439 \u043e\u0442 \u0437\u0430\u043a\u0430\u0437\u0447\u0438\u043a\u0430',
+  17: '\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 \u043d\u0430\u0439\u043c\u0430 \u0434\u043b\u044f \u043b\u0438\u0447\u043d\u044b\u0445 \u043d\u0443\u0436\u0434',
 }
 
 const verificationDocumentStatusLabel: Record<number, string> = {
@@ -161,6 +179,101 @@ const verificationDocumentStatusLabel: Record<number, string> = {
   2: '\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d',
   3: '\u041e\u0448\u0438\u0431\u043a\u0430',
   4: '\u041e\u0442\u043a\u043b\u043e\u043d\u0435\u043d',
+}
+
+type VerificationProfileFieldKey =
+  | 'ogrnOrOgrnip'
+  | 'inn'
+  | 'kpp'
+  | 'legalAddress'
+  | 'actualAddress'
+  | 'representativeFullName'
+  | 'representativePosition'
+  | 'mainIndustryId'
+  | 'taxOffice'
+  | 'workEmail'
+  | 'workPhone'
+  | 'siteOrPublicLinks'
+
+type VerificationProfileFieldRule = {
+  visible: boolean
+  required: boolean
+}
+
+const verificationProfileFieldKeys: VerificationProfileFieldKey[] = [
+  'ogrnOrOgrnip',
+  'inn',
+  'kpp',
+  'legalAddress',
+  'actualAddress',
+  'representativeFullName',
+  'representativePosition',
+  'mainIndustryId',
+  'taxOffice',
+  'workEmail',
+  'workPhone',
+  'siteOrPublicLinks',
+]
+
+const defaultVerificationProfileFieldRules: Record<VerificationProfileFieldKey, VerificationProfileFieldRule> = {
+  ogrnOrOgrnip: { visible: true, required: true },
+  inn: { visible: true, required: true },
+  kpp: { visible: true, required: false },
+  legalAddress: { visible: true, required: true },
+  actualAddress: { visible: true, required: false },
+  representativeFullName: { visible: true, required: true },
+  representativePosition: { visible: true, required: false },
+  mainIndustryId: { visible: true, required: true },
+  taxOffice: { visible: false, required: false },
+  workEmail: { visible: true, required: true },
+  workPhone: { visible: true, required: true },
+  siteOrPublicLinks: { visible: false, required: false },
+}
+
+const verificationProfileFieldRuleOverridesByEmployerType: Record<number, Partial<Record<VerificationProfileFieldKey, VerificationProfileFieldRule>>> = {
+  1: { representativePosition: { visible: true, required: true } },
+  2: {
+    kpp: { visible: false, required: false },
+    representativePosition: { visible: false, required: false },
+    taxOffice: { visible: true, required: false },
+  },
+  3: {
+    ogrnOrOgrnip: { visible: false, required: false },
+    kpp: { visible: false, required: false },
+    legalAddress: { visible: false, required: false },
+    actualAddress: { visible: false, required: false },
+    representativePosition: { visible: false, required: false },
+    taxOffice: { visible: true, required: false },
+    siteOrPublicLinks: { visible: true, required: true },
+  },
+  4: { representativePosition: { visible: true, required: true } },
+  5: {
+    ogrnOrOgrnip: { visible: false, required: false },
+    kpp: { visible: false, required: false },
+    legalAddress: { visible: false, required: false },
+    actualAddress: { visible: false, required: false },
+    representativePosition: { visible: false, required: false },
+    taxOffice: { visible: true, required: false },
+    siteOrPublicLinks: { visible: true, required: true },
+  },
+  6: {
+    ogrnOrOgrnip: { visible: false, required: false },
+    kpp: { visible: false, required: false },
+    legalAddress: { visible: false, required: false },
+    actualAddress: { visible: false, required: false },
+    representativePosition: { visible: false, required: false },
+    inn: { visible: true, required: false },
+    siteOrPublicLinks: { visible: true, required: false },
+  },
+}
+
+function getVerificationProfileFieldRules(employerType: number) {
+  const overrides = verificationProfileFieldRuleOverridesByEmployerType[employerType] ?? {}
+  const rules = {} as Record<VerificationProfileFieldKey, VerificationProfileFieldRule>
+  verificationProfileFieldKeys.forEach((field) => {
+    rules[field] = overrides[field] ?? defaultVerificationProfileFieldRules[field]
+  })
+  return rules
 }
 
 
@@ -347,6 +460,7 @@ export function EmployerDashboardPage() {
   const [companyMissing, setCompanyMissing] = useState(false)
   const [cities, setCities] = useState<City[]>([])
   const [tags, setTags] = useState<TagListItem[]>([])
+  const [technologyTags, setTechnologyTags] = useState<EmployerTechnologyTag[]>([])
   const [vacancyLocations, setVacancyLocations] = useState<Location[]>([])
   const [opportunityLocations, setOpportunityLocations] = useState<Location[]>([])
   const [opportunities, setOpportunities] = useState<EmployerOpportunity[]>([])
@@ -379,6 +493,10 @@ export function EmployerDashboardPage() {
   const [opportunityStatusesFilter, setOpportunityStatusesFilter] = useState<number[]>([])
   const [applicationSearch, setApplicationSearch] = useState('')
   const [applicationStatusesFilter, setApplicationStatusesFilter] = useState<number[]>([])
+  const [technologyCreateName, setTechnologyCreateName] = useState('')
+  const [technologyEditId, setTechnologyEditId] = useState<number | null>(null)
+  const [technologyEditName, setTechnologyEditName] = useState('')
+  const [technologyProcessingId, setTechnologyProcessingId] = useState<number | null>(null)
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -459,15 +577,17 @@ export function EmployerDashboardPage() {
   const [verificationDocuments, setVerificationDocuments] = useState<EmployerVerificationDocument[]>([])
   const [verificationSaving, setVerificationSaving] = useState(false)
   const [verificationUploadFiles, setVerificationUploadFiles] = useState<Record<number, File | null>>({})
+  const verificationRequirementsRequestIdRef = useRef(0)
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
     setError('')
 
     try {
-      const [citiesResult, tagsResult, chatsResult, applicationsResult] = await Promise.allSettled([
+      const [citiesResult, tagsResult, technologyTagsResult, chatsResult, applicationsResult] = await Promise.allSettled([
         fetchCities(),
         fetchTags(),
+        fetchEmployerTechnologyTags(),
         fetchEmployerChats(),
         fetchEmployerApplications(),
       ])
@@ -478,6 +598,12 @@ export function EmployerDashboardPage() {
 
       if (tagsResult.status === 'fulfilled') {
         setTags(tagsResult.value)
+      }
+
+      if (technologyTagsResult.status === 'fulfilled') {
+        setTechnologyTags(technologyTagsResult.value)
+      } else {
+        setTechnologyTags([])
       }
 
       if (chatsResult.status === 'fulfilled') {
@@ -531,8 +657,7 @@ export function EmployerDashboardPage() {
 
       if (verificationProfileResult.status === 'fulfilled') {
         setVerificationProfile(verificationProfileResult.value)
-        const requirements = await fetchEmployerVerificationRequirements(verificationProfileResult.value.employerType)
-        setVerificationRequirements(requirements)
+        await loadVerificationRequirements(verificationProfileResult.value.employerType)
       } else {
         setVerificationProfile(null)
         setVerificationRequirements([])
@@ -736,6 +861,18 @@ export function EmployerDashboardPage() {
     () => requiredVerificationDocuments.filter((item) => !verificationDocumentByType.has(item.documentType)).map((item) => item.documentType),
     [requiredVerificationDocuments, verificationDocumentByType],
   )
+  const verificationProfileFieldRules = useMemo(
+    () => getVerificationProfileFieldRules(verificationProfile?.employerType ?? 0),
+    [verificationProfile?.employerType],
+  )
+  const isVerificationFieldVisible = useCallback(
+    (field: VerificationProfileFieldKey) => verificationProfileFieldRules[field].visible,
+    [verificationProfileFieldRules],
+  )
+  const isVerificationFieldRequired = useCallback(
+    (field: VerificationProfileFieldKey) => verificationProfileFieldRules[field].required,
+    [verificationProfileFieldRules],
+  )
 
   const selectedCandidateResume = selectedApplicationDetail?.candidateResume ?? null
 
@@ -819,6 +956,9 @@ export function EmployerDashboardPage() {
 
   function onVerificationProfileChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     const { name, value } = event.target
+    const isEmployerTypeField = name === 'employerType'
+    const nextEmployerType = isEmployerTypeField ? Number(value) || 0 : null
+
     setVerificationProfile((state) => {
       if (!state) {
         return state
@@ -826,9 +966,27 @@ export function EmployerDashboardPage() {
 
       return {
         ...state,
-        [name]: name === 'employerType' || name === 'mainIndustryId' ? Number(value) || 0 : value,
+        [name]: isEmployerTypeField || name === 'mainIndustryId' ? Number(value) || 0 : value,
       }
     })
+
+    if (typeof nextEmployerType === 'number') {
+      void loadVerificationRequirements(nextEmployerType)
+    }
+  }
+
+  async function loadVerificationRequirements(employerType: number) {
+    const requestId = ++verificationRequirementsRequestIdRef.current
+    try {
+      const requirements = await fetchEmployerVerificationRequirements(employerType)
+      if (verificationRequirementsRequestIdRef.current === requestId) {
+        setVerificationRequirements(requirements)
+      }
+    } catch {
+      if (verificationRequirementsRequestIdRef.current === requestId) {
+        setVerificationRequirements([])
+      }
+    }
   }
 
   async function onSaveVerificationProfile(event: FormEvent<HTMLFormElement>) {
@@ -842,8 +1000,7 @@ export function EmployerDashboardPage() {
     setVerificationSaving(true)
     try {
       await updateEmployerCompanyVerification(verificationProfile)
-      const requirements = await fetchEmployerVerificationRequirements(verificationProfile.employerType)
-      setVerificationRequirements(requirements)
+      await loadVerificationRequirements(verificationProfile.employerType)
       setSuccess('Данные верификации сохранены.')
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Не удалось сохранить данные верификации.')
@@ -1467,6 +1624,81 @@ export function EmployerDashboardPage() {
       setError(deleteError instanceof Error ? deleteError.message : 'Не удалось удалить ссылку компании.')
     } finally {
       setDeletingCompanyLinkId(null)
+    }
+  }
+
+
+
+  async function onCreateTechnologyTag() {
+    const name = technologyCreateName.trim()
+    if (!name) {
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setTechnologyProcessingId(0)
+
+    try {
+      const created = await createEmployerTechnologyTag(name)
+      setTechnologyTags((state) => [...state, created].sort((a, b) => a.name.localeCompare(b.name, 'ru')))
+      setTechnologyCreateName('')
+      setSuccess('Тег технологии добавлен.')
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Не удалось добавить технологию.')
+    } finally {
+      setTechnologyProcessingId(null)
+    }
+  }
+
+  async function onSaveTechnologyTag() {
+    if (!technologyEditId) {
+      return
+    }
+
+    const name = technologyEditName.trim()
+    if (!name) {
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setTechnologyProcessingId(technologyEditId)
+
+    try {
+      const updated = await updateEmployerTechnologyTag(technologyEditId, name)
+      setTechnologyTags((state) => state.map((item) => (item.id === updated.id ? updated : item)).sort((a, b) => a.name.localeCompare(b.name, 'ru')))
+      setTechnologyEditId(null)
+      setTechnologyEditName('')
+      setSuccess('Тег технологии обновлен.')
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Не удалось обновить технологию.')
+    } finally {
+      setTechnologyProcessingId(null)
+    }
+  }
+
+  async function onDeleteTechnologyTag(item: EmployerTechnologyTag) {
+    if (typeof window !== 'undefined' && !window.confirm(`Удалить тег "${item.name}"?`)) {
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setTechnologyProcessingId(item.id)
+
+    try {
+      await deleteEmployerTechnologyTag(item.id)
+      setTechnologyTags((state) => state.filter((tag) => tag.id !== item.id))
+      if (technologyEditId === item.id) {
+        setTechnologyEditId(null)
+        setTechnologyEditName('')
+      }
+      setSuccess('Тег технологии удален.')
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Не удалось удалить технологию.')
+    } finally {
+      setTechnologyProcessingId(null)
     }
   }
 
@@ -2530,56 +2762,60 @@ export function EmployerDashboardPage() {
                       ))}
                     </select>
                   </label>
-                  <label>
-                    {'\u041e\u0413\u0420\u041d/\u041e\u0413\u0420\u041d\u0418\u041f'}
-                    <input name="ogrnOrOgrnip" type="text" value={verificationProfile.ogrnOrOgrnip} onChange={onVerificationProfileChange} />
-                  </label>
-                  <label>
-                    {'\u0418\u041d\u041d'}
-                    <input name="inn" type="text" value={verificationProfile.inn} onChange={onVerificationProfileChange} />
-                  </label>
-                  <label>
-                    {'\u041a\u041f\u041f'}
-                    <input name="kpp" type="text" value={verificationProfile.kpp} onChange={onVerificationProfileChange} />
-                  </label>
-                  <label className="full-width">
-                    {'\u042e\u0440\u0438\u0434\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u0430\u0434\u0440\u0435\u0441'}
-                    <input name="legalAddress" type="text" value={verificationProfile.legalAddress} onChange={onVerificationProfileChange} />
-                  </label>
-                  <label className="full-width">
-                    {'\u0424\u0430\u043a\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u0430\u0434\u0440\u0435\u0441'}
-                    <input name="actualAddress" type="text" value={verificationProfile.actualAddress} onChange={onVerificationProfileChange} />
-                  </label>
-                  <label>
-                    {'\u0424\u0418\u041e \u043f\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u0438\u0442\u0435\u043b\u044f'}
-                    <input name="representativeFullName" type="text" value={verificationProfile.representativeFullName} onChange={onVerificationProfileChange} />
-                  </label>
-                  <label>
-                    {'\u0414\u043e\u043b\u0436\u043d\u043e\u0441\u0442\u044c \u043f\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u0438\u0442\u0435\u043b\u044f'}
-                    <input name="representativePosition" type="text" value={verificationProfile.representativePosition} onChange={onVerificationProfileChange} />
-                  </label>
-                  <label>
-                    {'\u041e\u0442\u0440\u0430\u0441\u043b\u044c'}
-                    <select name="mainIndustryId" value={verificationProfile.mainIndustryId} onChange={onVerificationProfileChange}>
+                  {isVerificationFieldVisible('ogrnOrOgrnip') ? <label>
+                    {'\u041e\u0413\u0420\u041d/\u041e\u0413\u0420\u041d\u0418\u041f'}{isVerificationFieldRequired('ogrnOrOgrnip') ? ' *' : ''}
+                    <input name="ogrnOrOgrnip" type="text" value={verificationProfile.ogrnOrOgrnip} onChange={onVerificationProfileChange} required={isVerificationFieldRequired('ogrnOrOgrnip')} />
+                  </label> : null}
+                  {isVerificationFieldVisible('inn') ? <label>
+                    {'\u0418\u041d\u041d'}{isVerificationFieldRequired('inn') ? ' *' : ''}
+                    <input name="inn" type="text" value={verificationProfile.inn} onChange={onVerificationProfileChange} required={isVerificationFieldRequired('inn')} />
+                  </label> : null}
+                  {isVerificationFieldVisible('kpp') ? <label>
+                    {'\u041a\u041f\u041f'}{isVerificationFieldRequired('kpp') ? ' *' : ''}
+                    <input name="kpp" type="text" value={verificationProfile.kpp} onChange={onVerificationProfileChange} required={isVerificationFieldRequired('kpp')} />
+                  </label> : null}
+                  {isVerificationFieldVisible('legalAddress') ? <label className="full-width">
+                    {'\u042e\u0440\u0438\u0434\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u0430\u0434\u0440\u0435\u0441'}{isVerificationFieldRequired('legalAddress') ? ' *' : ''}
+                    <input name="legalAddress" type="text" value={verificationProfile.legalAddress} onChange={onVerificationProfileChange} required={isVerificationFieldRequired('legalAddress')} />
+                  </label> : null}
+                  {isVerificationFieldVisible('actualAddress') ? <label className="full-width">
+                    {'\u0424\u0430\u043a\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u0430\u0434\u0440\u0435\u0441'}{isVerificationFieldRequired('actualAddress') ? ' *' : ''}
+                    <input name="actualAddress" type="text" value={verificationProfile.actualAddress} onChange={onVerificationProfileChange} required={isVerificationFieldRequired('actualAddress')} />
+                  </label> : null}
+                  {isVerificationFieldVisible('representativeFullName') ? <label>
+                    {'\u0424\u0418\u041e \u043f\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u0438\u0442\u0435\u043b\u044f'}{isVerificationFieldRequired('representativeFullName') ? ' *' : ''}
+                    <input name="representativeFullName" type="text" value={verificationProfile.representativeFullName} onChange={onVerificationProfileChange} required={isVerificationFieldRequired('representativeFullName')} />
+                  </label> : null}
+                  {isVerificationFieldVisible('representativePosition') ? <label>
+                    {'\u0414\u043e\u043b\u0436\u043d\u043e\u0441\u0442\u044c \u043f\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u0438\u0442\u0435\u043b\u044f'}{isVerificationFieldRequired('representativePosition') ? ' *' : ''}
+                    <input name="representativePosition" type="text" value={verificationProfile.representativePosition} onChange={onVerificationProfileChange} required={isVerificationFieldRequired('representativePosition')} />
+                  </label> : null}
+                  {isVerificationFieldVisible('mainIndustryId') ? <label>
+                    {'\u041e\u0442\u0440\u0430\u0441\u043b\u044c'}{isVerificationFieldRequired('mainIndustryId') ? ' *' : ''}
+                    <select name="mainIndustryId" value={verificationProfile.mainIndustryId} onChange={onVerificationProfileChange} required={isVerificationFieldRequired('mainIndustryId')}>
                       {verificationIndustries.map((item) => (
                         <option key={item.id} value={item.id}>
                           {item.name}
                         </option>
                       ))}
                     </select>
-                  </label>
-                  <label>
-                    {'\u0420\u0430\u0431\u043e\u0447\u0438\u0439 email'}
-                    <input name="workEmail" type="email" value={verificationProfile.workEmail} onChange={onVerificationProfileChange} />
-                  </label>
-                  <label>
-                    {'\u0420\u0430\u0431\u043e\u0447\u0438\u0439 \u0442\u0435\u043b\u0435\u0444\u043e\u043d'}
-                    <input name="workPhone" type="text" value={verificationProfile.workPhone} onChange={onVerificationProfileChange} />
-                  </label>
-                  <label>
-                    {'\u0421\u0430\u0439\u0442 \u0438\u043b\u0438 \u043f\u0443\u0431\u043b\u0438\u0447\u043d\u044b\u0435 \u0441\u0441\u044b\u043b\u043a\u0438'}
-                    <input name="siteOrPublicLinks" type="text" value={verificationProfile.siteOrPublicLinks} onChange={onVerificationProfileChange} />
-                  </label>
+                  </label> : null}
+                  {isVerificationFieldVisible('taxOffice') ? <label>
+                    {'\u041d\u0430\u043b\u043e\u0433\u043e\u0432\u0430\u044f \u0438\u043d\u0441\u043f\u0435\u043a\u0446\u0438\u044f'}{isVerificationFieldRequired('taxOffice') ? ' *' : ''}
+                    <input name="taxOffice" type="text" value={verificationProfile.taxOffice} onChange={onVerificationProfileChange} required={isVerificationFieldRequired('taxOffice')} />
+                  </label> : null}
+                  {isVerificationFieldVisible('workEmail') ? <label>
+                    {'\u0420\u0430\u0431\u043e\u0447\u0438\u0439 email'}{isVerificationFieldRequired('workEmail') ? ' *' : ''}
+                    <input name="workEmail" type="email" value={verificationProfile.workEmail} onChange={onVerificationProfileChange} required={isVerificationFieldRequired('workEmail')} />
+                  </label> : null}
+                  {isVerificationFieldVisible('workPhone') ? <label>
+                    {'\u0420\u0430\u0431\u043e\u0447\u0438\u0439 \u0442\u0435\u043b\u0435\u0444\u043e\u043d'}{isVerificationFieldRequired('workPhone') ? ' *' : ''}
+                    <input name="workPhone" type="text" value={verificationProfile.workPhone} onChange={onVerificationProfileChange} required={isVerificationFieldRequired('workPhone')} />
+                  </label> : null}
+                  {isVerificationFieldVisible('siteOrPublicLinks') ? <label>
+                    {'\u0421\u0430\u0439\u0442 \u0438\u043b\u0438 \u043f\u0443\u0431\u043b\u0438\u0447\u043d\u044b\u0435 \u0441\u0441\u044b\u043b\u043a\u0438'}{isVerificationFieldRequired('siteOrPublicLinks') ? ' *' : ''}
+                    <input name="siteOrPublicLinks" type="text" value={verificationProfile.siteOrPublicLinks} onChange={onVerificationProfileChange} required={isVerificationFieldRequired('siteOrPublicLinks')} />
+                  </label> : null}
                   <button type="submit" className="btn btn--secondary employer-verification-form__save" disabled={verificationSaving}>
                     {verificationSaving ? '\u0421\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u043c...' : '\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435'}
                   </button>
@@ -2643,6 +2879,60 @@ export function EmployerDashboardPage() {
           <button type="button" className="btn btn--primary employer-verification__submit" onClick={() => void onSubmitVerification()} disabled={submittingVerification || !company}>
             {submittingVerification ? '\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c...' : '\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043d\u0430 \u0432\u0435\u0440\u0438\u0444\u0438\u043a\u0430\u0446\u0438\u044e'}
           </button>
+        </div>
+              </section> : null}
+
+
+
+              {tab === 'technologies' ? <section className="dashboard-section card seeker-profile-panel">
+        <h2>Теги технологий</h2>
+        <div className="seeker-profile-panel__head">
+          <div className="admin-toolbar">
+            <input
+              value={technologyCreateName}
+              onChange={(event) => setTechnologyCreateName(event.target.value)}
+              placeholder="Новая технология"
+            />
+            <button type="button" className="btn btn--ghost" onClick={() => void onCreateTechnologyTag()} disabled={technologyProcessingId === 0}>
+              Добавить
+            </button>
+          </div>
+        </div>
+        <div className="admin-list-grid">
+          {technologyTags.map((item) => (
+            <article key={item.id} className="favorite-card admin-list-card">
+              <div className="favorite-card__head">
+                <div>
+                  {technologyEditId === item.id ? (
+                    <input value={technologyEditName} onChange={(event) => setTechnologyEditName(event.target.value)} />
+                  ) : (
+                    <h3>{item.name}</h3>
+                  )}
+                  <p>{item.slug}</p>
+                </div>
+              </div>
+              <div className="favorite-card__actions">
+                {technologyEditId === item.id ? (
+                  <>
+                    <button type="button" className="btn btn--secondary" onClick={() => void onSaveTechnologyTag()} disabled={technologyProcessingId === item.id}>
+                      Сохранить
+                    </button>
+                    <button type="button" className="btn btn--ghost" onClick={() => { setTechnologyEditId(null); setTechnologyEditName('') }}>
+                      Отмена
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className="btn btn--secondary" onClick={() => { setTechnologyEditId(item.id); setTechnologyEditName(item.name) }}>
+                    Редактировать
+                  </button>
+                )}
+                <button type="button" className="btn btn--danger" onClick={() => void onDeleteTechnologyTag(item)} disabled={technologyProcessingId === item.id}>
+                  Удалить
+                </button>
+              </div>
+            </article>
+          ))}
+          {!technologyTags.length ? <p>Список технологий пуст.</p> : null}
         </div>
               </section> : null}
 

@@ -2607,7 +2607,7 @@ export function SeekerDashboardPage() {
                   <Link className="btn btn--ghost" to="/dashboard/seeker?tab=resume">
                     Назад в профиль
                   </Link>
-                  <Link className="btn btn--primary" to="/dashboard/seeker/resume/print" target="_blank" rel="noreferrer">
+                  <Link className="btn btn--primary" to="/dashboard/seeker/resume/print">
                     Печать / PDF
                   </Link>
                 </div>
@@ -2955,8 +2955,6 @@ export function SeekerDashboardPage() {
                       <Link
                         className="seeker-profile-hero-exact__action seeker-profile-hero-exact__action--print"
                         to="/dashboard/seeker/resume/print"
-                        target="_blank"
-                        rel="noreferrer"
                       >
                         Печать / PDF
                       </Link>

@@ -308,6 +308,14 @@ type EmployerAddressHouseSuggestionApi = {
   houseNumber: string | null
 }
 
+type TechnologyTagApi = {
+  id: number
+  groupId: number
+  groupCode: string
+  name: string
+  slug: string
+}
+
 type EmployerVacancyDetailApi = {
   id: number
   title: string | null
@@ -748,6 +756,14 @@ export type EmployerAddressStreetSuggestion = {
 
 export type EmployerAddressHouseSuggestion = {
   houseNumber: string
+}
+
+export type EmployerTechnologyTag = {
+  id: number
+  groupId: number
+  groupCode: string
+  name: string
+  slug: string
 }
 
 const companyStatusMap: Record<number, string> = {
@@ -1450,4 +1466,31 @@ export function updateEmployerApplicationStatus(applicationId: number, status: n
   }
 
   return patchJson<unknown, UpdateEmployerApplicationStatusApiRequest>(`/employer/applications/${applicationId}/status`, payload)
+}
+
+function mapTechnologyTag(item: TechnologyTagApi): EmployerTechnologyTag {
+  return {
+    id: item.id,
+    groupId: item.groupId,
+    groupCode: item.groupCode ?? 'technology',
+    name: item.name ?? '',
+    slug: item.slug ?? '',
+  }
+}
+
+export async function fetchEmployerTechnologyTags(signal?: AbortSignal) {
+  const response = await getJson<TechnologyTagApi[]>('/employer/tags/technology', { signal })
+  return (Array.isArray(response) ? response : []).map(mapTechnologyTag)
+}
+
+export function createEmployerTechnologyTag(name: string) {
+  return postJson<TechnologyTagApi, { name: string }>('/employer/tags/technology', { name: name.trim() }).then(mapTechnologyTag)
+}
+
+export function updateEmployerTechnologyTag(id: number, name: string) {
+  return patchJson<TechnologyTagApi, { name: string }>(`/employer/tags/technology/${id}`, { name: name.trim() }).then(mapTechnologyTag)
+}
+
+export function deleteEmployerTechnologyTag(id: number) {
+  return deleteJson<unknown>(`/employer/tags/technology/${id}`)
 }

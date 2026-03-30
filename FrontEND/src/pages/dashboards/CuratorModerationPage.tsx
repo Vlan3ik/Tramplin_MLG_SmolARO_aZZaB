@@ -73,7 +73,25 @@ const companyStatusLabel: Record<number, string> = { 1: 'Черновик', 2: '
 const moderationStatusLabel: Record<number, string> = { 1: 'Черновик', 2: 'На модерации', 3: 'Активна', 4: 'Завершена', 5: 'Отменена', 6: 'Отклонена', 7: 'В архиве' }
 const reviewStatusLabel: Record<number, string> = { 1: 'Черновик', 2: 'Ожидает проверки', 3: 'Одобрено', 4: 'Отклонено' }
 const docStatusLabel: Record<number, string> = { 1: 'Загружен', 2: 'Принят', 3: 'Отклонён' }
-const docTypeLabel: Record<number, string> = { 1: 'Уставные документы', 2: 'ИНН / ОГРН', 3: 'Доверенность', 4: 'Реквизиты', 5: 'Иное' }
+const docTypeLabel: Record<number, string> = {
+  1: 'Выписка ЕГРЮЛ',
+  2: 'Выписка ЕГРИП',
+  3: 'Карточка компании с реквизитами',
+  4: 'Документ о полномочиях представителя',
+  5: 'Фото офиса',
+  6: 'Подтверждение доменной почты',
+  7: 'Подтверждение ИНН (постановка на учет)',
+  8: 'Фото рабочего места',
+  9: 'Подтверждение статуса самозанятого (НПД)',
+  10: 'Документ, удостоверяющий личность',
+  11: 'Портфолио или сайт',
+  12: 'Подтверждение HR-деятельности',
+  13: 'Оферта или договор на услуги',
+  14: 'Бренд-материалы',
+  15: 'Подтверждение рекрутинговой деятельности',
+  16: 'Подтверждение полномочий от заказчика',
+  17: 'Подтверждение найма для личных нужд',
+}
 
 function formatDate(value: string | null | undefined) {
   if (!value) return 'Не указано'
@@ -300,7 +318,7 @@ export function CuratorModerationPage() {
       return <>
         <button type="button" className="admin-icon-button admin-icon-button--info" aria-label="Открыть" title="Открыть" onClick={(event) => { stop(event); void openModal('resumes', resume.userId) }}><Eye size={18} /></button>
         <Link className="admin-icon-button admin-icon-button--primary" aria-label="Редактировать" title="Редактировать" to={`/dashboard/seeker/${encodeURIComponent(resume.username)}?mode=resume`} onClick={stop}><Pencil size={18} /></Link>
-        <button type="button" className="admin-icon-button admin-icon-button--warning" aria-label={resume.isArchived ? 'Восстановить' : 'В архив'} onClick={(event) => { stop(event); void openModal('resumes', resume.userId).then(() => confirmAction({ id: resume.isArchived ? 'resume-restore' : 'resume-archive', title: resume.isArchived ? 'Восстановить резюме' : 'Архивировать резюме', text: resume.isArchived ? 'Резюме снова станет доступно.' : 'Резюме будет скрыто из активного списка.', confirm: resume.isArchived ? 'Восстановить' : 'В архив', tone: resume.isArchived ? 'success' : 'warning' })) }}><Archive size={18} /></button>
+        <button type="button" className="admin-icon-button admin-icon-button--warning" aria-label={resume.isArchived ? 'Восстановить' : 'В архив'} title={resume.isArchived ? 'Восстановить резюме из архива' : 'Переместить резюме в архив'} onClick={(event) => { stop(event); void openModal('resumes', resume.userId).then(() => confirmAction({ id: resume.isArchived ? 'resume-restore' : 'resume-archive', title: resume.isArchived ? 'Восстановить резюме' : 'Архивировать резюме', text: resume.isArchived ? 'Резюме снова станет доступно.' : 'Резюме будет скрыто из активного списка.', confirm: resume.isArchived ? 'Восстановить' : 'В архив', tone: resume.isArchived ? 'success' : 'warning' })) }}><Archive size={18} /></button>
         <button type="button" className="admin-icon-button admin-icon-button--danger" aria-label="Заблокировать автора" title="Заблокировать автора" onClick={(event) => { stop(event); void openModal('resumes', resume.userId).then(() => confirmAction({ id: 'resume-ban', title: 'Заблокировать автора', text: `Автор резюме @${resume.username} потеряет доступ к платформе.`, confirm: 'Заблокировать', tone: 'danger' })) }}><Ban size={18} /></button>
         <button type="button" className="admin-icon-button admin-icon-button--danger" aria-label="Удалить" title="Удалить" onClick={(event) => { stop(event); void openModal('resumes', resume.userId).then(() => confirmAction({ id: 'resume-delete', title: 'Удалить резюме', text: `Резюме пользователя @${resume.username} будет удалено.`, confirm: 'Удалить', tone: 'danger' })) }}><Trash2 size={18} /></button>
       </>
@@ -329,12 +347,12 @@ export function CuratorModerationPage() {
     }
     const company = item as AdminCompany
     return <>
-      <button type="button" className="admin-icon-button admin-icon-button--info" aria-label="Открыть" title="Открыть" onClick={(event) => { stop(event); void openModal('companies', company.id) }}><Eye size={18} /></button>
-      <Link className="admin-icon-button admin-icon-button--primary" aria-label="Редактировать" title="Редактировать" to={`/dashboard/curator/companies/create?companyId=${company.id}`} state={{ company }} onClick={stop}><Pencil size={18} /></Link>
-      <button type="button" className="admin-icon-button admin-icon-button--success" aria-label="Одобрить верификацию" title="Одобрить верификацию" onClick={(event) => { stop(event); void openModal('companies', company.id).then(() => confirmAction({ id: 'company-approve', title: 'Одобрить верификацию', text: `Компания "${company.brandName || company.legalName}" будет подтверждена.`, confirm: 'Одобрить', tone: 'success' })) }}><BadgeCheck size={18} /></button>
-      <button type="button" className="admin-icon-button admin-icon-button--danger" aria-label="Отклонить верификацию" title="Отклонить верификацию" onClick={(event) => { stop(event); void openModal('companies', company.id).then(() => confirmAction({ id: 'company-reject', title: 'Отклонить верификацию', text: `Компания "${company.brandName || company.legalName}" будет отклонена.`, confirm: 'Отклонить', tone: 'danger' })) }}><X size={18} /></button>
-      <button type="button" className="admin-icon-button admin-icon-button--warning" aria-label="Заблокировать" title="Заблокировать" onClick={(event) => { stop(event); void openModal('companies', company.id).then(() => confirmAction({ id: 'company-block', title: 'Заблокировать компанию', text: `Компания "${company.brandName || company.legalName}" будет заблокирована.`, confirm: 'Заблокировать', tone: 'warning' })) }}><Ban size={18} /></button>
-      <button type="button" className="admin-icon-button admin-icon-button--danger" aria-label="Удалить" title="Удалить" onClick={(event) => { stop(event); void openModal('companies', company.id).then(() => confirmAction({ id: 'company-delete', title: 'Удалить компанию', text: `Компания "${company.brandName || company.legalName}" будет удалена без возможности восстановления.`, confirm: 'Удалить', tone: 'danger' })) }}><Trash2 size={18} /></button>
+      <button type="button" className="admin-icon-button admin-icon-button--info" aria-label="Открыть карточку компании" title="Открыть карточку компании" onClick={(event) => { stop(event); void openModal('companies', company.id) }}><Eye size={18} /></button>
+      <Link className="admin-icon-button admin-icon-button--primary" aria-label="Редактировать данные компании" title="Редактировать данные компании" to={`/dashboard/curator/companies/create?companyId=${company.id}`} state={{ company }} onClick={stop}><Pencil size={18} /></Link>
+      <button type="button" className="admin-icon-button admin-icon-button--success" aria-label="Одобрить верификацию компании" title="Одобрить верификацию компании" onClick={(event) => { stop(event); void openModal('companies', company.id).then(() => confirmAction({ id: 'company-approve', title: 'Одобрить верификацию', text: `Компания "${company.brandName || company.legalName}" будет подтверждена.`, confirm: 'Одобрить', tone: 'success' })) }}><BadgeCheck size={18} /></button>
+      <button type="button" className="admin-icon-button admin-icon-button--danger" aria-label="Отклонить верификацию компании" title="Отклонить верификацию компании" onClick={(event) => { stop(event); void openModal('companies', company.id).then(() => confirmAction({ id: 'company-reject', title: 'Отклонить верификацию', text: `Компания "${company.brandName || company.legalName}" будет отклонена.`, confirm: 'Отклонить', tone: 'danger' })) }}><X size={18} /></button>
+      <button type="button" className="admin-icon-button admin-icon-button--warning" aria-label="Заблокировать компанию" title="Заблокировать компанию" onClick={(event) => { stop(event); void openModal('companies', company.id).then(() => confirmAction({ id: 'company-block', title: 'Заблокировать компанию', text: `Компания "${company.brandName || company.legalName}" будет заблокирована.`, confirm: 'Заблокировать', tone: 'warning' })) }}><Ban size={18} /></button>
+      <button type="button" className="admin-icon-button admin-icon-button--danger" aria-label="Удалить компанию без восстановления" title="Удалить компанию без восстановления" onClick={(event) => { stop(event); void openModal('companies', company.id).then(() => confirmAction({ id: 'company-delete', title: 'Удалить компанию', text: `Компания "${company.brandName || company.legalName}" будет удалена без возможности восстановления.`, confirm: 'Удалить', tone: 'danger' })) }}><Trash2 size={18} /></button>
     </>
   }
 
@@ -349,7 +367,17 @@ export function CuratorModerationPage() {
           <div className="seeker-profile-hero__avatar admin-profile-hero__avatar"><span>MOD</span></div>
           <div className="seeker-profile-hero__content">
             <div className="seeker-profile-panel__head">
-              <h1>Модерация</h1>
+              <div>
+                <h1>Модерация</h1>
+                <div className="admin-company-actions-help">
+                  <span><Eye size={14} /> Открыть</span>
+                  <span><Pencil size={14} /> Редактировать</span>
+                  <span><BadgeCheck size={14} /> Одобрить</span>
+                  <span><X size={14} /> Отклонить</span>
+                  <span><Ban size={14} /> Заблокировать</span>
+                  <span><Trash2 size={14} /> Удалить</span>
+                </div>
+              </div>
               <div className="admin-toolbar"><Link className="btn btn--ghost" to="/dashboard/curator">Назад в кабинет куратора</Link></div>
             </div>
             <div className="seeker-profile-hero__meta">
