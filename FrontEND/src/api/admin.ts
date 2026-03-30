@@ -304,6 +304,58 @@ export type AdminResume = {
   userStatus: number
 }
 
+export type AdminResumeDetail = {
+  userId: number
+  username: string
+  fio: string
+  headline: string
+  desiredPosition: string
+  summary: string
+  updatedAt: string
+  isArchived: boolean
+  userStatus: number
+}
+
+export type AdminVacancyDetail = {
+  id: number
+  companyId: number
+  createdByUserId: number
+  title: string
+  shortDescription: string
+  fullDescription: string
+  kind: number
+  format: number
+  status: number
+  cityId: number | null
+  locationId: number | null
+  salaryFrom: number | null
+  salaryTo: number | null
+  currencyCode: string | null
+  salaryTaxMode: number
+  publishAt: string
+  applicationDeadline: string | null
+}
+
+export type AdminOpportunityDetail = {
+  id: number
+  companyId: number
+  createdByUserId: number
+  title: string
+  shortDescription: string
+  fullDescription: string
+  kind: number
+  format: number
+  status: number
+  cityId: number | null
+  locationId: number | null
+  priceType: number
+  priceAmount: number | null
+  priceCurrencyCode: string | null
+  participantsCanWrite: boolean
+  publishAt: string
+  eventDate: string | null
+}
+
 export type AdminUserUpsertRequest = {
   email: string
   username: string
@@ -663,7 +715,7 @@ export function updateAdminVacancy(id: number, payload: AdminVacancyUpsertReques
 
 export function fetchAdminVacancyById(id: number, signal?: AbortSignal) {
   return getJson<AdminVacancyDetailApi>(`/admin/vacancies/${id}`, { signal })
-    .then((item) => ({
+    .then((item): AdminVacancyDetail => ({
       id: item.id,
       companyId: item.companyId,
       createdByUserId: item.createdByUserId,
@@ -706,7 +758,7 @@ export function fetchAdminVacancyById(id: number, signal?: AbortSignal) {
         salaryTaxMode: 3,
         publishAt: item.publishAt ?? new Date().toISOString(),
         applicationDeadline: item.applicationDeadline ?? null,
-      }
+      } satisfies AdminVacancyDetail
     })
 }
 
@@ -736,7 +788,7 @@ export function updateAdminOpportunity(id: number, payload: AdminOpportunityUpse
 
 export function fetchAdminOpportunityById(id: number, signal?: AbortSignal) {
   return getJson<AdminOpportunityDetailApi>(`/admin/opportunities/${id}`, { signal })
-    .then((item) => ({
+    .then((item): AdminOpportunityDetail => ({
       id: item.id,
       companyId: item.companyId,
       createdByUserId: item.createdByUserId,
@@ -779,7 +831,7 @@ export function fetchAdminOpportunityById(id: number, signal?: AbortSignal) {
         participantsCanWrite: true,
         publishAt: item.publishAt ?? new Date().toISOString(),
         eventDate: item.eventDate ?? null,
-      }
+      } satisfies AdminOpportunityDetail
     })
 }
 
@@ -818,6 +870,32 @@ export async function fetchAdminResumes(options: FetchListOptions = {}) {
       totalCount: response.totalCount ?? 0,
     }
   }
+}
+
+export async function fetchAdminResumeById(userId: number, signal?: AbortSignal) {
+  const response = await getJson<{
+    userId: number
+    username: string
+    fio: string
+    headline: string | null
+    desiredPosition: string | null
+    summary: string | null
+    updatedAt: string
+    isArchived: boolean
+    userStatus: number | string
+  }>(`/admin/resumes/${userId}`, { signal })
+
+  return {
+    userId: response.userId,
+    username: response.username ?? '',
+    fio: response.fio ?? '',
+    headline: response.headline ?? '',
+    desiredPosition: response.desiredPosition ?? '',
+    summary: response.summary ?? '',
+    updatedAt: response.updatedAt,
+    isArchived: response.isArchived ?? false,
+    userStatus: parseEnum(response.userStatus),
+  } satisfies AdminResumeDetail
 }
 
 export function updateAdminResumeArchive(userId: number, isArchived: boolean) {
