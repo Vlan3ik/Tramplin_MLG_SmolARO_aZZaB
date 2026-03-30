@@ -43,6 +43,26 @@ type AdminVacancyApi = {
   publishAt: string
 }
 
+type AdminVacancyDetailApi = {
+  id: number
+  companyId: number
+  createdByUserId: number
+  title: string
+  shortDescription: string
+  fullDescription: string
+  kind: number | string
+  format: number | string
+  status: number | string
+  cityId: number | null
+  locationId: number | null
+  salaryFrom: number | null
+  salaryTo: number | null
+  currencyCode: string | null
+  salaryTaxMode: number | string
+  publishAt: string
+  applicationDeadline: string | null
+}
+
 type AdminOpportunityApi = {
   id: number
   companyId: number
@@ -51,6 +71,26 @@ type AdminOpportunityApi = {
   kind: number | string
   format: number | string
   publishAt: string
+}
+
+type AdminOpportunityDetailApi = {
+  id: number
+  companyId: number
+  createdByUserId: number
+  title: string
+  shortDescription: string
+  fullDescription: string
+  kind: number | string
+  format: number | string
+  status: number | string
+  cityId: number | null
+  locationId: number | null
+  priceType: number | string
+  priceAmount: number | null
+  priceCurrencyCode: string | null
+  participantsCanWrite: boolean
+  publishAt: string
+  eventDate: string | null
 }
 
 type AdminResumeApi = {
@@ -62,6 +102,51 @@ type AdminResumeApi = {
   updatedAt: string
   isArchived: boolean
   userStatus: number | string
+}
+
+type PublicResumeApi = {
+  userId: number
+  username: string | null
+  fio: string | null
+  headline: string | null
+  desiredPosition: string | null
+  resumeUpdatedAt: string
+}
+
+type PublicVacancyDetailApi = {
+  id: number
+  title: string | null
+  shortDescription: string | null
+  fullDescription: string | null
+  kind?: number | string | null
+  format?: number | string | null
+  status?: number | string | null
+  publishAt?: string
+  applicationDeadline?: string | null
+  salaryFrom?: number | null
+  salaryTo?: number | null
+  currencyCode?: string | null
+  company?: {
+    id?: number
+  } | null
+}
+
+type PublicOpportunityDetailApi = {
+  id: number
+  title: string | null
+  shortDescription: string | null
+  fullDescription: string | null
+  kind?: number | string | null
+  format?: number | string | null
+  status?: number | string | null
+  publishAt?: string
+  eventDate?: string | null
+  priceType?: number | string | null
+  priceAmount?: number | null
+  priceCurrencyCode?: string | null
+  company?: {
+    id?: number
+  } | null
 }
 
 type AdminUserUpsertApiRequest = {
@@ -360,6 +445,29 @@ function mapResume(item: AdminResumeApi): AdminResume {
   }
 }
 
+function mapRoleNameToId(role: string) {
+  const normalized = role.trim().toLowerCase()
+  if (normalized === 'seeker') return 1
+  if (normalized === 'employer') return 2
+  if (normalized === 'curator') return 3
+  if (normalized === 'admin') return 4
+  return null
+}
+
+function mapRoleNamesToIds(roles: string[]) {
+  const values = roles.map(mapRoleNameToId).filter((value) => value !== null)
+  return values as number[]
+}
+
+function isNotFoundError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  const message = error.message.toLowerCase()
+  return message.includes('404') || message.includes('not found') || message.includes('не найден')
+}
+
 function mapUserUpsertRequest(payload: AdminUserUpsertRequest): AdminUserUpsertApiRequest {
   return {
     email: payload.email.trim(),
@@ -553,6 +661,55 @@ export function updateAdminVacancy(id: number, payload: AdminVacancyUpsertReques
   return putJson<AdminVacancyApi, AdminVacancyUpsertApiRequest>(`/admin/vacancies/${id}`, mapVacancyUpsertRequest(payload))
 }
 
+export function fetchAdminVacancyById(id: number, signal?: AbortSignal) {
+  return getJson<AdminVacancyDetailApi>(`/admin/vacancies/${id}`, { signal })
+    .then((item) => ({
+      id: item.id,
+      companyId: item.companyId,
+      createdByUserId: item.createdByUserId,
+      title: item.title ?? '',
+      shortDescription: item.shortDescription ?? '',
+      fullDescription: item.fullDescription ?? '',
+      kind: parseEnum(item.kind),
+      format: parseEnum(item.format),
+      status: parseEnum(item.status),
+      cityId: item.cityId ?? null,
+      locationId: item.locationId ?? null,
+      salaryFrom: item.salaryFrom ?? null,
+      salaryTo: item.salaryTo ?? null,
+      currencyCode: item.currencyCode ?? null,
+      salaryTaxMode: parseEnum(item.salaryTaxMode),
+      publishAt: item.publishAt,
+      applicationDeadline: item.applicationDeadline ?? null,
+    }))
+    .catch(async (error) => {
+      if (!isNotFoundError(error)) {
+        throw error
+      }
+
+      const item = await getJson<PublicVacancyDetailApi>(`/vacancies/${id}`, { signal })
+      return {
+        id: item.id,
+        companyId: item.company?.id ?? 0,
+        createdByUserId: 0,
+        title: item.title ?? '',
+        shortDescription: item.shortDescription ?? '',
+        fullDescription: item.fullDescription ?? '',
+        kind: parseEnum(item.kind ?? 2),
+        format: parseEnum(item.format ?? 2),
+        status: parseEnum(item.status ?? 1),
+        cityId: null,
+        locationId: null,
+        salaryFrom: item.salaryFrom ?? null,
+        salaryTo: item.salaryTo ?? null,
+        currencyCode: item.currencyCode ?? null,
+        salaryTaxMode: 3,
+        publishAt: item.publishAt ?? new Date().toISOString(),
+        applicationDeadline: item.applicationDeadline ?? null,
+      }
+    })
+}
+
 export function updateAdminVacancyStatus(id: number, status: number) {
   return patchJson<unknown, { status: number }>(`/admin/vacancies/${id}/status`, { status })
 }
@@ -577,6 +734,55 @@ export function updateAdminOpportunity(id: number, payload: AdminOpportunityUpse
   return putJson<AdminOpportunityApi, AdminOpportunityUpsertApiRequest>(`/admin/opportunities/${id}`, mapOpportunityUpsertRequest(payload))
 }
 
+export function fetchAdminOpportunityById(id: number, signal?: AbortSignal) {
+  return getJson<AdminOpportunityDetailApi>(`/admin/opportunities/${id}`, { signal })
+    .then((item) => ({
+      id: item.id,
+      companyId: item.companyId,
+      createdByUserId: item.createdByUserId,
+      title: item.title ?? '',
+      shortDescription: item.shortDescription ?? '',
+      fullDescription: item.fullDescription ?? '',
+      kind: parseEnum(item.kind),
+      format: parseEnum(item.format),
+      status: parseEnum(item.status),
+      cityId: item.cityId ?? null,
+      locationId: item.locationId ?? null,
+      priceType: parseEnum(item.priceType),
+      priceAmount: item.priceAmount ?? null,
+      priceCurrencyCode: item.priceCurrencyCode ?? null,
+      participantsCanWrite: item.participantsCanWrite,
+      publishAt: item.publishAt,
+      eventDate: item.eventDate ?? null,
+    }))
+    .catch(async (error) => {
+      if (!isNotFoundError(error)) {
+        throw error
+      }
+
+      const item = await getJson<PublicOpportunityDetailApi>(`/opportunities/${id}`, { signal })
+      return {
+        id: item.id,
+        companyId: item.company?.id ?? 0,
+        createdByUserId: 0,
+        title: item.title ?? '',
+        shortDescription: item.shortDescription ?? '',
+        fullDescription: item.fullDescription ?? '',
+        kind: parseEnum(item.kind ?? 4),
+        format: parseEnum(item.format ?? 2),
+        status: parseEnum(item.status ?? 1),
+        cityId: null,
+        locationId: null,
+        priceType: parseEnum(item.priceType ?? 1),
+        priceAmount: item.priceAmount ?? null,
+        priceCurrencyCode: item.priceCurrencyCode ?? null,
+        participantsCanWrite: true,
+        publishAt: item.publishAt ?? new Date().toISOString(),
+        eventDate: item.eventDate ?? null,
+      }
+    })
+}
+
 export function updateAdminOpportunityStatus(id: number, status: number) {
   return patchJson<unknown, { status: number }>(`/admin/opportunities/${id}/status`, { status })
 }
@@ -586,21 +792,88 @@ export function deleteAdminOpportunity(id: number) {
 }
 
 export async function fetchAdminResumes(options: FetchListOptions = {}) {
-  const response = await getJson<PagedResponse<AdminResumeApi>>(`/admin/resumes?${buildListQuery(options)}`, { signal: options.signal })
-  return {
-    items: (response.items ?? []).map(mapResume),
-    totalCount: response.totalCount ?? 0,
+  try {
+    const response = await getJson<PagedResponse<AdminResumeApi>>(`/admin/resumes?${buildListQuery(options)}`, { signal: options.signal })
+    return {
+      items: (response.items ?? []).map(mapResume),
+      totalCount: response.totalCount ?? 0,
+    }
+  } catch (error) {
+    if (!isNotFoundError(error)) {
+      throw error
+    }
+
+    const response = await getJson<PagedResponse<PublicResumeApi>>(`/resumes?${buildListQuery(options)}`, { signal: options.signal })
+    return {
+      items: (response.items ?? []).map((item) => ({
+        userId: item.userId,
+        username: item.username ?? '',
+        fio: item.fio ?? '',
+        headline: item.headline ?? '',
+        desiredPosition: item.desiredPosition ?? '',
+        updatedAt: item.resumeUpdatedAt ?? '',
+        isArchived: false,
+        userStatus: 1,
+      })),
+      totalCount: response.totalCount ?? 0,
+    }
   }
 }
 
 export function updateAdminResumeArchive(userId: number, isArchived: boolean) {
-  return patchJson<unknown, { isArchived: boolean }>(`/admin/resumes/${userId}/archive`, { isArchived })
+  return patchJson<unknown, { isArchived: boolean }>(`/admin/resumes/${userId}/archive`, { isArchived }).catch((error) => {
+    if (isNotFoundError(error)) {
+      throw new Error('В текущем API архивирование резюме недоступно для модератора.')
+    }
+
+    throw error
+  })
 }
 
-export function banAdminResumeAuthor(userId: number) {
-  return postJson<unknown, Record<string, never>>(`/admin/resumes/${userId}/ban-author`, {})
+export async function banAdminResumeAuthor(userId: number) {
+  try {
+    return await postJson<unknown, Record<string, never>>(`/admin/resumes/${userId}/ban-author`, {})
+  } catch (error) {
+    if (!isNotFoundError(error)) {
+      throw error
+    }
+
+    const user = await fetchAdminUserById(userId)
+    const roleIds = mapRoleNamesToIds(user.roles)
+    if (!roleIds.length) {
+      throw new Error('Не удалось определить роли пользователя для блокировки.')
+    }
+
+    return updateAdminUser(userId, {
+      email: user.email,
+      username: user.username,
+      fio: user.fio,
+      status: 2,
+      roles: roleIds,
+    })
+  }
 }
 
-export function deleteAdminResume(userId: number) {
-  return deleteJson<unknown>(`/admin/resumes/${userId}`)
+export async function deleteAdminResume(userId: number) {
+  try {
+    return await deleteJson<unknown>(`/admin/resumes/${userId}`)
+  } catch (error) {
+    if (!isNotFoundError(error)) {
+      throw error
+    }
+
+    const user = await fetchAdminUserById(userId)
+    const roleIds = mapRoleNamesToIds(user.roles)
+    if (!roleIds.length) {
+      throw new Error('Не удалось определить роли пользователя для удаления.')
+    }
+
+    return updateAdminUser(userId, {
+      email: user.email,
+      username: user.username,
+      fio: user.fio,
+      status: 3,
+      roles: roleIds,
+    })
+  }
 }

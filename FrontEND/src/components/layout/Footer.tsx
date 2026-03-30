@@ -71,7 +71,7 @@ export function Footer() {
 
         <div className="platform-footer__socials">
           <SocialIcon src="/Group 35.svg" alt="VK" />
-              <SocialIcon src="/logo-max-1.svg" alt="MAX" />
+              <SocialIcon src="/social-icons/max.svg" alt="MAX" />
           <SocialIcon src="/Rutube_icon 1.svg" alt="Rutube" />
           <SocialIcon src="/Yandex_Zen_logo_icon 1.svg" alt="Яндекс Дзен" />
         </div>
@@ -86,7 +86,7 @@ export function Footer() {
         </div>
       </div>
 
-        <img className="platform-footer__decor" src="/hands-caps-and-more.svg" alt="" aria-hidden="true" />
+        <img className="platform-footer__decor" src="/Group 20.svg" alt="" aria-hidden="true" />
     </footer>
   )
 }

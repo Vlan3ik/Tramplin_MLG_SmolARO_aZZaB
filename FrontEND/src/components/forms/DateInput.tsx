@@ -125,14 +125,6 @@ export function DateInput({
   const [timeValue, setTimeValue] = useState(toTimeValue(parsedValue))
 
   useEffect(() => {
-    setSelectedDate(parsedValue)
-    setTimeValue(toTimeValue(parsedValue))
-    if (parsedValue) {
-      setViewDate(parsedValue)
-    }
-  }, [parsedValue])
-
-  useEffect(() => {
     if (!isOpen) {
       return
     }
@@ -222,7 +214,9 @@ export function DateInput({
     days.push(new Date(viewDate.getFullYear(), viewDate.getMonth(), day, 0, 0, 0, 0))
   }
 
-  const displayValue = formatDisplayValue(selectedDate, type, timeValue)
+  const displayDate = isOpen ? selectedDate : parsedValue
+  const displayTime = isOpen ? timeValue : toTimeValue(parsedValue)
+  const displayValue = formatDisplayValue(displayDate, type, displayTime)
   const wrapperClassName = `date-input${className ? ` ${className}` : ''}${disabled ? ' is-disabled' : ''}${isOpen ? ' is-open' : ''}`
 
   return (
@@ -233,7 +227,21 @@ export function DateInput({
         type="button"
         className="date-input__display"
         disabled={disabled}
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={() =>
+          setIsOpen((current) => {
+            if (current) {
+              return false
+            }
+
+            setSelectedDate(parsedValue)
+            setTimeValue(toTimeValue(parsedValue))
+            if (parsedValue) {
+              setViewDate(parsedValue)
+            }
+
+            return true
+          })
+        }
       >
         <span className="date-input__display-text">{displayValue || 'Выберите дату'}</span>
         <CalendarDays size={16} />

@@ -120,6 +120,7 @@ export function VacancyFlowPage() {
 
   const flowType: FlowType = searchParams.get('type') === 'event' ? 'event' : 'vacancy'
   const isVacancyFlow = flowType === 'vacancy'
+  const hasValidStep = Boolean(step && validSteps.has(step))
   const currentStep = (step && validSteps.has(step) ? Number(step) : 1) as Step
 
   useEffect(() => {
@@ -156,8 +157,6 @@ export function VacancyFlowPage() {
     const baseCity = cities.find((city) => city.latitude != null && city.longitude != null)
     return baseCity?.latitude != null && baseCity.longitude != null ? [baseCity.longitude, baseCity.latitude] : [37.6156, 55.7522]
   }, [activeAddress.mapPoint, cities, selectedCity])
-
-  if (!step || !validSteps.has(step)) return <Navigate to="/vacancy-flow/1" replace />
 
   function navigateSmooth(url: string) {
     const doc = document as Document & { startViewTransition?: (callback: () => void) => void }
@@ -417,6 +416,10 @@ export function VacancyFlowPage() {
   const streetSuggestions = isVacancyFlow ? vacancyStreetSuggestions : eventStreetSuggestions
   const houseSuggestions = isVacancyFlow ? vacancyHouseSuggestions : eventHouseSuggestions
   const addressText = buildAddressText(activeAddress.cityQuery, activeAddress.streetName, activeAddress.houseNumber)
+
+  if (!hasValidStep) {
+    return <Navigate to="/vacancy-flow/1" replace />
+  }
 
   return (
     <div className="app-shell">

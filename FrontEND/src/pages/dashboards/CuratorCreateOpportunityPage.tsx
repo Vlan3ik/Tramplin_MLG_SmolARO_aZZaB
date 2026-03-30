@@ -1,15 +1,15 @@
-﻿import { ArrowLeft, BriefcaseBusiness } from 'lucide-react'
+import { ArrowLeft, CalendarDays } from 'lucide-react'
 import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  createAdminVacancy,
-  fetchAdminVacancyById,
+  createAdminOpportunity,
   fetchAdminCompanies,
+  fetchAdminOpportunityById,
   fetchAdminUsers,
-  updateAdminVacancy,
+  updateAdminOpportunity,
   type AdminCompany,
+  type AdminOpportunityUpsertRequest,
   type AdminUser,
-  type AdminVacancyUpsertRequest,
 } from '../../api/admin'
 import { fetchCities } from '../../api/catalog'
 import { Footer } from '../../components/layout/Footer'
@@ -25,7 +25,6 @@ function toLocalDateTimeInputValue(date: Date) {
 function parseOptionalNumber(value: string) {
   const trimmed = value.trim()
   if (!trimmed) return null
-
   const parsed = Number(trimmed)
   return Number.isFinite(parsed) ? parsed : null
 }
@@ -37,44 +36,43 @@ function getInitialForm() {
     title: '',
     shortDescription: '',
     fullDescription: '',
-    kind: 2,
+    kind: 4,
     format: 2,
     status: 1,
     cityId: '',
     locationId: '',
-    salaryFrom: '',
-    salaryTo: '',
-    currencyCode: 'RUB',
-    salaryTaxMode: 3,
+    priceType: 1,
+    priceAmount: '',
+    priceCurrencyCode: 'RUB',
+    participantsCanWrite: true,
     publishAt: toLocalDateTimeInputValue(new Date()),
-    applicationDeadline: '',
+    eventDate: '',
   }
 }
 
-export function CuratorCreateVacancyPage() {
+export function CuratorCreateOpportunityPage() {
   const [searchParams] = useSearchParams()
-  const vacancyIdParam = Number(searchParams.get('vacancyId'))
-  const editingVacancyId = Number.isInteger(vacancyIdParam) && vacancyIdParam > 0 ? vacancyIdParam : null
-  const isEditMode = editingVacancyId !== null
+  const opportunityIdParam = Number(searchParams.get('opportunityId'))
+  const editingOpportunityId = Number.isInteger(opportunityIdParam) && opportunityIdParam > 0 ? opportunityIdParam : null
+  const isEditMode = editingOpportunityId !== null
 
   const [form, setForm] = useState(getInitialForm)
   const [companies, setCompanies] = useState<AdminCompany[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [cities, setCities] = useState<City[]>([])
   const [loadingRefs, setLoadingRefs] = useState(true)
-  const [loadingVacancy, setLoadingVacancy] = useState(isEditMode)
+  const [loadingOpportunity, setLoadingOpportunity] = useState(isEditMode)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
   useEffect(() => {
     let active = true
-
     setLoadingRefs(true)
+
     Promise.all([fetchAdminCompanies({ page: 1, pageSize: 200 }), fetchAdminUsers({ page: 1, pageSize: 200 }), fetchCities()])
       .then(([companiesResponse, usersResponse, citiesResponse]) => {
         if (!active) return
-
         setCompanies(companiesResponse.items)
         setUsers(usersResponse.items)
         setCities(citiesResponse)
@@ -95,49 +93,49 @@ export function CuratorCreateVacancyPage() {
   useEffect(() => {
     let active = true
 
-    if (!isEditMode || !editingVacancyId) {
-      setLoadingVacancy(false)
+    if (!isEditMode || !editingOpportunityId) {
+      setLoadingOpportunity(false)
       setForm(getInitialForm())
       return () => {
         active = false
       }
     }
 
-    setLoadingVacancy(true)
-    fetchAdminVacancyById(editingVacancyId)
-      .then((vacancy) => {
+    setLoadingOpportunity(true)
+    fetchAdminOpportunityById(editingOpportunityId)
+      .then((opportunity) => {
         if (!active) return
         setForm({
-          companyId: String(vacancy.companyId),
-          createdByUserId: vacancy.createdByUserId > 0 ? String(vacancy.createdByUserId) : '',
-          title: vacancy.title,
-          shortDescription: vacancy.shortDescription,
-          fullDescription: vacancy.fullDescription,
-          kind: vacancy.kind,
-          format: vacancy.format,
-          status: vacancy.status,
-          cityId: vacancy.cityId ? String(vacancy.cityId) : '',
-          locationId: vacancy.locationId ? String(vacancy.locationId) : '',
-          salaryFrom: vacancy.salaryFrom != null ? String(vacancy.salaryFrom) : '',
-          salaryTo: vacancy.salaryTo != null ? String(vacancy.salaryTo) : '',
-          currencyCode: vacancy.currencyCode ?? 'RUB',
-          salaryTaxMode: vacancy.salaryTaxMode,
-          publishAt: vacancy.publishAt ? toLocalDateTimeInputValue(new Date(vacancy.publishAt)) : toLocalDateTimeInputValue(new Date()),
-          applicationDeadline: vacancy.applicationDeadline ? toLocalDateTimeInputValue(new Date(vacancy.applicationDeadline)) : '',
+          companyId: String(opportunity.companyId),
+          createdByUserId: opportunity.createdByUserId > 0 ? String(opportunity.createdByUserId) : '',
+          title: opportunity.title,
+          shortDescription: opportunity.shortDescription,
+          fullDescription: opportunity.fullDescription,
+          kind: opportunity.kind,
+          format: opportunity.format,
+          status: opportunity.status,
+          cityId: opportunity.cityId ? String(opportunity.cityId) : '',
+          locationId: opportunity.locationId ? String(opportunity.locationId) : '',
+          priceType: opportunity.priceType,
+          priceAmount: opportunity.priceAmount != null ? String(opportunity.priceAmount) : '',
+          priceCurrencyCode: opportunity.priceCurrencyCode ?? 'RUB',
+          participantsCanWrite: opportunity.participantsCanWrite,
+          publishAt: opportunity.publishAt ? toLocalDateTimeInputValue(new Date(opportunity.publishAt)) : toLocalDateTimeInputValue(new Date()),
+          eventDate: opportunity.eventDate ? toLocalDateTimeInputValue(new Date(opportunity.eventDate)) : '',
         })
       })
       .catch((loadError) => {
         if (!active) return
-        setError(loadError instanceof Error ? loadError.message : 'Не удалось загрузить вакансию для редактирования.')
+        setError(loadError instanceof Error ? loadError.message : 'Не удалось загрузить мероприятие для редактирования.')
       })
       .finally(() => {
-        if (active) setLoadingVacancy(false)
+        if (active) setLoadingOpportunity(false)
       })
 
     return () => {
       active = false
     }
-  }, [editingVacancyId, isEditMode])
+  }, [editingOpportunityId, isEditMode])
 
   function clearMessages() {
     setError('')
@@ -145,11 +143,17 @@ export function CuratorCreateVacancyPage() {
   }
 
   function onInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
-    const { name, value } = event.target
+    const { name, value, type } = event.target
+    const checked = (event.target as HTMLInputElement).checked
+
     setForm((state) => ({
       ...state,
       [name]:
-        name === 'kind' || name === 'format' || name === 'status' || name === 'salaryTaxMode' ? Number(value) : value,
+        name === 'kind' || name === 'format' || name === 'status' || name === 'priceType'
+          ? Number(value)
+          : type === 'checkbox'
+            ? checked
+            : value,
     }))
   }
 
@@ -166,11 +170,11 @@ export function CuratorCreateVacancyPage() {
     }
 
     if (!Number.isInteger(createdByUserId) || createdByUserId <= 0) {
-      setError('Выберите автора вакансии.')
+      setError('Выберите автора мероприятия.')
       return
     }
 
-    const payload: AdminVacancyUpsertRequest = {
+    const payload: AdminOpportunityUpsertRequest = {
       companyId,
       createdByUserId,
       title: form.title,
@@ -181,31 +185,31 @@ export function CuratorCreateVacancyPage() {
       status: form.status,
       cityId: parseOptionalNumber(form.cityId),
       locationId: parseOptionalNumber(form.locationId),
-      salaryFrom: parseOptionalNumber(form.salaryFrom),
-      salaryTo: parseOptionalNumber(form.salaryTo),
-      currencyCode: form.currencyCode.trim() || null,
-      salaryTaxMode: form.salaryTaxMode,
+      priceType: form.priceType,
+      priceAmount: form.priceType === 1 ? null : parseOptionalNumber(form.priceAmount),
+      priceCurrencyCode: form.priceType === 1 ? null : form.priceCurrencyCode.trim() || null,
+      participantsCanWrite: form.participantsCanWrite,
       publishAt: new Date(form.publishAt).toISOString(),
-      applicationDeadline: form.applicationDeadline ? new Date(form.applicationDeadline).toISOString() : null,
+      eventDate: form.eventDate ? new Date(form.eventDate).toISOString() : null,
     }
 
     setIsSaving(true)
     try {
-      if (editingVacancyId) {
-        await updateAdminVacancy(editingVacancyId, payload)
-        setSuccess('Вакансия успешно обновлена.')
+      if (editingOpportunityId) {
+        await updateAdminOpportunity(editingOpportunityId, payload)
+        setSuccess('Мероприятие успешно обновлено.')
       } else {
-        await createAdminVacancy(payload)
-        setSuccess('Вакансия успешно создана.')
+        await createAdminOpportunity(payload)
+        setSuccess('Мероприятие успешно создано.')
         setForm(getInitialForm())
       }
     } catch (submitError) {
       setError(
         submitError instanceof Error
           ? submitError.message
-          : editingVacancyId
-            ? 'Не удалось обновить вакансию.'
-            : 'Не удалось создать вакансию.',
+          : editingOpportunityId
+            ? 'Не удалось обновить мероприятие.'
+            : 'Не удалось создать мероприятие.',
       )
     } finally {
       setIsSaving(false)
@@ -219,17 +223,20 @@ export function CuratorCreateVacancyPage() {
       <main className="container seeker-profile-page">
         <section className="dashboard-section card seeker-profile-panel admin-form-card">
           <div className="seeker-profile-panel__head">
-            <h1>{isEditMode ? `Редактирование вакансии #${editingVacancyId}` : 'Создание вакансии'}</h1>
-            <Link className="btn btn--ghost" to="/dashboard/curator">
-              <ArrowLeft size={14} /> Назад в кабинет
+            <h1>{isEditMode ? `Редактирование мероприятия #${editingOpportunityId}` : 'Создание мероприятия'}</h1>
+            <Link className="btn btn--ghost" to="/dashboard/curator/moderation">
+              <ArrowLeft size={14} /> Назад в модерацию
             </Link>
           </div>
+
           <p className="status-line">
-            {isEditMode ? 'Редактирование вакансии из кабинета модерации.' : 'Отдельная страница создания вакансии со всеми справочниками.'}
+            {isEditMode
+              ? 'Редактирование мероприятия из кабинета модерации.'
+              : 'Отдельная страница создания мероприятия со всеми справочниками.'}
           </p>
 
           {loadingRefs ? <p>Загружаем справочники...</p> : null}
-          {loadingVacancy ? <p>Загружаем вакансию...</p> : null}
+          {loadingOpportunity ? <p>Загружаем мероприятие...</p> : null}
           {error ? <div className="auth-feedback auth-feedback--error">{error}</div> : null}
           {success ? <div className="auth-feedback">{success}</div> : null}
 
@@ -267,10 +274,12 @@ export function CuratorCreateVacancyPage() {
             </label>
 
             <label>
-              Тип
+              Вид мероприятия
               <select name="kind" value={form.kind} onChange={onInputChange}>
-                <option value={1}>Стажировка</option>
-                <option value={2}>Работа</option>
+                <option value={1}>Хакатон</option>
+                <option value={2}>День открытых дверей</option>
+                <option value={3}>Лекция</option>
+                <option value={4}>Другое</option>
               </select>
             </label>
             <label>
@@ -311,30 +320,30 @@ export function CuratorCreateVacancyPage() {
               <input name="locationId" value={form.locationId} onChange={onInputChange} />
             </label>
             <label>
-              Срок отклика (необязательно)
-              <input type="datetime-local" name="applicationDeadline" value={form.applicationDeadline} onChange={onInputChange} />
+              Дата события (необязательно)
+              <input type="datetime-local" name="eventDate" value={form.eventDate} onChange={onInputChange} />
             </label>
 
             <label>
-              Зарплата от (необязательно)
-              <input type="number" name="salaryFrom" value={form.salaryFrom} onChange={onInputChange} />
+              Тип цены
+              <select name="priceType" value={form.priceType} onChange={onInputChange}>
+                <option value={1}>Бесплатно</option>
+                <option value={2}>Платно</option>
+                <option value={3}>Приз</option>
+              </select>
             </label>
             <label>
-              Зарплата до (необязательно)
-              <input type="number" name="salaryTo" value={form.salaryTo} onChange={onInputChange} />
+              Сумма (для платного/призового)
+              <input type="number" name="priceAmount" value={form.priceAmount} onChange={onInputChange} />
             </label>
 
             <label>
               Валюта
-              <input name="currencyCode" value={form.currencyCode} onChange={onInputChange} />
+              <input name="priceCurrencyCode" value={form.priceCurrencyCode} onChange={onInputChange} />
             </label>
-            <label>
-              Налоговый режим
-              <select name="salaryTaxMode" value={form.salaryTaxMode} onChange={onInputChange}>
-                <option value={1}>До налогов</option>
-                <option value={2}>После налогов</option>
-                <option value={3}>Не указано</option>
-              </select>
+            <label className="employer-checkbox">
+              <input type="checkbox" name="participantsCanWrite" checked={form.participantsCanWrite} onChange={onInputChange} />
+              Участники могут писать в чат
             </label>
 
             <label className="full-width">
@@ -347,8 +356,9 @@ export function CuratorCreateVacancyPage() {
             </label>
 
             <div className="favorite-card__actions full-width">
-              <button type="submit" className="btn btn--primary" disabled={isSaving || loadingRefs || loadingVacancy}>
-                <BriefcaseBusiness size={14} /> {isSaving ? (isEditMode ? 'Сохраняем...' : 'Создаем...') : isEditMode ? 'Сохранить вакансию' : 'Создать вакансию'}
+              <button type="submit" className="btn btn--primary" disabled={isSaving || loadingRefs || loadingOpportunity}>
+                <CalendarDays size={14} />{' '}
+                {isSaving ? (isEditMode ? 'Сохраняем...' : 'Создаем...') : isEditMode ? 'Сохранить мероприятие' : 'Создать мероприятие'}
               </button>
             </div>
           </form>
@@ -358,4 +368,3 @@ export function CuratorCreateVacancyPage() {
     </div>
   )
 }
-

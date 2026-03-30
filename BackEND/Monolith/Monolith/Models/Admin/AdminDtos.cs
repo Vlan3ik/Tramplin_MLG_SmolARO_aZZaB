@@ -119,6 +119,25 @@ public record AdminOpportunityListItemDto(
     WorkFormat Format,
     DateTimeOffset PublishAt);
 
+public record AdminOpportunityDetailDto(
+    long Id,
+    long CompanyId,
+    long CreatedByUserId,
+    string Title,
+    string ShortDescription,
+    string FullDescription,
+    OpportunityKind Kind,
+    WorkFormat Format,
+    OpportunityStatus Status,
+    long? CityId,
+    long? LocationId,
+    PriceType PriceType,
+    decimal? PriceAmount,
+    string? PriceCurrencyCode,
+    bool ParticipantsCanWrite,
+    DateTimeOffset PublishAt,
+    DateTimeOffset? EventDate);
+
 public record AdminOpportunityUpsertRequest(
     long CompanyId,
     long CreatedByUserId,
@@ -147,6 +166,25 @@ public record AdminVacancyListItemDto(
     VacancyKind Kind,
     WorkFormat Format,
     DateTimeOffset PublishAt);
+
+public record AdminVacancyDetailDto(
+    long Id,
+    long CompanyId,
+    long CreatedByUserId,
+    string Title,
+    string ShortDescription,
+    string FullDescription,
+    VacancyKind Kind,
+    WorkFormat Format,
+    OpportunityStatus Status,
+    long? CityId,
+    long? LocationId,
+    decimal? SalaryFrom,
+    decimal? SalaryTo,
+    string? CurrencyCode,
+    SalaryTaxMode SalaryTaxMode,
+    DateTimeOffset PublishAt,
+    DateTimeOffset? ApplicationDeadline);
 
 public record AdminVacancyUpsertRequest(
     long CompanyId,
