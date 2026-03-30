@@ -1381,7 +1381,7 @@ export function EmployerDashboardPage() {
     setSavingProfile(true)
 
     try {
-      await updateEmployerCompanyVerification(profileForm)
+      await updateEmployerCompanyVerification(profileForm as unknown as Parameters<typeof updateEmployerCompanyVerification>[0])
       setSuccess('Профиль компании обновлен.')
       await loadDashboard()
     } catch (saveError) {
