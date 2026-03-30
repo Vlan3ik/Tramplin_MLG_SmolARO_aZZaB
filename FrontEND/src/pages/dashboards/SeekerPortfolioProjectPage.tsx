@@ -21,6 +21,7 @@ import { TopServiceBar } from '../../components/layout/TopServiceBar'
 import { DateInput } from '../../components/forms/DateInput'
 import { API_ORIGIN } from '../../config/api'
 import { useAuth } from '../../hooks/useAuth'
+import { PlatformRole } from '../../types/auth'
 import type { PortfolioProjectMutationRequest } from '../../api/portfolio'
 import type {
   PublicPortfolioProjectCard,
@@ -108,6 +109,7 @@ export function SeekerPortfolioProjectPage() {
 
   const navigate = useNavigate()
   const { session } = useAuth()
+  const isEmployerSession = session?.platformRole === PlatformRole.Employer
 
   const normalizedSessionUsername = session?.user?.username?.trim().toLowerCase() ?? ''
   const normalizedRouteUsername = username.toLowerCase()
@@ -640,15 +642,20 @@ export function SeekerPortfolioProjectPage() {
                   </div>
 
                   <div className="seeker-project-sidebar__cta">
-                    <Link className="btn btn--ghost" to="/vacancy-flow">
-                      Предложить вакансию
-                    </Link>
-                    <Link className="btn btn--ghost" to="/vacancy-flow">
-                      Предложить мероприятие
-                    </Link>
-                    <Link className="btn btn--primary" to={authorProfileHref}>
-                      Связаться
-                    </Link>
+                    {isEmployerSession ? (
+                      <>
+                        <Link className="btn btn--ghost" to="/vacancy-flow">
+                          Предложить вакансию
+                        </Link>
+                        <Link className="btn btn--ghost" to="/vacancy-flow">
+                          Предложить мероприятие
+                        </Link>
+                      </>
+                    ) : (
+                      <Link className="btn btn--primary" to={authorProfileHref}>
+                        Связаться
+                      </Link>
+                    )}
                   </div>
 
                   <h3 className="seeker-project-sidebar__team-title">Совместно с</h3>
