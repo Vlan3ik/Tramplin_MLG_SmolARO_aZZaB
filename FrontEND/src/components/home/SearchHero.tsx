@@ -1,7 +1,10 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { List, Search, SlidersHorizontal } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { fetchSearchSuggestions } from '../../api/search'
+import { fetchCompanies } from '../../api/companies'
 import type { SearchSuggestItem } from '../../types/search'
+import type { Company } from '../../types/company'
 
 type SearchHeroProps = {
   searchValue: string
@@ -13,14 +16,9 @@ type SearchHeroProps = {
   onFiltersClick: () => void
 }
 
-const HERO_IFRAME_URL =
-    'https://f1522a5f98994b28bc6f9e7fab68bc03.elf.site'
-    // 'https://luxespa-smolensk.ru/'
-      // 'https://g.igroutka.ru/games/1652/1u2NbYJlreRAtwo7/3fdb3fff-ce9a-467e-aa21-a2f103202af3/index.html'
-  // 'https://igroutka.ru/loader/game/54272/'
-
 const SUGGEST_MIN_QUERY_LENGTH = 2
 const SUGGEST_DEBOUNCE_MS = 250
+const fallbackImage = 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=780&q=80'
 
 function formatSuggestMeta(item: SearchSuggestItem) {
   return [item.companyName, item.locationName].filter(Boolean).join(' - ')
@@ -39,10 +37,16 @@ export function SearchHero({
   const [isSuggestLoading, setIsSuggestLoading] = useState(false)
   const [suggestions, setSuggestions] = useState<SearchSuggestItem[]>([])
   const [suggestError, setSuggestError] = useState('')
+  const [topCompanies, setTopCompanies] = useState<Company[]>([])
+  const [isCompaniesLoading, setIsCompaniesLoading] = useState(true)
+  const [activeCompanyId, setActiveCompanyId] = useState<number | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
-  const iframeRef = useRef<HTMLIFrameElement | null>(null)
 
   const shouldLoadSuggest = useMemo(() => searchValue.trim().length >= SUGGEST_MIN_QUERY_LENGTH, [searchValue])
+  const activeCompany = useMemo(
+    () => topCompanies.find((company) => company.id === activeCompanyId) ?? topCompanies[0] ?? null,
+    [activeCompanyId, topCompanies],
+  )
 
   useEffect(() => {
     if (!isSuggestOpen) {
@@ -112,46 +116,38 @@ export function SearchHero({
     }
   }, [searchValue, shouldLoadSuggest])
 
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadTopCompanies() {
+      setIsCompaniesLoading(true)
+      try {
+        const response = await fetchCompanies({ page: 1, pageSize: 12, verifiedOnly: true }, controller.signal)
+        const sorted = [...response.items].sort((left, right) => right.activeOpportunitiesCount - left.activeOpportunitiesCount)
+        const shortlisted = sorted.slice(0, 6)
+        setTopCompanies(shortlisted)
+        setActiveCompanyId(shortlisted[0]?.id ?? null)
+      } catch {
+        if (!controller.signal.aborted) {
+          setTopCompanies([])
+          setActiveCompanyId(null)
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsCompaniesLoading(false)
+        }
+      }
+    }
+
+    void loadTopCompanies()
+    return () => controller.abort()
+  }, [])
+
   function handleSuggestSelect(item: SearchSuggestItem) {
     onSearchChange(item.title)
     onSuggestionSelect(item)
     setIsSuggestOpen(false)
     onSearchSubmit(item.title)
-  }
-
-  function removeIframeBranding() {
-    const frame = iframeRef.current
-
-    if (!frame) {
-      return
-    }
-
-    const tryRemoveBranding = () => {
-      try {
-        const frameDocument = frame.contentDocument ?? frame.contentWindow?.document
-        const branding = frameDocument?.getElementById('more_g')
-
-        if (branding) {
-          branding.remove()
-        }
-      } catch {
-        // Cross-origin iframe can block DOM access; keep silent.
-      }
-    }
-
-    let attemptsLeft = 12
-    const timer = window.setInterval(() => {
-      attemptsLeft -= 1
-      tryRemoveBranding()
-
-      if (attemptsLeft <= 0) {
-        window.clearInterval(timer)
-      }
-    }, 300)
-
-    window.setTimeout(() => {
-      tryRemoveBranding()
-    }, 5000)
   }
 
   return (
@@ -225,15 +221,57 @@ export function SearchHero({
         </div>
       </div>
 
-      <div className="search-hero__iframe" aria-label="Интерактивный виджет карты">
-        <iframe
-          ref={iframeRef}
-          src={HERO_IFRAME_URL}
-          title="Карта карьерных возможностей"
-          loading="lazy"
-          referrerPolicy="strict-origin-when-cross-origin"
-          onLoad={removeIframeBranding}
-        />
+      <div className="search-hero__iframe" aria-label="Лучшие работодатели">
+        <div className="hero-employers">
+          <div className="hero-employers__header">
+            <strong>Лучшие работодатели</strong>
+            <span>Проверенные компании с активными вакансиями</span>
+          </div>
+
+          {isCompaniesLoading ? <div className="hero-employers__state">Загружаем компании...</div> : null}
+
+          {!isCompaniesLoading && topCompanies.length === 0 ? (
+            <div className="hero-employers__state">Пока нет данных. Откройте общий список компаний.</div>
+          ) : null}
+
+          {!isCompaniesLoading && topCompanies.length > 0 && activeCompany ? (
+            <>
+              <div className="hero-employers__list" role="tablist" aria-label="Список работодателей">
+                {topCompanies.map((company) => {
+                  const isActive = company.id === activeCompany.id
+                  return (
+                    <button
+                      key={company.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      className={`hero-employers__item${isActive ? ' is-active' : ''}`}
+                      onMouseEnter={() => setActiveCompanyId(company.id)}
+                      onFocus={() => setActiveCompanyId(company.id)}
+                      onClick={() => setActiveCompanyId(company.id)}
+                    >
+                      <span>{company.name ?? 'Компания'}</span>
+                      <small>{company.activeOpportunitiesCount} активных</small>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="hero-employers__spotlight">
+                <img src={activeCompany.logoUrl || fallbackImage} alt={activeCompany.name ?? 'Компания'} loading="lazy" />
+                <div className="hero-employers__meta">
+                  <h3>{activeCompany.name ?? 'Компания'}</h3>
+                  <p>{activeCompany.industry ?? 'Направление не указано'}</p>
+                  <p>{activeCompany.cityName ?? 'Все регионы'}</p>
+                </div>
+              </div>
+
+              <Link className="hero-employers__link" to={activeCompany.id > 0 ? `/company/${activeCompany.id}` : '/companies'}>
+                Подробнее
+              </Link>
+            </>
+          ) : null}
+        </div>
       </div>
     </section>
   )
